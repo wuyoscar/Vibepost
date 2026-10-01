@@ -1,4 +1,4 @@
-// 生成 DMG 窗口的背景图（scripts/make-dmg.sh 用）：品牌橘红底，顶上是标志与字标（照 brand/wordmark.svg 画，反白），
+// 生成 DMG 窗口的背景图（scripts/make-dmg.sh 用）：品牌橘红底，顶上是简化的标志与字标（反白），
 // 中间一支从 App 指向「Applications」的箭头，底下一行说明。输出一张同时带 1x 与 2x 的 TIFF，视网膜屏上 Finder 自动用 2x。
 // 画布 640×440 点：窗口内容区 640×400，多出的 40 点垫在底下，标题栏高矮不同的系统上也不露白边。
 // 图标中心（App 在 170,205，「Applications」在 470,205）与 make-dmg.sh 里的 Finder 布局一致。
@@ -17,7 +17,7 @@ let canvas = NSSize(width: 640, height: 440)
 let base = NSColor(srgbRed: 0xd9 / 255, green: 0x3c / 255, blue: 0x17 / 255, alpha: 1)
 let brand = NSColor(srgbRed: 0xfc / 255, green: 0x4d / 255, blue: 0x1f / 255, alpha: 1)
 
-/// 标志：白色圆角方块上三道品牌色的波纹（brand/wordmark.svg 的方块反白，坐标照它：方块 48 点见方、圆角 11），
+/// 标志：白色圆角方块上三道品牌色的波纹（App 图标 brand/icon.png 的简化版：方块 48 点见方、圆角 11），
 /// 左上角放在 origin。
 func drawMark(at origin: NSPoint) {
     NSGraphicsContext.saveGraphicsState()
@@ -59,7 +59,7 @@ func draw() {
     NSGradient(colors: [.white.withAlphaComponent(0.18), .white.withAlphaComponent(0)])!
         .draw(fromCenter: NSPoint(x: 320, y: 30), radius: 0, toCenter: NSPoint(x: 320, y: 30), radius: 320, options: [])
 
-    // 标志 + 字标，整组水平居中（字标 post 淡一点，和 brand/wordmark.svg 里换色的那半一样）
+    // 标志 + 字标，整组水平居中（字标 post 淡一点）
     let word = NSMutableAttributedString(attributedString: text("Vibe", size: 30, weight: .semibold))
     word.append(text("post", size: 30, weight: .semibold, alpha: 0.78))
     let markWidth: CGFloat = 48

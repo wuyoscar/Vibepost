@@ -1,6 +1,8 @@
 <p align="center">
-  <img src="brand/wordmark.svg" alt="Vibepost" width="248" />
+  <img src="brand/app-icon-256.png" alt="Vibepost 图标" width="128" />
 </p>
+
+<h1 align="center">Vibepost</h1>
 
 <p align="center">在 Mac 上用 Markdown 写小红书：排成 3:4 图文卡片、长文长图和实况照片，按页序隔空投送到 iPhone。</p>
 
