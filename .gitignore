@@ -1,0 +1,17 @@
+# 依赖与构建产物
+node_modules/
+macos/.build/
+build/
+dist/
+
+# 打包字体：scripts/fetch-fonts.py 下载生成，不进 git
+fonts/
+
+# 本机与编辑器的东西
+.DS_Store
+.claude/settings.local.json
+.claude/worktrees/
+.playwright-mcp/
+# 只在本机：票与调研笔记、Agent 技能的仓库设置
+.scratch/
+docs/agents/

@@ -1,0 +1,1215 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      内容安全策略：脚本只许本源（页面全是本地文件，没有内联脚本、eval）；样式允许内联（界面与出图大量用 style 属性）；
+      图片与音视频另许 data: / blob:（画布导出、候选缩略图、实况预览）；字体另许 data:；联网只许本源（原生桥 /__native/ 与字体清单）。
+      放宽任何一项前先想清楚为什么，测试（CSPTests）会报出页面里每一次违反。
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vibepost</title>
+    <meta name="description" content="用 Markdown 写稿，排成小红书图文卡片或长文长图，隔空投送到 iPhone 直接发布。" />
+    <link rel="stylesheet" href="src/styles.css" />
+    <link rel="stylesheet" href="src/media/media.css" />
+    <link rel="stylesheet" href="src/stage/blocks.css" />
+    <link rel="stylesheet" href="src/onboarding.css" />
+    <!-- 动效的共同部分：先于页面内容定下 <html data-motion>，别的脚本都能用 MediaCraftMotion -->
+    <script src="src/motion.js"></script>
+  </head>
+  <!--
+    界面骨架（v3）。带 id 的元素和少数类名（toolbar、pop-menu、pop-menu-panel、layout-mode-switch、
+    modal、hidden、font-picker-button、pages…）是旧脚本 src/app.js 的挂钩，模块重写后逐个换掉。
+    正文编辑器（src/editor/，CodeMirror 6）按 data-block / data-mark / data-insert / data-color-menu 等属性挂上格式条与浮动条。
+    data-guide-lock：打开内置说明书（只读）时，这些区域里的控件全部停用。
+  -->
+  <body>
+    <svg class="icon-sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-sidebar" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="3" /><path d="M9 4.5v15" /></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6" /><path d="M20 20l-4.5-4.5" /></symbol>
+      <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" /></symbol>
+      <symbol id="i-chevron-up" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6" /></symbol>
+      <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6" /></symbol>
+      <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5" /><path d="M11 18.5h2" /></symbol>
+      <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9z" /><path d="M18.5 16.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" /></symbol>
+      <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 18V6M7 11l5-5 5 5" /></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4.5v10M7.5 10.5l4.5 4.5 4.5-4.5M5 19.5h14" /></symbol>
+      <symbol id="i-list" viewBox="0 0 24 24"><path d="M9.5 6.5h10M9.5 12h10M9.5 17.5h10" /><path d="M5 6.5h.01M5 12h.01M5 17.5h.01" stroke-width="2.6" /></symbol>
+      <symbol id="i-list-ordered" viewBox="0 0 24 24"><path d="M10.5 6.5h9.5M10.5 12h9.5M10.5 17.5h9.5" /><path d="M4.5 5.2l1.4-.9v4.4M4 13.7c.2-.8 2.4-.9 2.4.4 0 1.2-2.4 1.6-2.4 3.1h2.6" stroke-width="1.4" /></symbol>
+      <symbol id="i-quote" viewBox="0 0 24 24"><path d="M6 7h4.5v4.5c0 3-1.8 5-4.5 5.5M13.5 7H18v4.5c0 3-1.8 5-4.5 5.5" /></symbol>
+      <symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2.5" /><circle cx="9" cy="10" r="1.6" /><path d="M20.5 15.5l-5-4.5-8.5 8" /></symbol>
+      <symbol id="i-live" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="9" stroke-dasharray="1.2 2.4" /></symbol>
+      <symbol id="i-divider" viewBox="0 0 24 24"><path d="M4 12h16" /><path d="M8 7.5h8M8 16.5h8" opacity=".4" /></symbol>
+      <symbol id="i-page-break" viewBox="0 0 24 24"><path d="M6 3.5v4h12v-4M6 20.5v-4h12v4" /><path d="M3.5 12h2.5M9 12h2.5M14.5 12H17M20 12h.5" /></symbol>
+      <symbol id="i-end-page" viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="17" rx="2" /><path d="M9.5 10.5h5M10.5 13.5h3" /><circle cx="12" cy="17" r=".8" /></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></symbol>
+      <symbol id="i-code" viewBox="0 0 24 24"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5" /></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2.2" /><path d="M15.5 8.5V6.2c0-.9-.8-1.7-1.7-1.7H6.2c-.9 0-1.7.8-1.7 1.7v7.6c0 .9.8 1.7 1.7 1.7h2.3" /></symbol>
+      <symbol id="i-crop" viewBox="0 0 24 24"><path d="M7 3.5V17h13.5" /><path d="M3.5 7H17v13.5" /></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" /></symbol>
+      <symbol id="i-swap" viewBox="0 0 24 24"><path d="M5 8.5h13M15 5l3.5 3.5L15 12" /><path d="M19 15.5H6M9 12l-3.5 3.5L9 19" /></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M5.5 12.5l4.2 4.2 8.8-9.4" /></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.8v5M12 16.2v.01" /></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V5.2c0-.4.3-.7.7-.7h3.6c.4 0 .7.3.7.7V7M6.5 7l.9 11.6c.1.8.7 1.4 1.5 1.4h6.2c.8 0 1.4-.6 1.5-1.4L17.5 7" /><path d="M10.2 11v5.5M13.8 11v5.5" /></symbol>
+      <symbol id="i-align-left" viewBox="0 0 24 24"><path d="M4.5 4v16" /><rect x="7.5" y="8" width="9" height="8" rx="1.5" /></symbol>
+      <symbol id="i-align-center" viewBox="0 0 24 24"><path d="M12 3.5v3M12 17.5v3" /><rect x="6.5" y="8" width="11" height="8" rx="1.5" /></symbol>
+      <symbol id="i-align-right" viewBox="0 0 24 24"><path d="M19.5 4v16" /><rect x="7.5" y="8" width="9" height="8" rx="1.5" /></symbol>
+      <symbol id="i-zoom-out" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" /></symbol>
+      <symbol id="i-zoom-in" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="3" /></symbol>
+      <symbol id="i-reset" viewBox="0 0 24 24"><path d="M5 12a7 7 0 1 0 2.1-5" /><path d="M5 4.5V9h4.5" /></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M10 7V5h4v2" /><path d="M6.5 7l1 12.5h9l1-12.5" /><path d="M10.5 11v5M13.5 11v5" /></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7.5h8.5M17.5 7.5H20M4 16.5h2.5M11.5 16.5H20" /><circle cx="15" cy="7.5" r="2.5" /><circle cx="9" cy="16.5" r="2.5" /></symbol>
+      <symbol id="i-stop" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" /></symbol>
+      <symbol id="i-history" viewBox="0 0 24 24"><path d="M4.6 12a7.4 7.4 0 1 0 2.2-5.2" /><path d="M4.5 4.8v3.7h3.7" /><path d="M12 8.2v4l2.7 1.7" /></symbol>
+      <symbol id="i-more" viewBox="0 0 24 24"><path d="M6 12h.01M12 12h.01M18 12h.01" stroke-width="2.6" /></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2.2" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" /></symbol>
+      <symbol id="i-window" viewBox="0 0 24 24"><rect x="3.5" y="8" width="13" height="12" rx="2" /><path d="M8 8V6.5a2 2 0 0 1 2-2h8.5a2 2 0 0 1 2 2V15a2 2 0 0 1-2 2h-2" /></symbol>
+      <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5" /><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" /></symbol>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" /></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z" /></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.8v12.4c0 .6.7 1 1.2.6l9.3-6.2c.4-.3.4-.9 0-1.2L9.2 5.2c-.5-.4-1.2 0-1.2.6z" /></symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 6v12M15 6v12" /></symbol>
+      <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3z" /><path d="M15.5 9.2a4 4 0 0 1 0 5.6M18.2 6.8a7.5 7.5 0 0 1 0 10.4" /></symbol>
+      <symbol id="i-sound-off" viewBox="0 0 24 24"><path d="M4.5 9.5h3l4.5-4v13l-4.5-4h-3z" /><path d="M16 9.5l5 5M21 9.5l-5 5" /></symbol>
+      <symbol id="i-comment" viewBox="0 0 24 24"><path d="M5 18.5V6.5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9z" /></symbol>
+      <symbol id="i-palette" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="7" height="7" rx="2" /><rect x="13.5" y="4.5" width="7" height="7" rx="2" /><rect x="3.5" y="13.5" width="7" height="7" rx="2" /><rect x="13.5" y="13.5" width="7" height="7" rx="2" /></symbol>
+      <symbol id="i-wheel" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M12 3.5V12l7.4 4.25M12 12l-7.4 4.25" /></symbol>
+    </svg>
+
+    <h1 class="visually-hidden">Vibepost</h1>
+
+    <div class="app">
+      <header class="titlebar" data-window-drag>
+        <div class="titlebar-leading">
+          <button id="draftsToggleBtn" class="icon-button" type="button" aria-label="稿件列表" aria-expanded="false" aria-controls="draftsDrawer" title="稿件列表">
+            <svg class="icon" aria-hidden="true"><use href="#i-sidebar" /></svg>
+          </button>
+          <div class="draft-heading">
+            <span id="draftHeading" class="draft-heading-title">Vibepost</span>
+            <span id="statusText" class="draft-heading-status" role="status"></span>
+          </div>
+        </div>
+
+        <div id="layoutModeSwitch" class="segmented layout-mode-switch" role="group" aria-label="排版模式">
+          <button type="button" data-layout-mode="cards" aria-pressed="true">图文卡片</button>
+          <button type="button" data-layout-mode="article" aria-pressed="false">长文</button>
+        </div>
+
+        <div class="titlebar-trailing">
+          <button id="themeButton" class="pill-button theme-button" type="button" aria-label="主题：白" aria-controls="stylePanel" title="换主题">
+            <span class="theme-dot" aria-hidden="true"></span>
+            <span id="themeButtonName">白</span>
+            <svg class="icon icon-small" aria-hidden="true"><use href="#i-chevron-down" /></svg>
+          </button>
+          <button id="phoneButton" class="pill-button" type="button" aria-pressed="false" aria-controls="phonePreview" title="看看发出去在手机上的样子">
+            <svg class="icon" aria-hidden="true"><use href="#i-phone" /></svg>
+            <span>手机预览</span>
+          </button>
+          <!-- 有外部 Agent（MCP）连着时才出现；点开 AI 助手里「外部 Agent 的操作」（src/mcp/panel.js） -->
+          <button id="mcpIndicator" class="pill-button mcp-indicator" type="button" aria-controls="aiPanel" hidden>
+            <span class="status-dot" data-state="busy" aria-hidden="true"></span>
+            <span id="mcpIndicatorText">外部 Agent</span>
+          </button>
+          <button id="aiButton" class="pill-button" type="button" aria-pressed="false" aria-controls="aiPanel" title="AI 助手">
+            <svg class="icon" aria-hidden="true"><use href="#i-sparkle" /></svg>
+            <span>AI</span>
+          </button>
+          <div id="exportActions" class="export-actions">
+            <button id="outputZipBtn" class="pill-button" type="button" data-output="zip" title="全部卡片打包成 ZIP，存进「下载」">
+              <svg class="icon" aria-hidden="true"><use href="#i-download" /></svg>
+              <span>批量下载</span>
+            </button>
+            <button id="outputWechatBtn" class="pill-button" type="button" data-output="wechat" title="带格式复制，可直接粘贴进公众号编辑器" hidden>
+              <svg class="icon" aria-hidden="true"><use href="#i-copy" /></svg>
+              <span>复制公众号格式</span>
+            </button>
+            <button id="outputLongImageBtn" class="pill-button" type="button" data-output="long-image" title="整篇存成一张长图" hidden>
+              <svg class="icon" aria-hidden="true"><use href="#i-download" /></svg>
+              <span>下载长图</span>
+            </button>
+            <button id="sendToIPhoneBtn" class="primary-button" type="button" data-output="send" title="按页序隔空投送到 iPhone，正文放进剪贴板" hidden>
+              <svg class="icon" aria-hidden="true"><use href="#i-send" /></svg>
+              <span>发送到 iPhone</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <aside id="draftsDrawer" class="drawer" aria-label="稿件">
+          <div class="drawer-head">
+            <h2 class="section-label">稿件</h2>
+            <button id="newDraftBtn" class="icon-button" type="button" aria-label="新建稿件" title="新建稿件">
+              <svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg>
+            </button>
+          </div>
+          <label class="search-field">
+            <svg class="icon icon-small" aria-hidden="true"><use href="#i-search" /></svg>
+            <input id="draftSearch" type="search" placeholder="搜索稿件" aria-label="搜索稿件" autocomplete="off" />
+          </label>
+          <div class="segmented segmented-small" role="group" aria-label="稿件类型">
+            <button type="button" data-draft-filter="all" aria-pressed="true">全部</button>
+            <button type="button" data-draft-filter="cards" aria-pressed="false">图文</button>
+            <button type="button" data-draft-filter="article" aria-pressed="false">长文</button>
+          </div>
+          <div id="draftList" class="draft-list" role="list"></div>
+          <p id="draftSearchEmpty" class="drawer-note" hidden>没有找到这篇稿件</p>
+          <p class="drawer-note">稿件只存在这台 Mac 上，改动自动保存。</p>
+        </aside>
+
+        <section class="editor-pane" aria-label="编辑器">
+          <div class="format-bar toolbar" role="toolbar" aria-label="文字样式" data-guide-lock>
+            <button type="button" class="format-button" data-mark="bold" aria-label="加粗" aria-keyshortcuts="Meta+B" title="加粗 ⌘B"><b>B</b></button>
+            <button type="button" class="format-button format-italic" data-mark="italic" aria-label="斜体" aria-keyshortcuts="Meta+I" title="斜体 ⌘I"><i>I</i></button>
+            <button type="button" class="format-button" data-mark="underline" aria-label="下划线" aria-keyshortcuts="Meta+U" title="下划线 ⌘U"><u>U</u></button>
+            <button type="button" class="format-button" data-mark="strike" aria-label="删除线" aria-keyshortcuts="Meta+Shift+X" title="删除线 ⇧⌘X"><s>S</s></button>
+            <span class="bar-separator" aria-hidden="true"></span>
+            <details class="pop-menu">
+              <summary class="menu-button" aria-label="插入" title="插入（也可以在行首输入 /）">
+                <svg class="icon icon-small" aria-hidden="true"><use href="#i-plus" /></svg>
+                <span>插入</span>
+              </summary>
+              <div class="pop-menu-panel menu">
+                <label class="menu-item">
+                  <span class="menu-glyph" aria-hidden="true"><svg class="icon icon-small"><use href="#i-image" /></svg></span>图片或 PDF
+                  <input id="imageFileInput" class="visually-hidden" type="file" accept="image/*,application/pdf,.pdf" multiple />
+                </label>
+                <label class="menu-item">
+                  <span class="menu-glyph" aria-hidden="true"><svg class="icon icon-small"><use href="#i-live" /></svg></span>实况视频
+                  <input id="videoFileInput" class="visually-hidden" type="file" accept="video/mp4,video/quicktime,.mp4,.m4v,.mov" multiple />
+                </label>
+                <button type="button" class="menu-item" data-insert="divider" aria-label="分割线">
+                  <span class="menu-glyph" aria-hidden="true"><svg class="icon icon-small"><use href="#i-divider" /></svg></span>分割线
+                </button>
+                <button type="button" class="menu-item" data-insert="pageBreak" aria-label="分页" aria-keyshortcuts="Meta+Enter" title="后面的内容从下一张卡片开始">
+                  <span class="menu-glyph" aria-hidden="true"><svg class="icon icon-small"><use href="#i-page-break" /></svg></span>分页<kbd>⌘↩</kbd>
+                </button>
+                <button type="button" class="menu-item" data-insert="endPage" aria-label="结尾页" title="后面的内容排成结尾页：居中、留白，最后是署名">
+                  <span class="menu-glyph" aria-hidden="true"><svg class="icon icon-small"><use href="#i-end-page" /></svg></span>结尾页
+                </button>
+                <button type="button" class="menu-item" data-insert="code" aria-label="代码块">
+                  <span class="menu-glyph" aria-hidden="true"><svg class="icon icon-small"><use href="#i-code" /></svg></span>代码块
+                </button>
+              </div>
+            </details>
+            <button type="button" class="source-toggle" data-source-toggle aria-label="源码" aria-pressed="false" aria-keyshortcuts="Meta+/" title="显示 Markdown 源码 ⌘/">&lt;/&gt; 源码</button>
+          </div>
+
+          <div class="title-field" data-guide-lock>
+            <input id="titleInput" type="text" autocomplete="off" aria-label="标题" />
+            <span id="titleCount" class="count" title="小红书标题最多 20 字：中文、全角符号、emoji 算 1 个字，英文、数字、半角符号算半个">0/20</span>
+          </div>
+
+          <!-- 小红书正文（src/drafts/caption.js）：发布时图片下面的那段，和卡片上的内容分开写；收起时显示第一行，只在图文卡片模式下有 -->
+          <details id="captionField" class="caption-field" data-guide-lock>
+            <summary class="caption-summary" aria-label="小红书正文">
+              <svg class="icon icon-small caption-chevron" aria-hidden="true"><use href="#i-chevron-right" /></svg>
+              <span class="caption-label">正文</span>
+              <span id="captionPreview" class="caption-preview"></span>
+              <span id="bodyCount" class="count" title="小红书正文最多 1000 字，空白不计">0/1000</span>
+            </summary>
+            <textarea id="captionInput" class="caption-input" rows="3" aria-label="图片下面的正文" placeholder="写发布时图片下面的正文，#话题 也写在这里" spellcheck="false"></textarea>
+          </details>
+
+          <section id="aiReview" class="ai-review" aria-labelledby="aiReviewCount" hidden>
+            <div class="ai-review-head">
+              <svg class="icon" aria-hidden="true"><use href="#i-sparkle" /></svg>
+              <p class="ai-review-summary">
+                <strong id="aiReviewCount">AI 改了 0 处</strong>
+                <span id="aiReviewNote"></span>
+              </p>
+              <button id="aiReviewRejectAll" class="pill-button" type="button">全部拒绝</button>
+              <button id="aiReviewAcceptAll" class="primary-button" type="button">全部接受</button>
+            </div>
+            <div id="aiReviewTitle" class="ai-review-title" role="group" aria-label="标题的修改" hidden>
+              <span class="ai-review-label">标题</span>
+              <span class="ai-review-change"><del id="aiReviewTitleBefore"></del><ins id="aiReviewTitleAfter"></ins></span>
+              <button class="review-choice is-rejected" type="button" data-review-decision="rejected" aria-pressed="false">拒绝</button>
+              <button class="review-choice is-accepted" type="button" data-review-decision="accepted" aria-pressed="false">接受</button>
+            </div>
+            <div id="aiReviewCaption" class="ai-review-title ai-review-caption" role="group" aria-label="正文的修改" hidden>
+              <span class="ai-review-label">正文</span>
+              <span id="aiReviewCaptionChange" class="ai-review-change"></span>
+              <button class="review-choice is-rejected" type="button" data-review-decision="rejected" aria-pressed="false">拒绝</button>
+              <button class="review-choice is-accepted" type="button" data-review-decision="accepted" aria-pressed="false">接受</button>
+            </div>
+          </section>
+
+          <!-- 查找栏（src/editor/find.js）：⌘F 打开，⌥⌘F 连替换一起打开；按 Markdown 原文找，不分大小写 -->
+          <div id="findBar" class="find-bar" role="search" aria-label="查找替换" hidden>
+            <div class="find-row">
+              <button class="icon-button find-disclosure" type="button" data-find-toggle-replace aria-expanded="false" aria-controls="findReplaceRow" aria-label="展开替换" title="替换 ⌥⌘F">
+                <svg class="icon icon-small" aria-hidden="true"><use href="#i-chevron-right" /></svg>
+              </button>
+              <label class="find-field">
+                <svg class="icon icon-small" aria-hidden="true"><use href="#i-search" /></svg>
+                <input id="findInput" type="text" data-find-query aria-label="查找" placeholder="查找" autocomplete="off" spellcheck="false" />
+                <span class="find-count" data-find-count aria-live="polite"></span>
+              </label>
+              <button class="icon-button" type="button" data-find-step="previous" aria-label="上一个" title="上一个 ⇧⌘G">
+                <svg class="icon icon-small" aria-hidden="true"><use href="#i-chevron-up" /></svg>
+              </button>
+              <button class="icon-button" type="button" data-find-step="next" aria-label="下一个" title="下一个 ⌘G">
+                <svg class="icon icon-small" aria-hidden="true"><use href="#i-chevron-down" /></svg>
+              </button>
+              <button class="text-button find-done" type="button" data-find-close title="收起（Esc）">完成</button>
+            </div>
+            <div id="findReplaceRow" class="find-row" data-find-replace-row hidden>
+              <label class="find-field find-field-replace">
+                <input id="replaceInput" type="text" data-find-replacement aria-label="替换成" placeholder="替换成" autocomplete="off" spellcheck="false" />
+              </label>
+              <button class="pill-button" type="button" data-find-replace-one>替换</button>
+              <button class="pill-button" type="button" data-find-replace-all>全部替换</button>
+            </div>
+          </div>
+
+          <div id="markdownEditor" class="editor-body"></div>
+
+          <footer class="editor-footer">
+            <p class="editor-counts">
+              <span id="pageCount">0 张图片</span>
+              <button id="publishCheckBtn" class="check-badge" type="button" aria-expanded="false" aria-controls="publishCheck" title="发布检查：极限词、引流词、话题数、图片数与 AI 声明" hidden>检查</button>
+            </p>
+            <div class="editor-tools" data-guide-lock>
+              <button id="findToggleBtn" class="text-button" type="button" aria-label="查找替换" aria-expanded="false" aria-controls="findBar" aria-keyshortcuts="Meta+F" title="查找替换 ⌘F">
+                <svg class="icon icon-small" aria-hidden="true"><use href="#i-search" /></svg>
+                <span>查找</span>
+              </button>
+              <button id="copyCardTextBtn" class="text-button" type="button" title="复制卡片上的文字（去掉图片与格式）">
+                <svg class="icon icon-small" aria-hidden="true"><use href="#i-copy" /></svg>
+                <span>复制卡片文字</span>
+              </button>
+            </div>
+          </footer>
+
+          <!-- 发布检查（src/publish/assistant.js）：页脚的「检查」打开；命中处在正文里画线，可以逐个跳过去、替换或忽略 -->
+          <section id="publishCheck" class="check-panel" role="dialog" aria-labelledby="publishCheckTitle" tabindex="-1" hidden>
+            <header class="check-head">
+              <h2 id="publishCheckTitle" class="check-title">发布检查</h2>
+              <span id="publishCheckSummary" class="check-summary"></span>
+              <button class="icon-button" type="button" data-check-close aria-label="收起发布检查" title="收起（Esc）">
+                <svg class="icon icon-small" aria-hidden="true"><use href="#i-close" /></svg>
+              </button>
+            </header>
+            <div id="publishCheckList" class="check-list"></div>
+            <footer class="check-foot">
+              <label class="check-option"><input id="publishCheckAuto" type="checkbox" checked />发送前自动检查</label>
+              <button id="publishCheckRestore" class="text-button" type="button" hidden></button>
+            </footer>
+          </section>
+
+          <div class="editor-divider" data-panel-resize="editor" role="separator" aria-orientation="vertical" tabindex="0" aria-label="编辑区宽度" title="拖动调整编辑区宽度；← → 微调，双击恢复"></div>
+        </section>
+
+        <section id="previewPanel" class="stage" aria-label="预览">
+          <div class="stage-nav">
+            <button id="prevPageBtn" class="round-button" type="button" aria-label="上一张" title="上一张">
+              <svg class="icon icon-small" aria-hidden="true"><use href="#i-chevron-left" /></svg>
+            </button>
+            <span id="stagePageLabel" class="stage-page-label" aria-live="polite">第 1 张 · 共 1 张</span>
+            <button id="nextPageBtn" class="round-button" type="button" aria-label="下一张" title="下一张">
+              <svg class="icon icon-small" aria-hidden="true"><use href="#i-chevron-right" /></svg>
+            </button>
+          </div>
+          <div id="stageScroller" class="stage-scroller">
+            <div id="stageCards" class="stage-cards"></div>
+          </div>
+          <p class="stage-spec">1728 × 2304 · 3:4 · PNG</p>
+          <div id="filmstrip" class="filmstrip" role="group" aria-label="全部卡片"></div>
+
+          <!-- 手机预览：iPhone 外框里的笔记、发现页、主页三种样子，不用任何平台的标识；顶栏「手机预览」开合。
+               焦点在手机预览里时 ⌘1 / ⌘2 / ⌘3 切换三种视图（编辑器里的 ⌘1–3 是标题级别，互不相干） -->
+          <div id="phonePreview" class="phone-stage" aria-label="手机预览" role="region" tabindex="-1" hidden>
+            <div class="phone-bar">
+              <div class="segmented phone-views" role="group" aria-label="手机预览的视图">
+                <button type="button" data-phone-view="note" aria-pressed="true" aria-keyshortcuts="Meta+1" title="⌘1">笔记</button>
+                <button type="button" data-phone-view="feed" aria-pressed="false" aria-keyshortcuts="Meta+2" title="⌘2">发现页</button>
+                <button type="button" data-phone-view="profile" aria-pressed="false" aria-keyshortcuts="Meta+3" title="⌘3">主页</button>
+              </div>
+              <p class="phone-hint">点卡片左右两侧或按 ← → 翻页</p>
+            </div>
+            <div class="phone-fit">
+              <div class="phone">
+                <div class="phone-view phone-note" data-phone-screen="note">
+                  <div class="phone-author">
+                    <span class="phone-glyph" aria-hidden="true"><svg class="icon"><use href="#i-chevron-left" /></svg></span>
+                    <canvas class="phone-avatar" width="128" height="128" aria-hidden="true"></canvas>
+                    <span class="phone-name"></span>
+                    <span class="phone-follow" aria-hidden="true">关注</span>
+                    <span class="phone-glyph" aria-hidden="true"><svg class="icon"><use href="#i-share" /></svg></span>
+                  </div>
+                  <div class="phone-carousel" role="group" aria-roledescription="轮播" aria-label="卡片" tabindex="0">
+                    <div class="phone-track"></div>
+                    <button class="phone-flip phone-flip-prev" type="button" aria-label="上一张"></button>
+                    <button class="phone-flip phone-flip-next" type="button" aria-label="下一张"></button>
+                    <span class="phone-counter" aria-live="polite"></span>
+                  </div>
+                  <div class="phone-dots" aria-hidden="true"></div>
+                  <article class="phone-post" aria-label="帖子">
+                    <p class="phone-title"></p>
+                    <p class="phone-body" role="button" tabindex="0" title="在「正文」栏里写"></p>
+                    <p class="phone-tags"></p>
+                    <p class="phone-date">刚刚</p>
+                  </article>
+                  <div class="phone-actions" aria-hidden="true">
+                    <span class="phone-comment-field">说点什么…</span>
+                    <svg class="icon"><use href="#i-heart" /></svg>
+                    <svg class="icon"><use href="#i-star" /></svg>
+                    <svg class="icon"><use href="#i-comment" /></svg>
+                  </div>
+                </div>
+                <!-- 发现页：双列瀑布流，这一篇混在最近几篇稿子中间 -->
+                <div class="phone-view phone-feed" data-phone-screen="feed" hidden>
+                  <p class="phone-feed-head" aria-hidden="true">发现</p>
+                  <div class="phone-feed-list" role="list" aria-label="发现页">
+                    <div class="phone-feed-column"></div>
+                    <div class="phone-feed-column"></div>
+                  </div>
+                </div>
+                <!-- 主页：资料头（数字只是占位）+ 三列网格，这一篇在第一格 -->
+                <div class="phone-view phone-profile" data-phone-screen="profile" hidden>
+                  <div class="phone-profile-head">
+                    <span class="phone-profile-avatar" aria-hidden="true"></span>
+                    <p class="phone-profile-name"></p>
+                    <p class="phone-profile-handle"></p>
+                    <p class="phone-profile-stats" aria-hidden="true">
+                      <span><b>—</b> 关注</span><span><b>—</b> 粉丝</span><span><b>—</b> 获赞</span>
+                    </p>
+                  </div>
+                  <p class="phone-profile-tabs" aria-hidden="true"><span class="is-current">笔记</span><span>收藏</span></p>
+                  <div class="phone-grid" role="list" aria-label="主页网格"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="inspector" aria-label="检查器">
+          <div class="inspector-head">
+            <div class="segmented segmented-tabs" role="tablist" aria-label="检查器">
+              <button id="styleTab" type="button" role="tab" aria-selected="true" aria-controls="stylePanel">样式</button>
+              <button id="aiTab" type="button" role="tab" aria-selected="false" aria-controls="aiPanel" tabindex="-1">AI 助手</button>
+            </div>
+          </div>
+
+          <div id="stylePanel" class="inspector-panel" role="tabpanel" aria-labelledby="styleTab" data-guide-lock>
+            <section class="inspector-section" aria-labelledby="themeLabel">
+              <h2 id="themeLabel" class="section-label">主题</h2>
+              <div id="themeOptions" class="theme-grid" role="group" aria-label="主题"></div>
+            </section>
+
+            <section class="inspector-section" aria-labelledby="fontLabel">
+              <h2 id="fontLabel" class="section-label">字体</h2>
+              <div class="font-row">
+                <span id="zhFontLabel" class="option-label">中文<span class="visually-hidden">字体</span></span>
+                <div class="font-picker">
+                  <button id="zhFontInput" class="font-picker-button" type="button" value="theme" data-font-script="zh" aria-haspopup="listbox" aria-expanded="false" aria-controls="zhFontList" aria-labelledby="zhFontLabel zhFontInput">跟随主题</button>
+                  <ul id="zhFontList" class="font-picker-list" role="listbox" tabindex="-1" aria-labelledby="zhFontLabel" hidden></ul>
+                </div>
+              </div>
+              <div class="font-row">
+                <span id="enFontLabel" class="option-label">英文<span class="visually-hidden">字体</span></span>
+                <div class="font-picker">
+                  <button id="enFontInput" class="font-picker-button" type="button" value="theme" data-font-script="en" aria-haspopup="listbox" aria-expanded="false" aria-controls="enFontList" aria-labelledby="enFontLabel enFontInput">跟随主题</button>
+                  <ul id="enFontList" class="font-picker-list" role="listbox" tabindex="-1" aria-labelledby="enFontLabel" hidden></ul>
+                </div>
+              </div>
+              <div class="font-row">
+                <span id="codeFontLabel" class="option-label">代码<span class="visually-hidden">字体</span></span>
+                <div class="font-picker">
+                  <button id="codeFontInput" class="font-picker-button" type="button" value="theme" data-font-script="code" aria-haspopup="listbox" aria-expanded="false" aria-controls="codeFontList" aria-labelledby="codeFontLabel codeFontInput">跟随主题</button>
+                  <ul id="codeFontList" class="font-picker-list" role="listbox" tabindex="-1" aria-labelledby="codeFontLabel" hidden></ul>
+                </div>
+              </div>
+            </section>
+
+            <section class="inspector-section" aria-labelledby="layoutLabel">
+              <h2 id="layoutLabel" class="section-label">版式</h2>
+              <label class="slider-row">
+                <span class="option-label">字号</span>
+                <input id="fontSizeInput" type="range" min="24" max="40" step="1" value="34" />
+                <output class="slider-value" for="fontSizeInput">34</output>
+              </label>
+              <label class="slider-row">
+                <span class="option-label">行距</span>
+                <input id="lineHeightInput" type="range" min="1" max="2.4" step="0.01" value="1.85" />
+                <output class="slider-value" for="lineHeightInput">1.85</output>
+              </label>
+              <label class="slider-row card-only">
+                <span class="option-label">图片高</span>
+                <input id="imageHeightInput" type="range" min="220" max="1048" step="1" value="1048" aria-label="图片最大高度" />
+                <output class="slider-value" for="imageHeightInput">1048</output>
+              </label>
+            </section>
+
+            <!-- 封面：src/workspace/cover-form.js。标题取标题框，版式随主题；结尾页在正文里写 [[结尾]] -->
+            <section id="coverPanel" class="inspector-section cover-panel card-only" aria-labelledby="coverLabel">
+              <h2 id="coverLabel" class="section-label">封面</h2>
+              <label class="check-row">
+                <input id="coverToggle" type="checkbox" />
+                <span>首页做封面<small>标题取自标题框，正文从第 2 张开始</small></span>
+              </label>
+              <div class="cover-fields" data-cover-fields hidden>
+                <label class="field">
+                  <span>副标题</span>
+                  <input id="coverSubtitleInput" type="text" autocomplete="off" placeholder="可不填" />
+                </label>
+                <div class="cover-image-row">
+                  <span id="coverImagesLabel" class="option-label">底图</span>
+                  <div id="coverImages" class="cover-choices" role="group" aria-labelledby="coverImagesLabel"></div>
+                  <label class="pill-button cover-upload" title="另选一张图只给封面用（不插进正文）">
+                    上传
+                    <input id="coverImageInput" class="visually-hidden" type="file" accept="image/*" aria-label="上传封面底图" />
+                  </label>
+                </div>
+                <p class="section-note">底图可以用正文里的图或实况；字压在图上时自动加一层渐变，保证看得清。</p>
+              </div>
+            </section>
+
+            <section class="inspector-section palette-section" aria-labelledby="colorLabel">
+              <div class="section-head">
+                <h2 id="colorLabel" class="section-label">配色</h2>
+                <button id="resetColorsBtn" class="text-button is-accent" type="button">恢复主题配色</button>
+              </div>
+              <!-- 五个色块的名字与说明由 src/workspace/style-form.js 按 src/engine/colors.js 的 ROLE_INFO 填 -->
+              <div class="color-roles">
+                <label class="swatch-tile">
+                  <input id="bgColorInput" type="color" value="#ffffff" />
+                  <span class="swatch-name"></span>
+                  <output class="swatch-hex" for="bgColorInput">#ffffff</output>
+                </label>
+                <label class="swatch-tile">
+                  <input id="textColorInput" type="color" value="#161616" />
+                  <span class="swatch-name"></span>
+                  <output class="swatch-hex" for="textColorInput">#161616</output>
+                </label>
+                <label class="swatch-tile">
+                  <input id="accentColorInput" type="color" value="#0043ce" />
+                  <span class="swatch-name"></span>
+                  <output class="swatch-hex" for="accentColorInput">#0043ce</output>
+                </label>
+                <label class="swatch-tile">
+                  <input id="secondaryColorInput" type="color" value="#161616" />
+                  <span class="swatch-name"></span>
+                  <output class="swatch-hex" for="secondaryColorInput">#161616</output>
+                </label>
+                <label class="swatch-tile">
+                  <input id="surfaceColorInput" type="color" value="#e8e8e8" />
+                  <span class="swatch-name"></span>
+                  <output class="swatch-hex" for="surfaceColorInput">#e8e8e8</output>
+                </label>
+              </div>
+              <!-- 配色库与色轮：src/workspace/palette-panel.js 填内容；弹出层锚在这一行，和检查器一样宽 -->
+              <div class="palette-actions">
+                <details id="paletteLibrary" class="pop-menu palette-menu">
+                  <summary class="pill-button" aria-label="配色库">
+                    <svg class="icon icon-small" aria-hidden="true"><use href="#i-palette" /></svg>配色库
+                  </summary>
+                  <div class="pop-menu-panel palette-popover" role="group" aria-label="配色库面板"></div>
+                </details>
+                <details id="colorWheel" class="pop-menu palette-menu">
+                  <summary class="pill-button" aria-label="色轮">
+                    <svg class="icon icon-small" aria-hidden="true"><use href="#i-wheel" /></svg>色轮
+                  </summary>
+                  <div class="pop-menu-panel palette-popover wheel-popover" role="group" aria-label="色轮面板"></div>
+                </details>
+              </div>
+            </section>
+
+            <section id="imagePanel" class="inspector-section image-panel" aria-labelledby="imagesLabel">
+              <div class="section-head">
+                <h2 id="imagesLabel" class="section-label">图片</h2>
+                <span class="image-panel-scope" data-image-scope>全部图片</span>
+              </div>
+              <div class="image-panel-summary" data-image-summary hidden>
+                <img class="image-panel-thumb" data-image-thumb alt="" />
+                <div class="image-panel-meta">
+                  <strong data-image-name></strong>
+                  <span data-image-info></span>
+                </div>
+                <button class="icon-button" type="button" data-image-deselect aria-label="取消选中图片" title="取消选中">
+                  <svg class="icon icon-small" aria-hidden="true"><use href="#i-close" /></svg>
+                </button>
+              </div>
+              <p class="section-note" data-image-hint>在预览里点一张图，单独调它的宽度、对齐与裁剪；没选中时，下面的设置可以一次用到全部图片。</p>
+              <label class="slider-row" data-image-size>
+                <span class="option-label">宽度</span>
+                <input type="range" min="25" max="100" step="1" value="100" data-image-width aria-label="图片宽度（百分比）" />
+                <span class="slider-value" data-image-width-value>100%</span>
+              </label>
+              <div class="option-row image-align-row" data-image-align-row hidden>
+                <span class="option-label">对齐</span>
+                <div class="segmented segmented-small" role="group" aria-label="图片对齐">
+                  <button type="button" data-image-align="left" aria-label="靠左" title="靠左"><svg class="icon icon-small" aria-hidden="true"><use href="#i-align-left" /></svg></button>
+                  <button type="button" data-image-align="center" aria-label="居中" title="居中"><svg class="icon icon-small" aria-hidden="true"><use href="#i-align-center" /></svg></button>
+                  <button type="button" data-image-align="right" aria-label="靠右" title="靠右"><svg class="icon icon-small" aria-hidden="true"><use href="#i-align-right" /></svg></button>
+                </div>
+              </div>
+              <div class="image-fixed-size" data-image-size>
+                <label class="field">
+                  <span>固定宽</span>
+                  <span class="unit-field"><input type="number" min="80" max="780" step="1" placeholder="自动" data-image-fixed-width /><span>px</span></span>
+                </label>
+                <label class="field">
+                  <span>固定高</span>
+                  <span class="unit-field"><input type="number" min="80" max="1048" step="1" placeholder="自动" data-image-fixed-height /><span>px</span></span>
+                </label>
+              </div>
+              <div class="image-panel-actions">
+                <button class="pill-button" type="button" data-image-edit hidden>裁剪</button>
+                <button class="pill-button image-panel-delete" type="button" data-image-delete hidden>删除</button>
+                <button class="pill-button" type="button" data-image-size data-image-apply-width>宽度用到全部图片</button>
+                <button class="pill-button" type="button" data-image-size data-image-apply-fixed>固定宽高用到全部图片</button>
+              </div>
+            </section>
+
+            <!-- 卡片样式：src/workspace/card-css.js。这一篇自己的 CSS，只作用在 HTML 卡片上 -->
+            <section class="inspector-section card-only" aria-labelledby="cardCssLabel">
+              <details class="advanced-field">
+                <summary id="cardCssLabel" class="section-label">高级 · 卡片样式</summary>
+                <p class="section-note">这一篇自己的 CSS，只作用在卡片上（HTML 卡片）。页面是 <code>.mc-page</code>，正文区 <code>.mc-body</code>，组件如 <code>.mc-note</code>、<code>.c-名字</code>；配色变量 <code>--mc-accent</code> 等。也可以让 AI 助手照你的描述写。</p>
+                <textarea id="cardCssInput" class="code-input" rows="8" spellcheck="false" aria-label="卡片样式（CSS）" placeholder=".mc-note { border-radius: 20px; }"></textarea>
+                <p id="cardCssCount" class="section-note" aria-live="polite"></p>
+              </details>
+            </section>
+
+            <section class="inspector-section byline" aria-labelledby="bylineLabel">
+              <h2 id="bylineLabel" class="section-label">署名</h2>
+              <div class="byline-row">
+                <label class="avatar-button" title="换头像">
+                  <img id="avatarPreview" alt="头像" />
+                  <input id="avatarInput" class="visually-hidden" type="file" accept="image/*" aria-label="换头像" />
+                </label>
+                <div class="byline-fields">
+                  <input id="displayNameInput" class="plain-input" type="text" aria-label="署名" placeholder="你的名字" />
+                  <input id="handleInput" class="plain-input byline-handle" type="text" aria-label="账号" placeholder="账号（可不填）" />
+                </div>
+                <button id="cropAvatarBtn" class="icon-button" type="button" aria-label="裁剪头像" title="裁剪头像">
+                  <svg class="icon" aria-hidden="true"><use href="#i-crop" /></svg>
+                </button>
+              </div>
+              <p class="section-note">首页页眉放头像和名字，内页页脚一行淡淡的署名。</p>
+            </section>
+          </div>
+
+          <!-- AI 助手：本机的 Codex 或 Claude Code，每篇稿子一个会话（src/ai/panel.js、src/ai/session.js、src/ai/backends/，会话历史 src/ai/history.js） -->
+          <div id="aiPanel" class="inspector-panel ai-panel" role="tabpanel" aria-labelledby="aiTab" hidden>
+            <!-- 这篇的会话：标题就是稿子的标题（直接改）；会话历史、更多（重新开始这篇的对话）、AI 设置；
+                 下面是用哪个后端（有对话后锁定）与模型（下一轮起生效），再下面一行找没找到本机的程序 -->
+            <header class="ai-session-head">
+              <div class="ai-session-title-row">
+                <input id="aiSessionTitle" class="ai-session-title" type="text" autocomplete="off" spellcheck="false" aria-label="会话标题" placeholder="给这篇起个标题" title="就是这篇稿子的标题：在这里改，稿子的标题也跟着改（⌘Z 可以撤销）" />
+                <details id="aiHistory" class="pop-menu ai-history">
+                  <summary class="icon-button" aria-label="会话历史" title="会话历史：聊过的稿子">
+                    <svg class="icon" aria-hidden="true"><use href="#i-history" /></svg>
+                  </summary>
+                  <div class="pop-menu-panel ai-history-popover" role="group" aria-labelledby="aiHistoryTitle">
+                    <div class="ai-history-head">
+                      <h2 id="aiHistoryTitle" class="section-label">会话历史</h2>
+                      <span class="ai-history-hint">按最近聊过排</span>
+                    </div>
+                    <label class="ai-history-search">
+                      <svg class="icon icon-small" aria-hidden="true"><use href="#i-search" /></svg>
+                      <input id="aiHistorySearch" type="search" autocomplete="off" spellcheck="false" aria-label="搜索会话" placeholder="搜标题或聊过的话" />
+                    </label>
+                    <ul id="aiHistoryList" class="ai-history-list" aria-label="聊过的稿子"></ul>
+                    <p id="aiHistoryEmpty" class="ai-history-empty" hidden></p>
+                  </div>
+                </details>
+                <details id="aiMore" class="pop-menu ai-more">
+                  <summary class="icon-button" aria-label="更多" title="更多">
+                    <svg class="icon" aria-hidden="true"><use href="#i-more" /></svg>
+                  </summary>
+                  <div class="pop-menu-panel menu ai-more-menu" role="menu" aria-label="这篇的会话">
+                    <button id="aiNewSessionBtn" class="menu-item" type="button" role="menuitem" title="清空这篇的会话记录，下一轮从头开始，可以换 AI 后端；每轮之前存的版本保留">
+                      <svg class="icon" aria-hidden="true"><use href="#i-reset" /></svg>
+                      <span>重新开始这篇的对话…</span>
+                    </button>
+                  </div>
+                </details>
+                <details id="aiSettings" class="pop-menu ai-settings">
+                  <summary class="icon-button" aria-label="AI 设置" title="AI 设置">
+                    <svg class="icon" aria-hidden="true"><use href="#i-settings" /></svg>
+                  </summary>
+                  <div class="pop-menu-panel ai-settings-popover" role="group" aria-labelledby="aiSettingsTitle">
+                    <h2 id="aiSettingsTitle" class="section-label">AI 设置</h2>
+                    <p class="section-note">用本机的 Codex 或 Claude Code，沿用它们在终端里的账号与设置（技能、MCP、权限），不用另填密钥。</p>
+                    <!-- 每个后端一组：现在用的是哪里的程序、指定路径（src/ai/panel.js 的 pathGroups） -->
+                    <div class="ai-path-group" role="group" aria-label="Codex" data-backend="codex">
+                      <h3 class="ai-path-title">Codex</h3>
+                      <p id="aiCodexFound" class="section-note" data-path-found></p>
+                      <label class="field">
+                        <span>codex 的路径</span>
+                        <input id="aiCodexPathInput" type="text" spellcheck="false" autocomplete="off" placeholder="留空：在终端的 PATH 里自动找" data-path-input />
+                      </label>
+                      <p id="aiCodexError" class="ai-settings-error" role="alert" data-path-error hidden></p>
+                      <div class="button-pair">
+                        <button class="pill-button" type="button" data-path-auto>自动查找</button>
+                        <button class="primary-button" type="button" data-path-save>保存</button>
+                      </div>
+                    </div>
+                    <div class="ai-path-group" role="group" aria-label="Claude Code" data-backend="claude">
+                      <h3 class="ai-path-title">Claude Code</h3>
+                      <p id="aiSettingsFound" class="section-note" data-path-found></p>
+                      <label class="field">
+                        <span>claude 的路径</span>
+                        <input id="aiPathInput" type="text" spellcheck="false" autocomplete="off" placeholder="留空：在终端的 PATH 里自动找" data-path-input />
+                      </label>
+                      <p id="aiSettingsError" class="ai-settings-error" role="alert" data-path-error hidden></p>
+                      <div class="button-pair">
+                        <button id="aiPathAutoBtn" class="pill-button" type="button" data-path-auto>自动查找</button>
+                        <button id="aiPathSaveBtn" class="primary-button" type="button" data-path-save>保存</button>
+                      </div>
+                    </div>
+                    <!-- 生图（用 Claude Code 时 App 的工具 generate_image，走 OpenAI）：哪个模型，密钥取终端环境里的（src/ai/panel.js）；Codex 用它自带的 -->
+                    <div class="ai-image-settings" role="group" aria-labelledby="aiImageTitle">
+                      <h2 id="aiImageTitle" class="section-label">生图</h2>
+                      <label class="field">
+                        <span>生图模型</span>
+                        <input id="aiImageModelInput" type="text" spellcheck="false" autocomplete="off" placeholder="gpt-image-2" />
+                      </label>
+                      <p id="aiImageError" class="ai-settings-error" role="alert" hidden></p>
+                      <p id="aiImageNote" class="section-note"></p>
+                    </div>
+                    <!-- 外部 Agent（MCP）：终端里的 Claude Code 等经 mediacraft-mcp 操作 App（src/mcp/panel.js）；只在 App 里有 -->
+                    <div id="mcpSettings" class="mcp-settings" role="group" aria-labelledby="mcpSettingsTitle" hidden>
+                      <h2 id="mcpSettingsTitle" class="section-label">外部 Agent（MCP）</h2>
+                      <label class="check-row">
+                        <input id="mcpEnabledInput" type="checkbox" role="switch" />
+                        <span>允许外部 Agent 连接<small id="mcpSettingsState"></small></span>
+                      </label>
+                      <p class="section-note">终端里的 Claude Code 等 Agent 能新建稿子、写正文、换主题、出图、导出；发送到 iPhone 时隔空投送由你选设备。每一步都能 ⌘Z 撤销。</p>
+                      <code id="mcpCommand" class="mcp-command"></code>
+                      <button id="mcpCopyBtn" class="pill-button" type="button" title="在终端里运行这行，把 Vibepost 登记为 Claude Code 的 MCP 服务">
+                        <svg class="icon icon-small" aria-hidden="true"><use href="#i-copy" /></svg>
+                        <span>复制接入命令</span>
+                      </button>
+                    </div>
+                  </div>
+                </details>
+              </div>
+              <div class="ai-session-bar" role="group" aria-label="这篇的 AI">
+                <span class="ai-picker ai-backend-picker">
+                  <span id="aiStatusDot" class="status-dot" aria-hidden="true"></span>
+                  <select id="aiBackendSelect" aria-label="AI 后端" title="这篇稿子用哪个本机 AI">
+                    <option value="codex">Codex</option>
+                    <option value="claude">Claude Code</option>
+                  </select>
+                  <svg class="icon ai-picker-chevron" aria-hidden="true"><use href="#i-chevron-down" /></svg>
+                  <svg class="icon ai-picker-lock" aria-hidden="true"><use href="#i-lock" /></svg>
+                </span>
+                <!-- 选项按后端由 src/ai/panel.js 填：默认模型、这个后端的模型、自定义… -->
+                <span class="ai-picker ai-model-picker">
+                  <select id="aiModelSelect" aria-label="模型" title="这篇稿子的 AI 用哪个模型，下一轮起生效">
+                    <option value="default">默认模型</option>
+                    <option value="custom">自定义…</option>
+                  </select>
+                  <svg class="icon ai-picker-chevron" aria-hidden="true"><use href="#i-chevron-down" /></svg>
+                </span>
+              </div>
+              <div id="aiModelCustom" class="ai-model-custom" hidden>
+                <input id="aiModelInput" type="text" spellcheck="false" autocomplete="off" aria-label="模型 ID" placeholder="模型 ID，如 claude-opus-4-6，↩ 确定" />
+                <p id="aiModelError" class="ai-settings-error" role="alert" hidden></p>
+              </div>
+              <p class="ai-status"><span id="aiStatusText" aria-live="polite">本机的 AI</span></p>
+            </header>
+            <!-- 外部 Agent 的操作：每个改稿子的调用一行，可以逐个撤销（src/mcp/panel.js）；有连接或有操作时才出现 -->
+            <details id="mcpLogBox" class="mcp-log" hidden>
+              <summary>
+                <span id="mcpLogDot" class="status-dot" aria-hidden="true"></span>
+                <span id="mcpLogTitle">外部 Agent 的操作</span>
+                <span id="mcpLogCount" class="mcp-log-count"></span>
+              </summary>
+              <div id="mcpLog" class="mcp-log-list" role="log" aria-labelledby="mcpLogTitle"></div>
+              <p id="mcpLogEmpty" class="section-note">外部 Agent 连上了，还没有改稿子。</p>
+            </details>
+            <!-- 找不到、运行不起来、没登录时：按这篇的后端说清楚怎么办（文字由 src/ai/panel.js 的 GUIDES 填） -->
+            <section id="aiGuide" class="ai-guide" aria-labelledby="aiGuideTitle" hidden>
+              <h2 id="aiGuideTitle" class="ai-guide-title">没有找到本机 Claude Code</h2>
+              <p id="aiGuideLead"></p>
+              <ol id="aiGuideSteps"></ol>
+              <p id="aiGuideReason" class="section-note"></p>
+              <div class="button-pair">
+                <button id="aiRetryBtn" class="pill-button" type="button">重新查找</button>
+                <button id="aiSetPathBtn" class="primary-button" type="button">指定路径</button>
+              </div>
+              <button id="aiGuideSwitch" class="text-button ai-guide-switch" type="button" hidden></button>
+            </section>
+            <div id="aiThread" class="ai-thread" role="log" aria-label="AI 对话"></div>
+            <div id="aiEmpty" class="ai-empty">
+              <span class="ai-empty-mark" aria-hidden="true"><svg class="icon"><use href="#i-sparkle" /></svg></span>
+              <h2 id="aiEmptyTitle" class="ai-empty-title">和 AI 一起改这篇</h2>
+              <p id="aiEmptyText">AI 助手会读这篇稿子，帮你润色、起标题、按要点分页；改动先标在正文里等你逐处确认，每轮之前自动存版本，随时能撤回。</p>
+              <p class="ai-empty-tip">选中一段文字点「改写」或按 <kbd>⌘J</kbd>，就能只改这一段。</p>
+            </div>
+            <!-- 「封面标题 5 选 1」说完后：读出来的候选，按显示宽度计字，点一个写进标题框（⌘Z 撤回） -->
+            <section id="aiTitlePicker" class="ai-title-picker" aria-labelledby="aiTitlePickerLabel" hidden>
+              <div class="ai-title-picker-head">
+                <h2 id="aiTitlePickerLabel" class="section-label">封面标题候选 · 点一个用作标题</h2>
+                <button id="aiTitlePickerClose" class="icon-button" type="button" aria-label="收起标题候选" title="收起">
+                  <svg class="icon icon-small" aria-hidden="true"><use href="#i-close" /></svg>
+                </button>
+              </div>
+              <div id="aiTitleOptions" class="ai-title-options" role="group" aria-labelledby="aiTitlePickerLabel"></div>
+              <p id="aiTitleNote" class="section-note" hidden>没从回复里读出标题候选，可以再点一次「封面标题 5 选 1」。</p>
+            </section>
+            <!-- 权限确认：Claude 要做在终端里也会问的事（运行命令、写工作目录以外的文件……）时弹出，回答经控制通道交给 claude -->
+            <section id="aiPermission" class="ai-permission" role="alertdialog" aria-labelledby="aiPermissionTitle" aria-describedby="aiPermissionDetail" hidden>
+              <p class="ai-permission-kicker">需要你确认</p>
+              <h2 id="aiPermissionTitle" class="ai-permission-title"></h2>
+              <pre id="aiPermissionDetail" class="ai-permission-detail"></pre>
+              <p id="aiPermissionNote" class="ai-permission-note" hidden></p>
+              <div class="button-pair">
+                <button id="aiDenyBtn" class="pill-button" type="button">拒绝</button>
+                <button id="aiAllowBtn" class="primary-button" type="button">允许</button>
+              </div>
+              <button id="aiAllowSessionBtn" class="text-button ai-permission-session" type="button">本次会话都允许</button>
+              <p id="aiPermissionQueue" class="ai-permission-queue" hidden></p>
+            </section>
+            <!-- 快捷命令（data-ai-preset 的字与发给 AI 的话在 src/ai/presets.js）：还没有对话时摊开在输入框上面；
+                 有了对话收成一行，「快捷命令」从这一行上面弹出两组 -->
+            <div id="aiPresets" class="ai-presets">
+              <div class="ai-presets-bar">
+                <button id="aiPolishBtn" class="primary-button ai-polish" type="button" disabled>
+                  <svg class="icon" aria-hidden="true"><use href="#i-sparkle" /></svg>
+                  <span>一键润色全文</span>
+                </button>
+                <button id="aiPresetsToggle" class="pill-button ai-presets-toggle" type="button" aria-expanded="false" aria-controls="aiPresetsBody">
+                  <span>快捷命令</span>
+                  <svg class="icon" aria-hidden="true"><use href="#i-chevron-up" /></svg>
+                </button>
+              </div>
+              <div id="aiPresetsBody" class="ai-presets-body">
+                <div class="ai-preset-group">
+                  <p id="aiPresetsWriting" class="ai-preset-label">改稿</p>
+                  <div class="chip-grid chip-grid-two" role="group" aria-label="快捷命令" aria-describedby="aiPresetsWriting">
+                    <button type="button" class="chip" data-ai-preset="coverTitles" disabled></button>
+                    <button type="button" class="chip" data-ai-preset="hook" disabled></button>
+                    <button type="button" class="chip" data-ai-preset="humanize" disabled></button>
+                    <button type="button" class="chip" data-ai-preset="repaginate" disabled></button>
+                    <button type="button" class="chip" data-ai-command="shorten" disabled>缩短到 800 字</button>
+                    <button type="button" class="chip" data-ai-preset="caption" disabled></button>
+                    <button type="button" class="chip" data-ai-command="tags" disabled>加话题标签</button>
+                  </div>
+                </div>
+                <!-- 设计方向：先看再改，用卡片上点选一块后的同一套操作（src/ai/presets.js 的 design） -->
+                <div class="ai-preset-group">
+                  <p id="aiPresetsDesign" class="ai-preset-label">设计方向</p>
+                  <div class="chip-grid chip-grid-three" role="group" aria-label="设计方向">
+                    <button type="button" class="chip" data-ai-preset="bolder" disabled></button>
+                    <button type="button" class="chip" data-ai-preset="quieter" disabled></button>
+                    <button type="button" class="chip" data-ai-preset="distill" disabled></button>
+                    <button type="button" class="chip" data-ai-preset="colorize" disabled></button>
+                    <button type="button" class="chip" data-ai-preset="typeset" disabled></button>
+                    <button type="button" class="chip" data-ai-preset="layout" disabled></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <form id="aiComposer" class="ai-composer" aria-label="对 Claude 说">
+              <div id="aiContext" class="ai-context" hidden>
+                <span id="aiContextLabel" class="ai-context-label"></span>
+                <span id="aiContextText" class="ai-context-text"></span>
+                <button id="aiContextClear" class="icon-button" type="button" aria-label="不带选中的文字" title="不带选中的文字">
+                  <svg class="icon icon-small" aria-hidden="true"><use href="#i-close" /></svg>
+                </button>
+              </div>
+              <div class="ai-composer-row">
+                <textarea id="aiInput" rows="2" aria-label="问 Claude" placeholder="问 Claude，或让它改稿…" title="↩ 发送，⇧↩ 换行" disabled></textarea>
+                <button id="aiSendBtn" class="send-button" type="submit" aria-label="发送" title="发送" disabled>
+                  <svg class="icon" aria-hidden="true"><use href="#i-send" /></svg>
+                </button>
+                <button id="aiStopBtn" class="send-button is-stop" type="button" aria-label="停止" title="停止" hidden>
+                  <svg class="icon" aria-hidden="true"><use href="#i-stop" /></svg>
+                </button>
+              </div>
+            </form>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <div id="selectionTools" class="selection-tools floating-bar" role="toolbar" aria-label="选中的文字" hidden>
+      <div class="floating-row">
+        <button type="button" class="floating-button" data-mark="bold" aria-label="加粗" title="加粗 ⌘B"><b>B</b></button>
+        <button type="button" class="floating-button format-italic" data-mark="italic" aria-label="斜体" title="斜体 ⌘I"><i>I</i></button>
+        <button type="button" class="floating-button" data-mark="underline" aria-label="下划线" title="下划线 ⌘U"><u>U</u></button>
+        <span class="bar-separator" aria-hidden="true"></span>
+        <button type="button" class="floating-button" data-color-menu-toggle="color" aria-label="字色" aria-expanded="false" title="字色">
+          <span class="glyph-color" aria-hidden="true">A</span>
+        </button>
+        <button type="button" class="floating-button" data-color-menu-toggle="bg" aria-label="高亮" aria-expanded="false" title="高亮">
+          <span class="highlight-chip" aria-hidden="true">高亮</span>
+        </button>
+        <button type="button" class="floating-button" data-link aria-label="链接" title="链接 ⌘K">
+          <svg class="icon" aria-hidden="true"><use href="#i-link" /></svg>
+        </button>
+        <span class="bar-separator" aria-hidden="true"></span>
+        <button type="button" class="floating-button rewrite-button" data-rewrite aria-label="改写" title="让 AI 改写选中的文字">
+          <svg class="icon icon-small" aria-hidden="true"><use href="#i-sparkle" /></svg>改写
+        </button>
+      </div>
+      <div class="selection-tools-palette" data-color-menu="color" role="group" aria-label="挑字色" hidden>
+        <div class="selection-tools-palette-row">
+          <label class="color-field">
+            <span>自定义</span>
+            <input type="color" value="#0043ce" aria-label="自定义字色" />
+          </label>
+          <button type="button" class="text-button" data-clear-color>去掉字色</button>
+        </div>
+      </div>
+      <div class="selection-tools-palette" data-color-menu="bg" role="group" aria-label="挑高亮" hidden>
+        <div class="selection-tools-palette-row">
+          <label class="color-field">
+            <span>自定义</span>
+            <input type="color" value="#fff3a3" aria-label="自定义高亮" />
+          </label>
+          <button type="button" class="text-button" data-clear-color>去掉高亮</button>
+        </div>
+      </div>
+    </div>
+
+    <section id="outputActivity" class="activity" role="status" aria-label="导出进度" hidden>
+      <span class="activity-icon" aria-hidden="true">
+        <svg class="icon activity-done"><use href="#i-check" /></svg>
+        <svg class="icon activity-alert"><use href="#i-alert" /></svg>
+      </span>
+      <div class="activity-copy">
+        <strong class="activity-title"></strong>
+        <span class="activity-detail"></span>
+      </div>
+      <button class="text-button activity-cancel" type="button" aria-label="取消导出">取消</button>
+      <button class="icon-button activity-close" type="button" aria-label="关闭提示" title="关闭">
+        <svg class="icon icon-small" aria-hidden="true"><use href="#i-close" /></svg>
+      </button>
+      <div class="activity-track" role="progressbar" aria-label="进度" aria-valuemin="0" aria-valuemax="100">
+        <span class="activity-fill"></span>
+      </div>
+      <p class="activity-note" hidden>
+        <svg class="icon icon-small" aria-hidden="true"><use href="#i-alert" /></svg>
+        <span class="activity-note-text"></span>
+        <button class="text-button activity-note-action" type="button"></button>
+      </p>
+      <div class="activity-actions" role="group" aria-label="分别复制" hidden></div>
+    </section>
+
+    <!-- 稿件列表里右键一篇（src/drafts/drawer.js）：在新窗口打开（只在 App 里有）、删除 -->
+    <div id="draftMenu" class="pop-menu-panel draft-menu" role="menu" aria-label="这篇稿件" hidden>
+      <button class="menu-item" type="button" role="menuitem" data-draft-action="window">
+        <svg class="icon icon-small" aria-hidden="true"><use href="#i-window" /></svg>
+        <span>在新窗口打开</span>
+        <kbd>⌘ 点按</kbd>
+      </button>
+      <button class="menu-item" type="button" role="menuitem" data-draft-action="delete">
+        <svg class="icon icon-small" aria-hidden="true"><use href="#i-trash" /></svg>
+        <span>删除…</span>
+      </button>
+    </div>
+    <div id="confirmDialog" class="modal hidden" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
+      <div class="dialog dialog-small">
+        <h3 id="confirmTitle" class="dialog-title">确认</h3>
+        <p id="confirmMessage" class="dialog-message"></p>
+        <div class="dialog-actions">
+          <button id="confirmCancel" class="pill-button" type="button">取消</button>
+          <button id="confirmOk" class="primary-button" type="button">好</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 发送前的发布检查（src/publish/assistant.js）：还有提醒时问一句 -->
+    <div id="sendCheckDialog" class="modal hidden" role="alertdialog" aria-modal="true" aria-labelledby="sendCheckTitle" aria-describedby="sendCheckList">
+      <div class="dialog dialog-small send-check">
+        <h3 id="sendCheckTitle" class="dialog-title"></h3>
+        <ul id="sendCheckList" class="send-check-list"></ul>
+        <label class="check-option"><input id="sendCheckMute" type="checkbox" />不再提醒（在「检查」里可以重新打开）</label>
+        <div class="dialog-actions">
+          <button id="sendCheckReview" class="pill-button" type="button">去看看</button>
+          <button id="sendCheckGo" class="primary-button" type="button">仍然发送</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="pairDialog" class="modal media-modal hidden" role="dialog" aria-modal="true" aria-labelledby="pairDialogTitle" aria-describedby="pairDialogNames">
+      <div class="dialog media-dialog pair-dialog">
+        <header class="media-dialog-head">
+          <div class="media-dialog-heading">
+            <h3 id="pairDialogTitle" class="dialog-title">拼图</h3>
+            <p id="pairDialogNames" class="media-dialog-names"></p>
+          </div>
+          <button id="pairClose" class="icon-button" type="button" aria-label="关闭拼图" title="关闭（Esc）">
+            <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+          </button>
+        </header>
+        <div class="media-well pair-well">
+          <div id="pairStage" class="pair-stage">
+            <figure class="pair-frame">
+              <canvas id="pairLeftCanvas"></canvas>
+              <button id="pairLeftCrop" class="pair-frame-edit" type="button" aria-label="裁剪左图" title="裁剪左图">
+                <svg class="icon icon-small" aria-hidden="true"><use href="#i-crop" /></svg>
+              </button>
+            </figure>
+            <figure class="pair-frame">
+              <canvas id="pairRightCanvas"></canvas>
+              <button id="pairRightCrop" class="pair-frame-edit" type="button" aria-label="裁剪右图" title="裁剪右图">
+                <svg class="icon icon-small" aria-hidden="true"><use href="#i-crop" /></svg>
+              </button>
+            </figure>
+            <div id="pairRatioHandle" class="pair-ratio-handle" role="slider" tabindex="0" aria-label="拖动改变拼图比例"
+              aria-valuemin="0" aria-valuemax="3" aria-valuenow="0" aria-valuetext="16:9" title="上下拖动改变整组比例"></div>
+          </div>
+        </div>
+        <div class="media-dialog-controls">
+          <div id="pairRatios" class="segmented segmented-small" role="group" aria-label="拼图比例">
+            <button type="button" data-pair-ratio="16x9" aria-pressed="true">16:9</button>
+            <button type="button" data-pair-ratio="3x2" aria-pressed="false">3:2</button>
+            <button type="button" data-pair-ratio="4x3" aria-pressed="false">4:3</button>
+            <button type="button" data-pair-ratio="1x1" aria-pressed="false">1:1</button>
+          </div>
+          <button id="pairSwap" class="pill-button" type="button">
+            <svg class="icon icon-small" aria-hidden="true"><use href="#i-swap" /></svg>
+            <span>左右对调</span>
+          </button>
+        </div>
+        <footer class="media-dialog-actions">
+          <button id="pairSplit" class="text-button" type="button" title="拆开成上下两张单独的图">拆成两张</button>
+          <span class="media-dialog-spacer"></span>
+          <button id="pairCancel" class="pill-button" type="button">取消</button>
+          <button id="pairDone" class="primary-button" type="button">完成</button>
+        </footer>
+      </div>
+    </div>
+
+    <div id="cropDialog" class="modal media-modal hidden" role="dialog" aria-modal="true" aria-labelledby="cropTitle">
+      <div class="dialog media-dialog crop-dialog">
+        <header class="media-dialog-head">
+          <h3 id="cropTitle" class="dialog-title">裁剪</h3>
+          <button id="cropClose" class="icon-button" type="button" aria-label="关闭裁剪" title="关闭（Esc）">
+            <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+          </button>
+        </header>
+        <div id="cropWell" class="media-well crop-well">
+          <div id="cropBox" class="crop-box">
+            <img id="cropImage" class="crop-image" alt="" draggable="false" />
+            <div id="cropFrame" class="crop-frame" tabindex="0" role="group" aria-label="裁剪框：拖动移动，拖四角改大小，方向键微调">
+              <span class="crop-grid" aria-hidden="true"></span>
+              <span class="crop-handle is-corner is-nw" data-crop-handle="nw" aria-hidden="true"></span>
+              <span class="crop-handle is-corner is-ne" data-crop-handle="ne" aria-hidden="true"></span>
+              <span class="crop-handle is-corner is-sw" data-crop-handle="sw" aria-hidden="true"></span>
+              <span class="crop-handle is-corner is-se" data-crop-handle="se" aria-hidden="true"></span>
+              <span class="crop-handle is-edge is-n" data-crop-handle="n" aria-hidden="true"></span>
+              <span class="crop-handle is-edge is-s" data-crop-handle="s" aria-hidden="true"></span>
+              <span class="crop-handle is-edge is-w" data-crop-handle="w" aria-hidden="true"></span>
+              <span class="crop-handle is-edge is-e" data-crop-handle="e" aria-hidden="true"></span>
+            </div>
+          </div>
+        </div>
+        <div class="media-dialog-controls">
+          <div id="cropAspects" class="segmented segmented-small" role="group" aria-label="裁剪比例">
+            <button type="button" data-crop-aspect="free" aria-pressed="true">自由</button>
+            <button type="button" data-crop-aspect="3:4" aria-pressed="false">3:4</button>
+            <button type="button" data-crop-aspect="1:1" aria-pressed="false">1:1</button>
+            <button type="button" data-crop-aspect="4:3" aria-pressed="false">4:3</button>
+            <button type="button" data-crop-aspect="16:9" aria-pressed="false">16:9</button>
+          </div>
+          <label class="crop-zoom">
+            <svg class="icon icon-small" aria-hidden="true"><use href="#i-zoom-out" /></svg>
+            <input id="cropZoom" type="range" min="1" max="8" step="0.01" value="1" aria-label="缩放" />
+            <svg class="icon icon-small" aria-hidden="true"><use href="#i-zoom-in" /></svg>
+          </label>
+          <span id="cropSize" class="crop-size" aria-live="polite"></span>
+        </div>
+        <footer class="media-dialog-actions">
+          <button id="cropReset" class="text-button" type="button">
+            <svg class="icon icon-small" aria-hidden="true"><use href="#i-reset" /></svg>
+            <span>还原</span>
+          </button>
+          <span class="media-dialog-spacer"></span>
+          <button id="cropCancel" class="pill-button" type="button">取消</button>
+          <button id="cropDone" class="primary-button" type="button">完成</button>
+        </footer>
+      </div>
+    </div>
+
+    <div id="liveDialog" class="modal media-modal hidden" role="dialog" aria-modal="true" aria-labelledby="liveTitle" aria-describedby="liveSummary">
+      <div class="dialog media-dialog live-dialog">
+        <header class="media-dialog-head">
+          <div class="media-dialog-heading">
+            <h3 id="liveTitle" class="dialog-title">实况</h3>
+            <p id="liveName" class="media-dialog-names"></p>
+          </div>
+          <button id="liveClose" class="icon-button" type="button" aria-label="关闭实况" title="关闭（Esc）">
+            <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+          </button>
+        </header>
+        <div id="liveWell" class="media-well live-well">
+          <div id="liveBox" class="live-box">
+            <video id="liveVideo" class="live-video" muted playsinline preload="auto"></video>
+            <div id="liveFrame" class="crop-frame live-frame" tabindex="0" role="group" aria-label="取景框：拖动移动，拖四角改大小，方向键微调">
+              <span class="crop-grid" aria-hidden="true"></span>
+              <span class="crop-handle is-corner is-nw" data-live-handle="nw" aria-hidden="true"></span>
+              <span class="crop-handle is-corner is-ne" data-live-handle="ne" aria-hidden="true"></span>
+              <span class="crop-handle is-corner is-sw" data-live-handle="sw" aria-hidden="true"></span>
+              <span class="crop-handle is-corner is-se" data-live-handle="se" aria-hidden="true"></span>
+            </div>
+          </div>
+          <span class="live-badge" aria-hidden="true"><svg class="icon icon-small"><use href="#i-live" /></svg>LIVE</span>
+        </div>
+        <div class="live-timeline">
+          <button id="livePlay" class="icon-button live-play" type="button" aria-label="播放" title="播放 / 暂停（空格）">
+            <svg class="icon" aria-hidden="true"><use href="#i-play" /></svg>
+          </button>
+          <div id="liveTrack" class="live-track" role="slider" tabindex="0" aria-label="选取片段" title="拖动亮框选取片段，点一下看那一刻"
+            aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="">
+            <canvas id="liveStrip" class="live-strip" aria-hidden="true"></canvas>
+            <div id="liveWindow" class="live-window" aria-hidden="true"><span id="liveCoverMark" class="live-cover-mark"></span></div>
+            <div id="livePlayhead" class="live-playhead" aria-hidden="true"></div>
+          </div>
+        </div>
+        <div class="media-dialog-controls live-controls">
+          <div class="live-control">
+            <span id="liveDurationLabel" class="live-control-label">时长</span>
+            <div id="liveDurations" class="segmented segmented-small" role="group" aria-labelledby="liveDurationLabel">
+              <button type="button" data-duration="3" aria-pressed="true">3 秒</button>
+              <button type="button" data-duration="5" aria-pressed="false">5 秒</button>
+              <button type="button" data-duration="8" aria-pressed="false">8 秒</button>
+            </div>
+          </div>
+          <div class="live-control">
+            <span id="liveSpeedLabel" class="live-control-label">倍速</span>
+            <div id="liveSpeeds" class="segmented segmented-small" role="group" aria-labelledby="liveSpeedLabel">
+              <button type="button" data-speed="1" aria-pressed="true">1×</button>
+              <button type="button" data-speed="1.5" aria-pressed="false">1.5×</button>
+              <button type="button" data-speed="2" aria-pressed="false">2×</button>
+              <button type="button" data-speed="3" aria-pressed="false">3×</button>
+            </div>
+          </div>
+          <button id="liveSoundBtn" class="pill-button live-sound" type="button" aria-pressed="true" title="成片带不带声音">
+            <svg class="icon icon-small" aria-hidden="true"><use href="#i-sound" /></svg>
+            <span>声音</span>
+          </button>
+          <div class="live-control live-control-wide">
+            <span id="liveAspectLabel" class="live-control-label">取景</span>
+            <div id="liveAspects" class="segmented segmented-small" role="group" aria-labelledby="liveAspectLabel">
+              <button type="button" data-aspect="original" aria-pressed="true">原视频</button>
+              <button type="button" data-aspect="free" aria-pressed="false">自由</button>
+              <button type="button" data-aspect="3:4" aria-pressed="false">3:4</button>
+              <button type="button" data-aspect="1:1" aria-pressed="false">1:1</button>
+              <button type="button" data-aspect="4:3" aria-pressed="false">4:3</button>
+              <button type="button" data-aspect="16:9" aria-pressed="false">16:9</button>
+              <button type="button" data-aspect="9:16" aria-pressed="false">9:16</button>
+            </div>
+          </div>
+        </div>
+        <footer class="media-dialog-actions">
+          <button id="liveCoverBtn" class="pill-button live-cover-button" type="button" title="把播放头停着的这一帧设为封面">
+            <canvas id="liveCoverThumb" class="live-cover-thumb" width="1" height="1" aria-hidden="true"></canvas>
+            <span>设为封面</span>
+          </button>
+          <p id="liveSummary" class="live-summary" aria-live="polite"></p>
+          <span class="media-dialog-spacer"></span>
+          <button id="liveCancel" class="pill-button" type="button">取消</button>
+          <button id="liveDone" class="primary-button" type="button">完成</button>
+        </footer>
+      </div>
+    </div>
+
+    <script src="src/vendor/jszip.min.js?v=3.10.1"></script>
+    <script src="src/vendor/html2canvas.min.js?v=1.4.1"></script>
+    <script src="src/native-bridge.js"></script>
+    <script src="src/vendor/codemirror.js?v=6.43.13"></script>
+    <script src="src/engine/freeze.js"></script>
+    <script src="src/engine/colors.js"></script>
+    <script src="src/engine/media.js"></script>
+    <script src="src/engine/markdown.js"></script>
+    <script src="src/engine/plain-text.js"></script>
+    <script src="src/engine/structures.js"></script>
+    <!-- HTML 卡片（ADR 0006）：语法树 → HTML → 分页 → 舞台上的 DOM / 壳里截图 -->
+    <script src="src/cards/html.js"></script>
+    <script src="src/cards/paginate.js"></script>
+    <script src="src/cards/chrome.js"></script>
+    <script src="src/cards/cover.js"></script>
+    <script src="src/cards/summary.js"></script>
+    <script src="src/cards/blocks.js"></script>
+    <script src="src/cards/cards.js"></script>
+    <script src="src/editor/syntax.js"></script>
+    <script src="src/editor/commands.js"></script>
+    <script src="src/editor/review.js"></script>
+    <script src="src/editor/live-preview.js"></script>
+    <script src="src/editor/slash-menu.js"></script>
+    <script src="src/editor/toolbars.js"></script>
+    <script src="src/editor/editor.js"></script>
+    <script src="src/editor/find.js"></script>
+    <script src="src/editor/hints.js"></script>
+    <script src="src/drafts/store.js"></script>
+    <script src="src/drafts/drafts.js"></script>
+    <script src="src/drafts/windows.js"></script>
+    <script src="src/article/article.js"></script>
+    <script src="src/output/progress.js"></script>
+    <script src="src/output/output.js"></script>
+    <script src="src/publish/check.js"></script>
+    <script src="src/publish/assistant.js"></script>
+    <script src="src/media/placement.js"></script>
+    <script src="src/media/import.js"></script>
+    <script src="src/media/crop-dialog.js"></script>
+    <script src="src/media/pair-dialog.js"></script>
+    <script src="src/media/stage-images.js"></script>
+    <script src="src/media/image-panel.js"></script>
+    <script src="src/media/media.js"></script>
+    <script src="src/media/image-store.js"></script>
+    <script src="src/ai/diff.js"></script>
+    <script src="src/ai/review.js"></script>
+    <script src="src/ai/versions.js"></script>
+    <script src="src/media/live.js"></script>
+    <script src="src/media/live-dialog.js"></script>
+    <script src="src/media/live-stage.js"></script>
+    <script src="src/media/live-photos.js"></script>
+    <script src="src/ai/tools.js"></script>
+    <script src="src/ai/presets.js"></script>
+    <script src="src/ai/backends/claude.js"></script>
+    <script src="src/ai/backends/codex.js"></script>
+    <script src="src/ai/session.js"></script>
+    <script src="src/ai/host.js"></script>
+    <script src="src/mcp/tools.js"></script>
+    <script src="src/mcp/server.js"></script>
+    <script src="src/guides/guides.js"></script>
+    <script src="src/guides/cards.js"></script>
+    <script src="src/guides/article.js"></script>
+    <script src="src/onboarding.js"></script>
+    <script src="src/themes/themes.js"></script>
+    <script src="src/themes/palettes.js"></script>
+    <script src="src/themes/fonts.js"></script>
+    <script src="src/themes/font-picker.js"></script>
+    <script src="src/workspace/style-form.js"></script>
+    <script src="src/workspace/byline.js"></script>
+    <script src="src/workspace/cover-form.js"></script>
+    <script src="src/workspace/card-css.js"></script>
+    <script src="src/workspace/panels.js"></script>
+    <script src="src/workspace/menus.js"></script>
+    <script src="src/stage/render.js"></script>
+    <script src="src/stage/preview.js"></script>
+    <script src="src/stage/pipeline.js"></script>
+    <script src="src/stage/blocks.js"></script>
+    <script src="src/stage/annotations.js"></script>
+    <script src="src/api/media.js"></script>
+    <script src="src/api/palettes.js"></script>
+    <script src="src/api/api.js"></script>
+    <script src="src/app.js"></script>
+    <script src="src/drafts/drawer.js"></script>
+    <script src="src/drafts/title.js"></script>
+    <script src="src/drafts/caption.js"></script>
+    <script src="src/shell.js"></script>
+    <script src="src/theme-panel.js"></script>
+    <script src="src/workspace/palette-panel.js"></script>
+    <script src="src/phone-feed.js"></script>
+    <script src="src/phone-preview.js"></script>
+    <script src="src/ai/panel.js"></script>
+    <script src="src/ai/history.js"></script>
+    <script src="src/mcp/panel.js"></script>
+  </body>
+</html>

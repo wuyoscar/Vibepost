@@ -1,0 +1,526 @@
+/* HTML 卡片的基础样式与组件（ADR 0006）。每张卡片是 Shadow DOM 里的一页：舞台预览与出图用的是同一份 HTML 和这份样式。
+   尺寸按逻辑像素写（864 × 1152，出图 ×2）；颜色、字体、间距都是变量，主题只换变量与 structures.css 里的结构样式，
+   稿子的自定义样式接在主题后面。组件的写法见 docs/markdown-syntax.md。 */
+
+:host {
+  all: initial;
+  display: block;
+}
+
+.mc-page {
+  /* 主题令牌（主题文件覆盖这些值） */
+  --mc-bg: #ffffff;
+  --mc-text: #161616;
+  --mc-muted: #6f6f6f;
+  --mc-accent: #0043ce;
+  --mc-secondary: var(--mc-text);
+  --mc-surface: #f2f2f2;
+  --mc-paper: var(--mc-bg);
+  --mc-accent-text: var(--mc-accent);
+  --mc-on-accent: #ffffff;
+  --mc-surface-text: var(--mc-text);
+  --mc-chip: var(--mc-surface);
+  --mc-tint: color-mix(in oklab, var(--mc-accent) 14%, var(--mc-bg));
+  --mc-bold: 700;
+  --mc-rule: color-mix(in oklab, var(--mc-text) 14%, transparent);
+  --mc-mark-1: var(--mc-accent);
+  --mc-mark-2: #007d79;
+  --mc-mark-3: #8d8d8d;
+  --mc-mark-4: #1c1740;
+  --mc-font-body: "MC Inter", "MC Noto Sans SC", "PingFang SC", sans-serif;
+  --mc-font-display: var(--mc-font-body);
+  --mc-font-mono: "MC JetBrains Mono", "MC Noto Sans SC", ui-monospace, monospace;
+  --mc-font-label: var(--mc-font-body);
+  --mc-size-body: 21px;
+  --mc-leading: 1.75;
+  --mc-pad-x: 60px;
+  --mc-pad-top: 64px;
+  --mc-pad-bottom: 56px;
+  --mc-gap: 22px;
+
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 864px;
+  height: 1152px;
+  padding: var(--mc-pad-top) var(--mc-pad-x) var(--mc-pad-bottom);
+  overflow: hidden;
+  background: var(--mc-bg);
+  color: var(--mc-text);
+  font-family: var(--mc-font-body);
+  font-size: var(--mc-size-body);
+  line-height: var(--mc-leading);
+  -webkit-font-smoothing: antialiased;
+  font-kerning: normal;
+  text-rendering: optimizeLegibility;
+}
+
+.mc-page *,
+.mc-page *::before,
+.mc-page *::after {
+  box-sizing: border-box;
+}
+
+/* 正文区：分页按它的高度排；页脚固定在底部 */
+.mc-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--mc-gap);
+  min-height: 0;
+}
+
+.mc-body > *,
+.mc-body p {
+  margin: 0;
+}
+
+/* ---------- 基本块 ---------- */
+
+.mc-body p {
+  overflow-wrap: anywhere;
+}
+
+.mc-body h1,
+.mc-body h2,
+.mc-body h3 {
+  margin: 0;
+  text-wrap: balance;
+  color: var(--mc-secondary);
+  font-family: var(--mc-font-display);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.mc-body h1 {
+  font-size: 44px;
+}
+
+.mc-body h2 {
+  font-size: 32px;
+}
+
+.mc-body h3 {
+  font-size: 25px;
+}
+
+.mc-body strong {
+  font-weight: var(--mc-bold);
+}
+
+.mc-body em {
+  font-style: italic;
+}
+
+.mc-body del {
+  text-decoration-thickness: 1.5px;
+}
+
+.mc-body a {
+  color: var(--mc-accent-text);
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+}
+
+.mc-body code {
+  padding: 0.05em 0.35em;
+  border-radius: 6px;
+  background: var(--mc-chip);
+  font-family: var(--mc-font-mono);
+  font-size: 0.88em;
+}
+
+.mc-body blockquote {
+  margin: 0;
+  padding: 14px 20px;
+  border-left: 4px solid var(--mc-accent);
+  border-radius: 0 10px 10px 0;
+  background: var(--mc-surface);
+  color: var(--mc-surface-text);
+}
+
+.mc-body ul,
+.mc-body ol {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 1.4em;
+}
+
+/* 普通列表：编号自己画（src/cards/html.js），悬挂区至少 1.66 个字宽，编号长时（2024.）整个列表一起放宽 */
+.mc-body .mc-list {
+  padding-left: 0;
+  list-style: none;
+}
+
+.mc-list > li {
+  display: grid;
+  grid-template-columns: max(1.66em, calc(var(--mc-marker-chars, 0) * 0.62em + 0.5em)) 1fr;
+}
+
+.mc-marker {
+  color: var(--mc-accent-text);
+  font-family: var(--mc-font-label);
+  font-weight: 600;
+}
+
+.mc-marker.is-bullet::before {
+  content: "";
+  display: inline-block;
+  width: 0.3em;
+  height: 0.3em;
+  margin-left: 0.25em;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: 0.28em;
+}
+
+.mc-body hr {
+  width: 100%;
+  height: 1px;
+  border: 0;
+  background: var(--mc-rule);
+}
+
+.mc-body pre {
+  margin: 0;
+  padding: 16px 20px;
+  border-radius: 10px;
+  background: var(--mc-surface);
+  color: var(--mc-surface-text);
+  font-family: var(--mc-font-mono);
+  font-size: 0.86em;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.mc-body pre code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+}
+
+.mc-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88em;
+}
+
+.mc-body th {
+  background: var(--mc-surface);
+  color: var(--mc-surface-text);
+  font-weight: 700;
+  text-align: left;
+}
+
+.mc-body th,
+.mc-body td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--mc-rule);
+}
+
+.mc-body figure {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+
+/* 图片：外框按裁剪后的比例留位置，里面的图放大、挪位只露出裁剪的那一块 */
+.mc-figure {
+  align-items: var(--mc-fig-align, center);
+}
+
+.mc-img {
+  position: relative;
+  /* 基准宽：正文宽，但不高过「图片最大高」（--ar 是裁剪后的宽高比）；再乘版式的比例（--mc-fig-pct）与分页时的缩小 */
+  width: calc(min(100%, calc(var(--mc-img-max, 100000px) * var(--ar, 1))) * var(--mc-fig-pct, 1) * var(--mc-fig-scale, 1));
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--mc-surface);
+}
+
+.mc-img > img {
+  position: absolute;
+  display: block;
+  max-width: none;
+  height: auto;
+}
+
+.mc-img.is-missing {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  color: var(--mc-muted);
+  font-size: 16px;
+}
+
+.mc-live-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.45);
+  color: #ffffff;
+  font-family: var(--mc-font-body);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+}
+
+/* 拼图：两格等宽、同一个宽高比（html.js 按拼图比例在各自的裁剪框里取景），所以一样高 */
+.mc-body .mc-pair {
+  flex-direction: row;
+  gap: 6px;
+  align-self: center;
+  width: min(calc(100% * var(--mc-fig-scale, 1)), calc(var(--mc-img-max, 100000px) * var(--ar, 1)));
+}
+
+/* 固定框：按框的宽（不超过正文宽），高由框的比例定 */
+.mc-figure.is-fixed > .mc-img {
+  width: calc(min(var(--mc-fixed-w), 100%) * var(--mc-fig-scale, 1));
+}
+
+/* 整组按拼图比例（--ar），两格撑满高 */
+.mc-body .mc-pair {
+  aspect-ratio: var(--ar, 2);
+}
+
+.mc-pair > .mc-img {
+  flex: 1 1 0;
+  width: auto;
+  height: 100%;
+}
+
+.mc-body figcaption {
+  color: var(--mc-muted);
+  font-size: 0.8em;
+  text-align: center;
+}
+
+/* 行内的字色、高亮、下划线：{{color|bg|underline:…|文字}} */
+.mc-hl {
+  padding: 0 0.15em;
+  border-radius: 4px;
+  background: var(--hl);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.mc-u {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 5px;
+}
+
+.mc-u[data-style="dashed"] {
+  text-decoration-style: dashed;
+}
+
+/* ---------- 行内标注：{{mark:类别|文字}} ----------
+   同一个类别在一篇稿子里颜色固定（按第一次出现的先后取 --mc-mark-1…4），标签列表的胶囊用同一个颜色。 */
+
+.mc-mark {
+  --mark: var(--mc-mark-1);
+  padding: 0.08em 0.3em 0.12em;
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--mark) 13%, transparent);
+  box-shadow: inset 0 -3px 0 var(--mark);
+  color: inherit;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.mc-mark[data-tone="2"],
+.mc-badge[data-tone="2"] {
+  --mark: var(--mc-mark-2);
+}
+
+.mc-mark[data-tone="3"],
+.mc-badge[data-tone="3"] {
+  --mark: var(--mc-mark-3);
+}
+
+.mc-mark[data-tone="4"],
+.mc-badge[data-tone="4"] {
+  --mark: var(--mc-mark-4);
+}
+
+.mc-mark:has(> del:only-child) {
+  box-shadow: none;
+  color: var(--mc-muted);
+}
+
+/* ---------- 组件 ---------- */
+
+/* 小标签：标题上方一行小字 */
+.mc-kicker {
+  color: var(--mc-muted);
+  font-size: 19px;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+}
+
+/* 等宽块：左边一条细线的等宽段落，里面可以用标注 */
+.mc-mono {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 4px 0 4px 22px;
+  border-left: 3px solid var(--mc-rule);
+  font-family: var(--mc-font-mono);
+  font-size: 19px;
+  line-height: 2;
+  letter-spacing: 0.01em;
+}
+
+/* 标签列表：左边胶囊标签，右边说明，行间细线 */
+.mc-body .mc-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mc-rows > li {
+  display: grid;
+  grid-template-columns: 104px 1fr;
+  gap: 18px;
+  align-items: baseline;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--mc-rule);
+}
+
+.mc-rows > li:last-child {
+  border-bottom: 0;
+}
+
+.mc-rows > li::marker {
+  content: none;
+}
+
+.mc-badge {
+  --mark: var(--mc-mark-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  height: 29px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--mark);
+  color: #ffffff;
+  font-family: var(--mc-font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  transform: translateY(-2px);
+}
+
+.mc-rows code {
+  padding: 0;
+  background: none;
+  font-size: 0.92em;
+  font-weight: 700;
+}
+
+/* 步骤：大号序号 + 说明 */
+.mc-body .mc-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.mc-steps > li {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 14px;
+  align-items: baseline;
+}
+
+.mc-steps > li::marker {
+  content: none;
+}
+
+.mc-step-no {
+  color: var(--mc-accent-text);
+  font-family: var(--mc-font-display);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* 不认识名字的组件（:::名字）：默认像一段普通内容，样式交给这一篇的自定义样式 */
+.mc-c {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mc-gap);
+}
+
+/* 提示框 */
+.mc-note {
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: var(--mc-surface);
+}
+
+/* 页尾小字：贴在页脚上方，上面一条细线 */
+.mc-footnote {
+  margin-top: auto !important;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--mc-rule);
+  color: var(--mc-muted);
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+/* ---------- 页眉 ---------- */
+
+.mc-head {
+  padding-bottom: 20px;
+}
+
+.mc-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* ---------- 页脚 ---------- */
+
+.mc-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: 26px;
+  color: var(--mc-muted);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.mc-folio {
+  font-family: var(--mc-font-display);
+  font-size: 22px;
+}
+
+/* 组件的对齐（:::名字 align=center） */
+.mc-body [data-align="left"] {
+  text-align: left;
+}
+
+.mc-body [data-align="center"] {
+  text-align: center;
+}
+
+.mc-body [data-align="right"] {
+  text-align: right;
+}

@@ -1,0 +1,271 @@
+/* 舞台上 HTML 卡片的块（src/stage/blocks.js）：悬停淡描边、选中实描边、拖走时原处虚线，工具条沿用图片的 .stage-media-bar */
+.stage-block-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.stage-block {
+  position: absolute;
+  border-radius: 4px;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+  transition:
+    outline-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-quick) var(--ease-standard);
+}
+
+.stage-block:hover {
+  outline: 1.5px dashed color-mix(in srgb, var(--ui-accent) 55%, transparent);
+  outline-offset: 4px;
+}
+
+/* 拖动手柄：悬停、选中时在块的左边出来，一看就知道可以拖 */
+.stage-block::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -20px;
+  width: 10px;
+  height: 18px;
+  border-radius: 3px;
+  background: radial-gradient(circle, var(--ui-accent) 1.4px, transparent 1.6px) 0 0 / 5px 6px;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity var(--motion-fast) var(--ease-standard);
+}
+
+.stage-block:hover::before,
+.stage-block.is-selected::before,
+.stage-block.is-dragging::before {
+  opacity: 1;
+}
+
+.stage-block:focus-visible {
+  outline: 3px solid var(--ui-focus);
+  outline-offset: 4px;
+}
+
+.stage-block.is-selected {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 4px;
+}
+
+/* 拖着走：浮起来一点、带阴影，跟着指针（transform 由 src/stage/blocks.js 写） */
+.stage-block.is-dragging {
+  z-index: 2;
+  background: color-mix(in srgb, var(--ui-accent) 12%, transparent);
+  outline: 2px solid var(--ui-accent);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.18);
+  cursor: grabbing;
+  transition: none;
+}
+
+.stage-block-layer:has(.is-dragging) .stage-block-bar {
+  display: none;
+}
+
+/* 换样式的小菜单：挂在工具条下面 */
+.stage-block-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  display: flex;
+  min-width: 128px;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-popover);
+  box-shadow: var(--ui-popover-shadow);
+  transform: translateX(-50%);
+  transform-origin: 50% 0;
+  transition:
+    opacity var(--motion-quick) var(--ease-standard),
+    transform var(--motion-moderate) var(--ease-spring);
+}
+
+@starting-style {
+  .stage-block-menu {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.96);
+  }
+}
+
+.stage-block-bar.is-below .stage-block-menu {
+  top: calc(100% + 6px);
+}
+
+/* 选择器带上工具条：压过 .stage-media-bar button 的小方钮样式 */
+.stage-block-bar .stage-block-menu-item {
+  display: flex;
+  width: auto;
+  place-items: initial;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.stage-block-bar .stage-block-menu-item:hover,
+.stage-block-bar .stage-block-menu-item:focus-visible {
+  background: var(--ui-hover);
+  outline: none;
+}
+
+.stage-block-bar .stage-block-menu-item:active {
+  transform: scale(0.98);
+}
+
+.stage-block-bar .stage-block-menu-item[aria-checked="true"] {
+  color: var(--ui-accent);
+  font-weight: 600;
+}
+
+.stage-block-bar .stage-block-menu-item[aria-checked="true"]::after {
+  content: "✓";
+  margin-left: auto;
+}
+
+.stage-block-menu-rule {
+  width: 100%;
+  height: 1px;
+  margin: 3px 0;
+  border: 0;
+  background: var(--ui-border);
+}
+
+/* ===== 卡片上的批注（src/stage/annotations.js） ===== */
+.stage-note-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.stage-note-pin {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid var(--ui-window);
+  border-radius: 50%;
+  background: var(--ui-accent);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  pointer-events: auto;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.25);
+  transform: translate(-40%, -60%);
+  transition: transform var(--motion-quick) var(--ease-spring);
+}
+
+.stage-note-pin:hover {
+  transform: translate(-40%, -60%) scale(1.12);
+}
+
+.stage-note-pin:active {
+  transform: translate(-40%, -60%) scale(0.94);
+}
+
+@starting-style {
+  .stage-note-pin {
+    transform: translate(-40%, -60%) scale(0.4);
+  }
+}
+
+.stage-note-editor {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  width: min(300px, 80%);
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-popover);
+  box-shadow: var(--ui-popover-shadow);
+  transform-origin: 0 0;
+  transition:
+    opacity var(--motion-quick) var(--ease-standard),
+    transform var(--motion-moderate) var(--ease-spring);
+}
+
+@starting-style {
+  .stage-note-editor {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+.stage-note-editor textarea {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 13px;
+  line-height: 1.5;
+  resize: none;
+}
+
+.stage-note-editor textarea:focus {
+  border-color: var(--ui-accent);
+  outline: none;
+}
+
+.stage-note-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* 舞台右上角的一条：几处批注、交给 AI、清空（不挡翻页与胶片） */
+.stage-note-tray {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-popover);
+  box-shadow: var(--ui-popover-shadow);
+  transition:
+    opacity var(--motion-quick) var(--ease-standard),
+    transform var(--motion-moderate) var(--ease-spring);
+}
+
+.stage-note-tray[hidden] {
+  display: none;
+}
+
+@starting-style {
+  .stage-note-tray {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+.stage-note-count {
+  color: var(--ui-text-2);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}

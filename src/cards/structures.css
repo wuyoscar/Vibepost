@@ -1,0 +1,826 @@
+/* HTML 卡片的卡片结构（ADR 0006）：页眉、页脚与页面上的装饰。
+   版心（--pad-*）、字号行距、标题比例（--h1…）、图片圆角、知识卡底板（--board-*）、配色与字体都不写在这里：
+   src/cards/cards.js 从 src/engine/structures.js 与这篇的配色、字体算好，作为变量写在每一页的 .mc-page 上。
+   正文区与页眉页脚都按卡片坐标绝对定位。 */
+
+.mc-page[data-structure] {
+  --mc-gap: calc(var(--mc-size-body) * var(--mc-leading) * 0.55);
+
+  display: block;
+  padding: 0;
+  background: var(--mc-bg);
+  /* 行高取整像素：一行行严丝合缝地排，量出来的每行也是整数 */
+  line-height: round(calc(var(--mc-size-body) * var(--mc-leading)), 1px);
+}
+
+.mc-page[data-structure] > .mc-body {
+  position: absolute;
+  inset: var(--pad-t) var(--pad-r) var(--pad-b) var(--pad-l);
+}
+
+.mc-page[data-structure] .mc-body h1 {
+  font-size: calc(var(--mc-size-body) * var(--h1));
+  font-weight: var(--h1-weight);
+  line-height: round(calc(var(--mc-size-body) * var(--h1) * var(--h1-leading)), 1px);
+  text-align: var(--h1-align);
+}
+
+.mc-page[data-structure] .mc-body h2 {
+  font-size: calc(var(--mc-size-body) * var(--h2));
+  font-weight: var(--h2-weight);
+  line-height: round(calc(var(--mc-size-body) * var(--h2) * var(--h2-leading)), 1px);
+}
+
+.mc-page[data-structure] .mc-body h3 {
+  font-size: calc(var(--mc-size-body) * var(--h3));
+  font-weight: var(--h3-weight);
+  line-height: round(calc(var(--mc-size-body) * var(--h3) * var(--h3-leading)), 1px);
+}
+
+.mc-page[data-structure] .mc-img {
+  border-radius: var(--mc-radius);
+}
+
+/* 结尾页：[[结尾]] 之后的内容居中、两侧多留白，和署名一起上下居中 */
+.mc-page[data-kind="end"] > .mc-body {
+  justify-content: center;
+  align-items: center;
+  padding: 0 var(--end-inset, 48px);
+  text-align: center;
+}
+
+.mc-signature {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  order: 1; /* 排在内容后面（在 DOM 里它先放进正文区） */
+  margin-top: calc(64px - var(--mc-gap));
+}
+
+.mc-body > .mc-signature:only-child {
+  margin-top: 0;
+}
+
+.mc-sig-rule {
+  width: 40px;
+  height: 2px;
+  margin-bottom: 46px;
+  background: var(--mc-accent);
+}
+
+.mc-page[data-structure] .mc-sig-avatar {
+  width: var(--sig-avatar, 96px);
+  height: var(--sig-avatar, 96px);
+}
+
+.mc-sig-name {
+  margin-top: 22px;
+  color: var(--mc-text);
+  font-family: var(--sig-name-font, var(--mc-font-body));
+  font-size: var(--sig-name-size, 32px);
+  font-weight: var(--sig-name-weight, 600);
+  letter-spacing: var(--sig-name-spacing, 0);
+  line-height: 1.3;
+  text-transform: var(--sig-name-case, none);
+}
+
+.mc-sig-handle {
+  margin-top: 6px;
+  color: var(--mc-muted);
+  font-size: var(--sig-handle-size, 24px);
+  line-height: 1.3;
+}
+
+/* ---------- 封面（src/cards/cover.js）：位置、字号按卡片结构的 cover 规格写成变量 ---------- */
+
+.mc-page[data-kind="cover"] > .mc-body {
+  inset: 0;
+  display: block;
+}
+
+/* 封面的正文区铺满整页（底图、遮罩在里面）：页眉页脚压在它上面 */
+.mc-page[data-kind="cover"] > .mc-head,
+.mc-page[data-kind="cover"] > .mc-foot {
+  z-index: 1;
+}
+
+.mc-cover {
+  position: absolute;
+  inset: 0;
+}
+
+.mc-cover-text {
+  position: absolute;
+  top: var(--cover-top);
+  right: var(--cover-right);
+  bottom: var(--cover-bottom);
+  left: var(--cover-left);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.mc-cover[data-anchor="top"] .mc-cover-text {
+  justify-content: flex-start;
+}
+
+.mc-cover[data-anchor="bottom"] .mc-cover-text {
+  justify-content: flex-end;
+}
+
+.mc-cover[data-align="center"] .mc-cover-text {
+  align-items: center;
+  text-align: center;
+}
+
+/* 比正文标题（.mc-page[data-structure] .mc-body h1）高一级，免得行高、字重被它换掉 */
+.mc-page[data-structure] .mc-body .mc-cover-title {
+  margin: 0;
+  color: var(--mc-secondary);
+  font-family: var(--mc-font-display);
+  font-weight: var(--cover-title-weight);
+  line-height: var(--cover-title-leading);
+  text-wrap: balance;
+  /* 英文单词不从中间拆：放不下就缩小字号（src/cards/cover.js 的 fit） */
+  overflow-wrap: normal;
+}
+
+/* 最小字号也放不下：单词只好拆开（截断在 cover.js 里做） */
+.mc-cover-title[data-clamped] {
+  overflow-wrap: anywhere;
+}
+
+.mc-cover-subtitle {
+  margin: var(--cover-sub-gap) 0 0;
+  color: var(--mc-muted);
+  font-size: var(--cover-sub-size);
+  font-weight: var(--cover-sub-weight);
+  line-height: var(--cover-sub-leading);
+  overflow-wrap: anywhere;
+}
+
+/* 副标题钉在某个高度（瑞士网格） */
+.mc-cover[data-pinned] .mc-cover-subtitle {
+  position: absolute;
+  top: calc(var(--cover-sub-pin) - var(--cover-top));
+  right: 0;
+  left: 0;
+  margin: 0;
+}
+
+.mc-cover-image {
+  margin: 0;
+}
+
+.mc-page[data-structure] .mc-cover .mc-img {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--plate-radius, 0);
+}
+
+.mc-cover .mc-img > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 固定框里的底图 */
+.mc-cover[data-image="plate"] .mc-cover-image {
+  position: absolute;
+  top: var(--plate-y);
+  left: var(--plate-x);
+  width: var(--plate-w);
+  height: var(--plate-h);
+}
+
+/* 跟在文字下面、一直到页底的底图（备忘录） */
+.mc-cover[data-image="below"] .mc-cover-text {
+  bottom: var(--plate-bottom);
+}
+
+.mc-cover[data-image="below"] .mc-cover-image {
+  flex: 1 1 auto;
+  min-height: var(--plate-min);
+  margin-top: var(--plate-gap);
+}
+
+/* 铺满的底图：文字压在底部渐变到底色的遮罩上；实况的图框只到遮罩最不透处 */
+.mc-cover[data-image="bleed"] .mc-cover-image {
+  position: absolute;
+  inset: 0;
+}
+
+.mc-cover[data-image="bleed"] .mc-cover-image[data-live="true"] {
+  bottom: auto;
+  height: var(--cover-solid, 60%);
+}
+
+.mc-cover-scrim {
+  position: absolute;
+  top: calc(var(--cover-solid, 60%) - var(--cover-fade));
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--mc-bg) 90%, transparent) var(--cover-fade), var(--mc-bg));
+}
+
+.mc-cover[data-image="bleed"]:has([data-live="true"]) .mc-cover-scrim {
+  top: var(--cover-solid, 60%);
+  background: var(--mc-bg);
+}
+
+/* 封面上的装饰：默认都不显示，按结构打开（哪些结构打开见下面各结构的规则） */
+.mc-cover-mark,
+.mc-cover-rule,
+.mc-cover-lines,
+.mc-cover-quote,
+.mc-cover-base {
+  display: none;
+}
+
+/* 左对齐的封面标题只有字那么宽：标题下的线跟着最宽的一行 */
+.mc-cover[data-align="left"] .mc-cover-title {
+  align-self: flex-start;
+}
+
+/* 居中的封面，标题也居中（封面标题同时是 h1，不跟着正文标题的对齐走） */
+.mc-page[data-structure] .mc-body .mc-cover[data-align="center"] .mc-cover-title {
+  text-align: center;
+}
+
+/* 页眉、页脚：绝对定位在卡片坐标上 */
+.mc-page[data-structure] > .mc-head,
+.mc-page[data-structure] > .mc-foot {
+  position: absolute;
+  right: var(--pad-r);
+  left: var(--pad-l);
+  padding: 0;
+  color: var(--mc-muted);
+  font-family: var(--mc-font-label);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.mc-page[data-structure] > .mc-head {
+  top: 0;
+}
+
+.mc-page[data-structure] > .mc-foot {
+  bottom: 30px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.mc-page[data-structure] .mc-avatar {
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.mc-page[data-structure] .mc-avatar.is-empty {
+  display: inline-block;
+  background: var(--mc-tint);
+}
+
+/* ================= 各主题的卡片结构（v5 定稿的八个，src/themes/themes.js） ================= */
+
+/* ---------- 陶土：暖米纸、衬线大标题、一点陶土色 ---------- */
+
+.mc-clay-head {
+  position: absolute;
+  top: 72px;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 40px;
+  font-size: 22px;
+  letter-spacing: 1.5px;
+}
+
+.mc-clay-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--mc-accent);
+}
+
+.mc-clay-head .mc-avatar {
+  width: 40px;
+  height: 40px;
+}
+
+.mc-clay-head .mc-sign {
+  color: var(--mc-text);
+  font-weight: 500;
+}
+
+.mc-clay-head .mc-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 小标题不加装饰，前面多留一点白分段 */
+.mc-page[data-structure="clay"] .mc-body h2 {
+  margin-top: 12px;
+}
+
+.mc-page[data-structure="clay"] .mc-body blockquote {
+  position: relative;
+  padding: 6px 0 6px 30px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--mc-secondary);
+  font-family: var(--mc-font-display);
+  font-size: 1.08em;
+}
+
+.mc-page[data-structure="clay"] .mc-body blockquote::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--mc-accent);
+}
+
+.mc-page[data-structure="clay"] .mc-marker.is-bullet::before {
+  border-radius: 2px;
+}
+
+.mc-page[data-structure="clay"] .mc-body pre {
+  border-radius: 12px;
+}
+
+.mc-page[data-structure="clay"] .mc-cover-subtitle {
+  color: color-mix(in oklab, var(--mc-text) 62%, var(--mc-bg));
+}
+
+.mc-page[data-structure="clay"] .mc-cover-mark {
+  display: block;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 44px;
+  border-radius: 50%;
+  background: var(--mc-accent);
+}
+
+.mc-page[data-structure="clay"] .mc-cover:is([data-image="plate"], [data-image="below"]) .mc-cover-mark {
+  display: none;
+}
+
+/* ---------- 纯白、纯黑：只有页眉下一条线，其余全靠字重与留白 ---------- */
+
+.mc-plain-head {
+  position: absolute;
+  top: 64px;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 44px;
+  padding-bottom: 16px;
+  box-sizing: content-box;
+  border-bottom: 2px solid var(--mc-text);
+  color: var(--mc-text);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 3px;
+}
+
+.mc-plain-head .mc-avatar {
+  width: 36px;
+  height: 36px;
+}
+
+.mc-plain-head .mc-count {
+  margin-left: auto;
+  color: var(--mc-muted);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.mc-page:is([data-structure="plain"], [data-structure="ink"]) .mc-body blockquote {
+  padding: 4px 0 4px 26px;
+  border-left: 3px solid var(--mc-text);
+  border-radius: 0;
+  background: none;
+  color: var(--mc-text);
+}
+
+.mc-page:is([data-structure="plain"], [data-structure="ink"]) .mc-marker {
+  color: var(--mc-text);
+}
+
+.mc-page:is([data-structure="plain"], [data-structure="ink"]) .mc-marker.is-bullet::before {
+  width: 0.26em;
+  height: 0.26em;
+  border-radius: 0;
+}
+
+.mc-page:is([data-structure="plain"], [data-structure="ink"]) .mc-body :is(pre, code) {
+  border-radius: 0;
+}
+
+.mc-page:is([data-structure="plain"], [data-structure="ink"]) .mc-body th {
+  border-top: 2px solid var(--mc-text);
+  border-bottom: 2px solid var(--mc-text);
+  background: none;
+  color: var(--mc-text);
+}
+
+.mc-page:is([data-structure="plain"], [data-structure="ink"]) .mc-cover-subtitle {
+  color: color-mix(in oklab, var(--mc-text) 60%, var(--mc-bg));
+}
+
+/* 纯黑：线条用淡白，次要文字提亮一点，不刺眼也不发灰 */
+.mc-page[data-structure="ink"] .mc-plain-head {
+  border-bottom-color: color-mix(in oklab, var(--mc-text) 24%, transparent);
+}
+
+.mc-page[data-structure="ink"] :is(.mc-plain-head .mc-count, .mc-sig-handle, .mc-body figcaption) {
+  color: color-mix(in oklab, var(--mc-text) 64%, var(--mc-bg));
+}
+
+.mc-page[data-structure="ink"] .mc-body blockquote {
+  border-left-color: color-mix(in oklab, var(--mc-text) 45%, transparent);
+}
+
+.mc-page[data-structure="ink"] .mc-body th {
+  border-color: color-mix(in oklab, var(--mc-text) 40%, transparent);
+}
+
+/* ---------- 杂志：全衬线、居中刊头、页码 ---------- */
+
+.mc-ed-head {
+  position: absolute;
+  top: 76px;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  height: 24px;
+  color: var(--mc-muted);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 6px;
+}
+
+.mc-ed-rule {
+  width: 56px;
+  height: 1px;
+  background: var(--mc-rule);
+}
+
+.mc-page[data-structure="editorial"] .mc-foot {
+  bottom: 70px;
+  justify-content: center;
+}
+
+.mc-folio {
+  color: var(--mc-muted);
+  font-family: var(--mc-font-display);
+  font-size: 26px;
+  letter-spacing: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 引语：大一号的衬线字，上面一小段强调色短线 */
+.mc-page[data-structure="editorial"] .mc-body blockquote {
+  padding: 30px 0 4px;
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(var(--mc-accent), var(--mc-accent)) left top / 48px 2px no-repeat;
+  color: var(--mc-secondary);
+  font-family: var(--mc-font-display);
+  font-size: 1.16em;
+}
+
+.mc-page[data-structure="editorial"] .mc-body hr {
+  width: 64px;
+  background: var(--mc-text);
+}
+
+.mc-page[data-structure="editorial"] .mc-body th {
+  background: none;
+  border-bottom: 1px solid var(--mc-text);
+  color: var(--mc-text);
+}
+
+.mc-page[data-structure="editorial"] .mc-cover-rule {
+  display: block;
+  width: 64px;
+  height: 1px;
+  margin: 40px auto 0;
+  background: var(--mc-text);
+}
+
+/* ---------- 备忘：左上角一个黄色小签，其余干净 ---------- */
+
+.mc-notes-head {
+  position: absolute;
+  top: 64px;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  height: 44px;
+  font-size: 20px;
+}
+
+.mc-notes-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 12px;
+  background: var(--mc-accent);
+  color: var(--mc-on-accent);
+  font-weight: 600;
+}
+
+.mc-notes-tag .mc-avatar {
+  width: 28px;
+  height: 28px;
+  margin-left: -6px;
+}
+
+/* 还没填署名：小签里只有头像，收成一个小方块 */
+.mc-notes-tag.is-avatar-only {
+  padding: 0 8px;
+}
+
+.mc-notes-tag.is-avatar-only .mc-avatar {
+  margin-left: 0;
+}
+
+.mc-notes-head .mc-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.mc-page[data-structure="notes"] .mc-body blockquote {
+  padding: 2px 0 2px 24px;
+  border-left: 4px solid var(--mc-accent);
+  border-radius: 0;
+  background: none;
+  color: var(--mc-text);
+}
+
+.mc-page[data-structure="notes"] .mc-marker {
+  color: var(--mc-muted);
+}
+
+.mc-page[data-structure="notes"] .mc-cover-rule {
+  display: block;
+  width: 100%;
+  height: 1px;
+  margin-top: 32px;
+  background: var(--mc-rule);
+}
+
+/* ---------- 手帐：文楷、极淡的点阵、胶带、照片白边 ---------- */
+
+.mc-page[data-structure="journal"] {
+  isolation: isolate;
+}
+
+/* 极淡的点阵：圆点用 SVG 遮罩画、颜色跟着正文色，压在正文下面。不用径向渐变：渐变的抖动让每次出图差一两个色阶 */
+.mc-page[data-structure="journal"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: color-mix(in oklab, var(--mc-text) 13%, transparent);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Ccircle cx='18' cy='18' r='1.6'/%3E%3C/svg%3E") 18px 18px / 36px 36px repeat;
+}
+
+.mc-tape {
+  position: absolute;
+  top: 56px;
+  left: -12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  height: 46px;
+  padding: 0 26px;
+  background: color-mix(in oklab, var(--mc-accent) 24%, var(--mc-bg));
+  color: var(--mc-text);
+  font-family: var(--mc-font-display);
+  font-size: 22px;
+  transform: rotate(-3deg);
+  clip-path: polygon(0 8%, 4% 0, 100% 6%, 97% 50%, 100% 94%, 3% 100%, 0 60%);
+}
+
+.mc-tape .mc-avatar {
+  width: 30px;
+  height: 30px;
+}
+
+.mc-page[data-structure="journal"] .mc-marker.is-bullet::before {
+  width: 0.34em;
+  height: 0.34em;
+  border: 2px solid currentColor;
+  background: none;
+  box-sizing: border-box;
+}
+
+.mc-page[data-structure="journal"] .mc-body blockquote {
+  padding: 14px 22px;
+  border: 0;
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--mc-accent) 12%, var(--mc-bg));
+  color: var(--mc-text);
+}
+
+.mc-page[data-structure="journal"] .mc-figure:not(.mc-pair) > .mc-img {
+  box-shadow: 0 0 0 10px #ffffff, 0 10px 24px rgb(30 45 40 / 0.14);
+}
+
+.mc-page[data-structure="journal"] .mc-cover[data-image="plate"] .mc-cover-image {
+  box-shadow: 0 0 0 14px #ffffff, 0 14px 30px rgb(30 45 40 / 0.16);
+  transform: rotate(-2deg);
+}
+
+/* 封面标题：马克笔划过的底 */
+.mc-page[data-structure="journal"] .mc-body .mc-cover-title {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, var(--mc-accent) 30%, transparent);
+  text-decoration-skip-ink: none;
+  text-decoration-thickness: 0.34em;
+  text-underline-offset: -0.2em;
+}
+
+.mc-page[data-structure="journal"] .mc-cover-mark {
+  display: block;
+  width: 180px;
+  height: 40px;
+  margin-bottom: 40px;
+  background: color-mix(in oklab, var(--mc-accent) 26%, var(--mc-bg));
+  transform: rotate(-4deg);
+  clip-path: polygon(0 10%, 5% 0, 100% 8%, 96% 50%, 100% 92%, 4% 100%, 0 58%);
+}
+
+.mc-page[data-structure="journal"] .mc-cover[data-image="plate"] .mc-cover-mark {
+  display: none;
+}
+
+/* ---------- 撞色：封面、结尾是满版强调色，正文页暖白底；黑色页眉条、贴纸式小标题 ---------- */
+
+.mc-page[data-structure="poster"]:is([data-kind="cover"], [data-kind="end"]) {
+  background: var(--mc-accent);
+}
+
+/* 颜色变量写在页面的内联样式上，要在里面一层换：强调色底上的字、标题、次要文字 */
+.mc-page[data-structure="poster"]:is([data-kind="cover"], [data-kind="end"]) > * {
+  --mc-secondary: var(--mc-on-accent);
+  --mc-text: var(--mc-on-accent);
+  --mc-muted: color-mix(in oklab, var(--mc-on-accent) 72%, var(--mc-accent));
+}
+
+.mc-poster-band {
+  position: absolute;
+  top: 0;
+  right: calc(-1 * var(--pad-r));
+  left: calc(-1 * var(--pad-l));
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 96px;
+  padding: 0 var(--pad-r) 0 var(--pad-l);
+  box-sizing: border-box;
+  background: var(--mc-text);
+  color: var(--mc-bg);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.mc-page[data-structure="poster"]:is([data-kind="cover"], [data-kind="end"]) .mc-poster-band {
+  color: var(--mc-accent);
+}
+
+.mc-poster-band .mc-avatar {
+  width: 44px;
+  height: 44px;
+}
+
+.mc-poster-band .mc-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 得意黑只给封面标题；正文里的标题用正文字体的粗体 */
+.mc-page[data-structure="poster"] .mc-body :is(h1, h2, h3):not(.mc-cover-title) {
+  font-family: var(--mc-font-body);
+}
+
+.mc-page[data-structure="poster"] .mc-body :is(h2, h3) {
+  width: fit-content;
+  padding: 2px 16px 4px;
+  background: var(--mc-text);
+  color: var(--mc-bg);
+}
+
+.mc-page[data-structure="poster"] .mc-body blockquote {
+  padding: 18px 24px;
+  border: 0;
+  border-radius: 0;
+  background: var(--mc-accent);
+  color: var(--mc-on-accent);
+  font-weight: 600;
+}
+
+.mc-page[data-structure="poster"] .mc-body :is(pre, code) {
+  border-radius: 0;
+}
+
+.mc-page[data-structure="poster"] .mc-marker {
+  color: var(--mc-text);
+  font-weight: 900;
+}
+
+.mc-page[data-structure="poster"] .mc-marker.is-bullet::before {
+  width: 0.34em;
+  height: 0.34em;
+  border-radius: 0;
+}
+
+.mc-page[data-structure="poster"] .mc-body hr {
+  height: 4px;
+  background: var(--mc-text);
+}
+
+.mc-page[data-structure="poster"] .mc-img {
+  outline: 4px solid var(--mc-text);
+  outline-offset: -4px;
+}
+
+.mc-page[data-structure="poster"] .mc-body table {
+  border: 3px solid var(--mc-text);
+}
+
+.mc-page[data-structure="poster"] .mc-body th {
+  background: var(--mc-text);
+  color: var(--mc-bg);
+}
+
+/* ---------- 柔光：同色系的柔和渐变纸 ---------- */
+
+.mc-page[data-structure="glow"] {
+  background:
+    radial-gradient(70% 45% at 88% 6%, color-mix(in oklab, var(--mc-accent) 20%, transparent), transparent),
+    radial-gradient(80% 50% at 0% 100%, color-mix(in oklab, var(--mc-accent) 12%, transparent), transparent),
+    var(--mc-bg);
+}
+
+.mc-glow-head {
+  position: absolute;
+  top: 70px;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 40px;
+  color: var(--mc-accent-text);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.mc-glow-head .mc-avatar {
+  width: 36px;
+  height: 36px;
+}
+
+.mc-glow-head .mc-count {
+  margin-left: auto;
+  color: var(--mc-muted);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.mc-page[data-structure="glow"] .mc-body blockquote {
+  padding: 18px 26px;
+  border: 0;
+  border-radius: 20px;
+  background: color-mix(in oklab, var(--mc-accent) 10%, var(--mc-bg));
+  color: var(--mc-text);
+}
+
+.mc-page[data-structure="glow"] .mc-body pre {
+  border-radius: 18px;
+}

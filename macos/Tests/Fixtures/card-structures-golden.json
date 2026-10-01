@@ -1,0 +1,357 @@
+{
+  "clay" : {
+    "pageCount" : 4,
+    "pages" : [
+      {
+        "bounds" : [
+          80,
+          150,
+          784,
+          1048
+        ],
+        "dropTargets" : [
+          "block y 150 h 78 src 2-15",
+          "text-line y 274 h 230 src 17-81",
+          "text-line y 564 h 108 src 83-109",
+          "block y 734 h 61 src 114-124",
+          "text-line y 829 h 63 src 126-138",
+          "text-line y 898 h 63 src 139-151",
+          "text-line y 967 h 63 src 152-161"
+        ],
+        "imageHits" : [
+
+        ],
+        "sha256" : "4e7299bdcf2b040e8940691d7bc3b5fd441fa42820bd9b63561e9bffb17a1bd5"
+      },
+      {
+        "bounds" : [
+          80,
+          150,
+          784,
+          1048
+        ],
+        "dropTargets" : [
+          "text-line y 161 h 167 src 163-228",
+          "block single.png y 375 h 422 src 230-263",
+          "block y 844 h 61 src 268-278",
+          "text-line y 950 h 41 src 280-393"
+        ],
+        "imageHits" : [
+          "single.png 150,375 563x422 base 704 max 704 resize 704 src 230-263"
+        ],
+        "sha256" : "1d518a2fff637901f4d319738b1e61bf3b27f427b6742a9a38ecad336883568c"
+      }
+    ],
+    "structure" : "clay"
+  },
+  "editorial" : {
+    "pageCount" : 5,
+    "pages" : [
+      {
+        "bounds" : [
+          80,
+          150,
+          784,
+          1002
+        ],
+        "dropTargets" : [
+          "block y 150 h 79 src 2-15",
+          "text-line y 272 h 235 src 17-81",
+          "text-line y 584 h 117 src 83-109"
+        ],
+        "imageHits" : [
+
+        ],
+        "sha256" : "285ace8f341868b9f1dc7ae189d9d947a78f244ed15a3519e2f2e1eb8c07a25d"
+      },
+      {
+        "bounds" : [
+          80,
+          150,
+          784,
+          1002
+        ],
+        "dropTargets" : [
+          "block y 150 h 62 src 114-124",
+          "text-line y 247 h 63 src 126-138",
+          "text-line y 316 h 63 src 139-151",
+          "text-line y 385 h 63 src 152-161",
+          "text-line y 490 h 172 src 163-228"
+        ],
+        "imageHits" : [
+
+        ],
+        "sha256" : "5c0d8b6de52f4d9242e94a6155080e833234ad98611888aa457fa336a613d8f2"
+      }
+    ],
+    "structure" : "editorial"
+  },
+  "glow" : {
+    "pageCount" : 4,
+    "pages" : [
+      {
+        "bounds" : [
+          72,
+          150,
+          792,
+          1052
+        ],
+        "dropTargets" : [
+          "block y 150 h 78 src 2-15",
+          "text-line y 274 h 230 src 17-81",
+          "text-line y 578 h 104 src 83-109",
+          "block y 746 h 62 src 114-124",
+          "text-line y 842 h 63 src 126-138",
+          "text-line y 911 h 63 src 139-151",
+          "text-line y 980 h 63 src 152-161"
+        ],
+        "imageHits" : [
+
+        ],
+        "sha256" : "4aa176c340a00154216174fdb10e46f08fbd202d38af78357588a34cbdba00c4"
+      },
+      {
+        "bounds" : [
+          72,
+          150,
+          792,
+          1052
+        ],
+        "dropTargets" : [
+          "text-line y 161 h 167 src 163-228",
+          "block single.png y 376 h 432 src 230-263",
+          "block y 842 h 62 src 268-278",
+          "text-line y 950 h 41 src 280-393"
+        ],
+        "imageHits" : [
+          "single.png 144,376 576x432 base 720 max 720 resize 720 src 230-263"
+        ],
+        "sha256" : "7b579fe58ca405eb877c5831a492534281213f5ccbca60e89487f188ff3a5844"
+      }
+    ],
+    "structure" : "glow"
+  },
+  "ink" : {
+    "pageCount" : 4,
+    "pages" : [
+      {
+        "bounds" : [
+          72,
+          164,
+          792,
+          1056
+        ],
+        "dropTargets" : [
+          "block y 164 h 80 src 2-15",
+          "text-line y 290 h 230 src 17-81",
+          "text-line y 580 h 104 src 83-109",
+          "block y 734 h 62 src 114-124",
+          "text-line y 830 h 63 src 126-138",
+          "text-line y 899 h 63 src 139-151",
+          "text-line y 968 h 63 src 152-161"
+        ],
+        "imageHits" : [
+
+        ],
+        "sha256" : "5174b4c3a95af82b1a0bd868b9546983a0176a30af773c7d0e0340672b9fa40a"
+      },
+      {
+        "bounds" : [
+          72,
+          164,
+          792,
+          1056
+        ],
+        "dropTargets" : [
+          "text-line y 175 h 167 src 163-228",
+          "block single.png y 390 h 432 src 230-263",
+          "block y 856 h 62 src 268-278",
+          "text-line y 964 h 41 src 280-393"
+        ],
+        "imageHits" : [
+          "single.png 144,390 576x432 base 720 max 720 resize 720 src 230-263"
+        ],
+        "sha256" : "76ebabce9226df224273db7413af0c0b3490021826f2e33de78ff1eed30972a9"
+      }
+    ],
+    "structure" : "ink"
+  },
+  "journal" : {
+    "pageCount" : 4,
+    "pages" : [
+      {
+        "bounds" : [
+          76,
+          156,
+          788,
+          1052
+        ],
+        "dropTargets" : [
+          "block y 156 h 81 src 2-15",
+          "text-line y 280 h 235 src 17-81",
+          "text-line y 580 h 109 src 83-109",
+          "block y 747 h 63 src 114-124",
+          "text-line y 844 h 63 src 126-138",
+          "text-line y 913 h 63 src 139-151",
+          "text-line y 982 h 63 src 152-161"
+        ],
+        "imageHits" : [
+
+        ],
+        "sha256" : "208da7571f2e3db604af96b32542b685386038cf1d0e2597ec110e64edd6b2ce"
+      },
+      {
+        "bounds" : [
+          76,
+          156,
+          788,
+          1052
+        ],
+        "dropTargets" : [
+          "text-line y 164 h 172 src 163-228",
+          "block single.png y 380 h 427 src 230-263",
+          "block y 841 h 63 src 268-278",
+          "text-line y 947 h 46 src 280-393"
+        ],
+        "imageHits" : [
+          "single.png 147,380 570x427 base 712 max 712 resize 712 src 230-263"
+        ],
+        "sha256" : "f1ab455e80453bf183d02c7e29fa8e62f988d3bb6f1d34aec5530c550ff6c8f1"
+      }
+    ],
+    "structure" : "journal"
+  },
+  "notes" : {
+    "pageCount" : 4,
+    "pages" : [
+      {
+        "bounds" : [
+          64,
+          150,
+          800,
+          1056
+        ],
+        "dropTargets" : [
+          "block y 150 h 83 src 2-15",
+          "text-line y 279 h 230 src 17-81",
+          "text-line y 567 h 104 src 83-109",
+          "block y 719 h 64 src 114-124",
+          "text-line y 817 h 63 src 126-138",
+          "text-line y 886 h 63 src 139-151",
+          "text-line y 955 h 63 src 152-161"
+        ],
+        "imageHits" : [
+
+        ],
+        "sha256" : "5e402e53fc6a7815ffd9a9f748ffd63ce1f4ac4fb3dcf3dec34a39f9f638d5b4"
+      },
+      {
+        "bounds" : [
+          64,
+          150,
+          800,
+          1056
+        ],
+        "dropTargets" : [
+          "text-line y 161 h 167 src 163-228",
+          "block single.png y 376 h 442 src 230-263",
+          "block y 852 h 64 src 268-278",
+          "text-line y 961 h 41 src 280-393"
+        ],
+        "imageHits" : [
+          "single.png 138,376 589x442 base 736 max 736 resize 736 src 230-263"
+        ],
+        "sha256" : "ce6fe814449a9e64e7284cd4d485e58aa428990d4ed3835de3ea63d3794e4f34"
+      }
+    ],
+    "structure" : "notes"
+  },
+  "plain" : {
+    "pageCount" : 4,
+    "pages" : [
+      {
+        "bounds" : [
+          72,
+          164,
+          792,
+          1056
+        ],
+        "dropTargets" : [
+          "block y 164 h 80 src 2-15",
+          "text-line y 290 h 230 src 17-81",
+          "text-line y 580 h 104 src 83-109",
+          "block y 734 h 62 src 114-124",
+          "text-line y 830 h 63 src 126-138",
+          "text-line y 899 h 63 src 139-151",
+          "text-line y 968 h 63 src 152-161"
+        ],
+        "imageHits" : [
+
+        ],
+        "sha256" : "1916c887fa4d73ede6df387da6c7ec17d403eae7efc6b135b3e73d35198ae090"
+      },
+      {
+        "bounds" : [
+          72,
+          164,
+          792,
+          1056
+        ],
+        "dropTargets" : [
+          "text-line y 175 h 167 src 163-228",
+          "block single.png y 390 h 432 src 230-263",
+          "block y 856 h 62 src 268-278",
+          "text-line y 964 h 41 src 280-393"
+        ],
+        "imageHits" : [
+          "single.png 144,390 576x432 base 720 max 720 resize 720 src 230-263"
+        ],
+        "sha256" : "18ff24488c385cd512d32bfb89354e77f88080718ce9ee69a51ec0add3c48374"
+      }
+    ],
+    "structure" : "plain"
+  },
+  "poster" : {
+    "pageCount" : 5,
+    "pages" : [
+      {
+        "bounds" : [
+          64,
+          160,
+          800,
+          1064
+        ],
+        "dropTargets" : [
+          "block y 160 h 162 src 2-15",
+          "text-line y 368 h 230 src 17-81",
+          "text-line y 672 h 104 src 83-109"
+        ],
+        "imageHits" : [
+
+        ],
+        "sha256" : "8603e1d1ba02848210784df8b52025d1c4469aef7d784aeffa28e53e6b7c559a"
+      },
+      {
+        "bounds" : [
+          64,
+          160,
+          800,
+          1064
+        ],
+        "dropTargets" : [
+          "block y 160 h 63 src 114-124",
+          "text-line y 258 h 63 src 126-138",
+          "text-line y 327 h 63 src 139-151",
+          "text-line y 396 h 63 src 152-161",
+          "text-line y 504 h 167 src 163-228",
+          "block single.png y 719 h 343 src 230-263"
+        ],
+        "imageHits" : [
+          "single.png 203,719 458x343 base 736 max 736 resize 736 src 230-263"
+        ],
+        "sha256" : "6edd409c26ba428db77fa8704bf71bd83d08c8ee7f914b41e0c0c2cb03790132"
+      }
+    ],
+    "structure" : "poster"
+  }
+}

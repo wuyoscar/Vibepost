@@ -1,0 +1,920 @@
+/* 图片与 PDF 的界面（src/media/）：编辑区拖文件的落点线、舞台上的图片选中 / 拖动 / 缩放、
+ * 裁剪、拼图与实况对话框、舞台上的实况预览、检查器「图片」。颜色都走 src/styles.css 的皮肤令牌。 */
+
+:root {
+  --media-well: #1d1d1f;
+  --media-well-line: rgba(255, 255, 255, 0.92);
+  --media-dim: rgba(0, 0, 0, 0.56);
+}
+
+:root[data-ui-theme="dark"] {
+  --media-well: #0c0c0d;
+}
+
+/* ===== 编辑区：拖文件进来时插在哪两行之间 ===== */
+/* 位置由 src/editor/editor.js 写在 translate 上：在两行之间换落点时滑过去；刚出现时从左端展开 */
+.editor-body .cm-file-drop-line {
+  position: absolute;
+  top: 0;
+  z-index: 5;
+  height: 2px;
+  margin-top: -1px;
+  border-radius: 1px;
+  background: var(--ui-accent);
+  pointer-events: none;
+  transform-origin: left;
+  transition:
+    translate var(--motion-fast) var(--ease-standard),
+    scale var(--motion-moderate) var(--ease-decelerate),
+    opacity var(--motion-fast) linear;
+}
+
+@starting-style {
+  .editor-body .cm-file-drop-line {
+    opacity: 0;
+    scale: 0.4 1;
+  }
+}
+
+.editor-body .cm-file-drop-line::before {
+  position: absolute;
+  top: -3px;
+  left: -8px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--ui-accent);
+  border-radius: 50%;
+  background: var(--ui-window);
+  content: "";
+}
+
+.editor-body .cm-editor.is-file-drag .cm-dropCursor {
+  display: none;
+}
+
+/* ===== 舞台：卡片上的图片 ===== */
+.stage-media-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* 描边用 outline：WebKit 里按钮上的 box-shadow 不一定画出来 */
+.stage-media {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+  appearance: none;
+  transition:
+    outline-color var(--motion-fast) var(--ease-standard),
+    outline-offset var(--motion-quick) var(--ease-spring),
+    background-color var(--motion-quick) var(--ease-standard);
+}
+
+.stage-media:hover {
+  outline: 1.5px solid color-mix(in srgb, var(--ui-accent) 60%, transparent);
+  outline-offset: 0;
+}
+
+.stage-media:focus-visible {
+  outline: 3px solid var(--ui-focus);
+  outline-offset: 1px;
+}
+
+.stage-media.is-selected {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 0;
+}
+
+/* 拖走时原处蒙一层，像把图拿起来了 */
+.stage-media.is-dragging {
+  background: color-mix(in srgb, var(--ui-window) 70%, transparent);
+  outline: 1.5px dashed var(--ui-accent);
+  cursor: grabbing;
+}
+
+.stage-media.is-dragging .stage-media-handle,
+.stage-media-layer:has(.is-dragging) .stage-media-bar {
+  display: none;
+}
+
+.stage-media.is-resizing {
+  background: color-mix(in srgb, var(--ui-accent) 10%, transparent);
+}
+
+.stage-media.is-pair-target {
+  background: color-mix(in srgb, var(--ui-accent) 22%, transparent);
+  outline: 3px solid var(--ui-accent);
+  outline-offset: 0;
+}
+
+.stage-media-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--ui-accent);
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.stage-media-handle.is-nw {
+  top: -6px;
+  left: -6px;
+  cursor: nwse-resize;
+}
+
+.stage-media-handle.is-ne {
+  top: -6px;
+  right: -6px;
+  cursor: nesw-resize;
+}
+
+.stage-media-handle.is-sw {
+  bottom: -6px;
+  left: -6px;
+  cursor: nesw-resize;
+}
+
+.stage-media-handle.is-se {
+  right: -6px;
+  bottom: -6px;
+  cursor: nwse-resize;
+}
+
+.stage-media-size {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #ffffff;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  transform: translateX(-50%);
+}
+
+/* 选中的图上方的小工具条（离卡片顶太近时放到图下方） */
+.stage-media-bar {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-popover);
+  box-shadow: var(--ui-popover-shadow);
+  pointer-events: auto;
+  transform: translate(-50%, calc(-100% - 10px));
+  transform-origin: 50% 100%;
+  transition:
+    opacity var(--motion-quick) var(--ease-standard),
+    transform var(--motion-moderate) var(--ease-spring);
+}
+
+/* 选中一张图时它的小工具条从图那一侧弹出来 */
+@starting-style {
+  .stage-media-bar.is-appearing {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 10px)) scale(0.94);
+  }
+
+  .stage-media-bar.is-appearing.is-below {
+    transform: translate(-50%, 10px) scale(0.94);
+  }
+}
+
+.stage-media-bar.is-below {
+  transform: translate(-50%, 10px);
+  transform-origin: 50% 0;
+}
+
+.stage-media-bar button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ui-text-2);
+}
+
+.stage-media-bar button:hover {
+  background: var(--ui-hover);
+  color: var(--ui-text);
+}
+
+.stage-media-bar button:active {
+  background: var(--ui-pressed);
+}
+
+/* 落点线：拖图片或文件时，插进去的两块内容之间 */
+.stage-drop-line {
+  position: absolute;
+  height: 0;
+  border-top: 3px solid var(--ui-accent);
+  border-radius: 2px;
+  pointer-events: none;
+  transform: translateY(-1.5px);
+  transition:
+    opacity var(--motion-fast) linear,
+    scale var(--motion-moderate) var(--ease-decelerate);
+}
+
+/* 换到一个新落点时，线从中间向两边展开（同一个落点不重画，src/media/stage-images.js） */
+@starting-style {
+  .stage-drop-line {
+    opacity: 0;
+    scale: 0.5 1;
+  }
+}
+
+.stage-drop-line::before,
+.stage-drop-line::after {
+  position: absolute;
+  top: -6.5px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--ui-accent);
+  border-radius: 50%;
+  background: var(--ui-window);
+  content: "";
+}
+
+.stage-drop-line::before {
+  left: -8px;
+}
+
+.stage-drop-line::after {
+  right: -8px;
+}
+
+.stage-drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: var(--layer-drag);
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--ui-popover);
+  box-shadow: var(--ui-dialog-shadow);
+  opacity: 0.94;
+  pointer-events: none;
+  rotate: -1.5deg;
+  transform-origin: 0 0;
+  transition:
+    scale var(--motion-moderate) var(--ease-spring),
+    rotate var(--motion-moderate) var(--ease-spring),
+    opacity var(--motion-quick) var(--ease-standard);
+}
+
+/* 拿起来的那一下：从原图大小的感觉缩成小图、微微歪一点 */
+@starting-style {
+  .stage-drag-ghost {
+    opacity: 0;
+    scale: 1.15;
+    rotate: 0deg;
+  }
+}
+
+.stage-drag-ghost canvas {
+  display: block;
+  border-radius: 6px;
+}
+
+/* ===== 裁剪与拼图对话框 ===== */
+.media-dialog {
+  gap: 14px;
+  width: min(760px, 100%);
+  padding: 16px 18px 18px;
+}
+
+.pair-dialog {
+  width: min(640px, 100%);
+}
+
+.media-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.media-dialog-heading {
+  min-width: 0;
+}
+
+.media-dialog-name {
+  color: var(--ui-text-3);
+  font-weight: 500;
+}
+
+/* 对话框标题下面一行：图片名，太长时省略 */
+.media-dialog-names {
+  font-size: 12px;
+  margin: 2px 0 0;
+  color: var(--ui-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-well {
+  position: relative;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--media-well);
+  user-select: none;
+}
+
+.media-dialog-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+
+.media-dialog-controls .segmented-small > button {
+  min-width: 46px;
+}
+
+.media-dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.media-dialog-actions .text-button {
+  gap: 5px;
+}
+
+.media-dialog-spacer {
+  flex: 1;
+}
+
+/* 裁剪：暗底上放原图，选框外压暗，拖动时显示三分线 */
+/* 选框外的压暗铺满取景区（不只是图上），把手压在图边上也看得见 */
+.crop-well {
+  height: min(56vh, 460px);
+  padding: 22px;
+  overflow: hidden;
+}
+
+.crop-box {
+  position: relative;
+}
+
+.crop-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.crop-frame {
+  position: absolute;
+  outline: 1px solid var(--media-well-line);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.22), 0 0 0 9999px var(--media-dim);
+  cursor: move;
+  touch-action: none;
+}
+
+.crop-frame:focus-visible {
+  outline: 2px solid var(--ui-accent);
+}
+
+.crop-grid,
+.crop-grid::before,
+.crop-grid::after {
+  position: absolute;
+  pointer-events: none;
+}
+
+.crop-grid {
+  inset: 0;
+  opacity: 0;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.45));
+  transition: opacity var(--motion-quick) var(--ease-standard);
+}
+
+.crop-grid::before {
+  inset: 0 33.333%;
+  border-right: 1px solid rgba(255, 255, 255, 0.7);
+  border-left: 1px solid rgba(255, 255, 255, 0.7);
+  content: "";
+}
+
+.crop-grid::after {
+  inset: 33.333% 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.7);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.7);
+  content: "";
+}
+
+.media-modal.is-adjusting .crop-grid {
+  opacity: 1;
+}
+
+/* 四角是 L 形的白角，四边中间一小截白条 */
+/* 白把手带一圈淡影，浅色的图上也看得清 */
+.crop-handle {
+  position: absolute;
+  filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.5));
+}
+
+.crop-handle.is-corner {
+  width: 22px;
+  height: 22px;
+  border: 0 solid var(--media-well-line);
+}
+
+.crop-handle.is-nw {
+  top: -4px;
+  left: -4px;
+  border-width: 4px 0 0 4px;
+  cursor: nwse-resize;
+}
+
+.crop-handle.is-ne {
+  top: -4px;
+  right: -4px;
+  border-width: 4px 4px 0 0;
+  cursor: nesw-resize;
+}
+
+.crop-handle.is-sw {
+  bottom: -4px;
+  left: -4px;
+  border-width: 0 0 4px 4px;
+  cursor: nesw-resize;
+}
+
+.crop-handle.is-se {
+  right: -4px;
+  bottom: -4px;
+  border-width: 0 4px 4px 0;
+  cursor: nwse-resize;
+}
+
+.crop-handle.is-edge::before {
+  position: absolute;
+  border-radius: 2px;
+  background: var(--media-well-line);
+  content: "";
+}
+
+.crop-handle.is-n,
+.crop-handle.is-s {
+  left: calc(50% - 16px);
+  width: 32px;
+  height: 14px;
+  cursor: ns-resize;
+}
+
+.crop-handle.is-n {
+  top: -4px;
+}
+
+.crop-handle.is-s {
+  bottom: -4px;
+}
+
+.crop-handle.is-n::before,
+.crop-handle.is-s::before {
+  left: 4px;
+  right: 4px;
+  height: 4px;
+}
+
+.crop-handle.is-s::before {
+  bottom: 0;
+}
+
+.crop-handle.is-w,
+.crop-handle.is-e {
+  top: calc(50% - 16px);
+  width: 14px;
+  height: 32px;
+  cursor: ew-resize;
+}
+
+.crop-handle.is-w {
+  left: -4px;
+}
+
+.crop-handle.is-e {
+  right: -4px;
+}
+
+.crop-handle.is-w::before,
+.crop-handle.is-e::before {
+  top: 4px;
+  bottom: 4px;
+  width: 4px;
+}
+
+.crop-handle.is-e::before {
+  right: 0;
+}
+
+.crop-frame.has-aspect .crop-handle.is-edge {
+  display: none;
+}
+
+.crop-zoom {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 150px;
+  color: var(--ui-text-3);
+}
+
+.crop-zoom input {
+  flex: 1;
+  min-width: 0;
+}
+
+.crop-size {
+  min-width: 88px;
+  color: var(--ui-text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* 拼图：和卡片上一样两张并排、中间留缝，拖下边改整组比例 */
+.pair-well {
+  padding: 24px 24px 36px;
+}
+
+.pair-stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  width: min(480px, 100%);
+}
+
+.pair-frame {
+  position: relative;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #2c2c2e;
+}
+
+.pair-frame canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.pair-frame-edit {
+  position: absolute;
+  inset: 8px 8px auto auto;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.58);
+  color: #ffffff;
+  opacity: 0;
+}
+
+.pair-frame-edit:hover {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.pair-frame:hover .pair-frame-edit,
+.pair-frame-edit:focus-visible {
+  opacity: 1;
+}
+
+.pair-ratio-handle {
+  position: absolute;
+  bottom: -20px;
+  left: calc(50% - 26px);
+  width: 52px;
+  height: 16px;
+  border-radius: 8px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.pair-ratio-handle::before {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  left: 8px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.55);
+  content: "";
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    scale var(--motion-moderate) var(--ease-spring);
+}
+
+.media-modal.is-adjusting .pair-ratio-handle::before {
+  scale: 1.15 1.5;
+}
+
+.pair-ratio-handle:hover::before,
+.pair-ratio-handle:focus-visible::before,
+.media-modal.is-adjusting .pair-ratio-handle::before {
+  background: #ffffff;
+}
+
+/* ===== 实况编辑器：上面视频与取景框，下面胶片条（亮框是要用的一段，白线是播放头，小点是封面）===== */
+.live-dialog {
+  width: min(820px, 100%);
+}
+
+.live-well {
+  height: min(46vh, 400px);
+  padding: 18px;
+  overflow: hidden;
+}
+
+.live-box {
+  position: relative;
+}
+
+.live-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+}
+
+/* 「原视频」就是整幅画面，框不能动 */
+.live-frame.is-locked {
+  box-shadow: none;
+  outline-color: transparent;
+  cursor: default;
+}
+
+.live-frame.is-locked .crop-handle {
+  display: none;
+}
+
+.live-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
+.live-timeline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-play {
+  flex: none;
+}
+
+.live-track {
+  position: relative;
+  flex: 1;
+  height: 48px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--media-well);
+  cursor: pointer;
+  touch-action: none;
+}
+
+.live-track:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+.live-strip {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 亮框外压暗；黄边和系统相册的剪辑框一样 */
+.live-window {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border: 3px solid #ffcc00;
+  border-radius: 8px;
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.55);
+  cursor: grab;
+}
+
+.live-track:active .live-window {
+  cursor: grabbing;
+}
+
+.live-cover-mark {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: var(--ui-accent);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.6);
+}
+
+.live-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: #ffffff;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+}
+
+.live-controls {
+  gap: 10px 20px;
+}
+
+.live-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-control-wide {
+  flex-basis: 100%;
+}
+
+.live-control-label {
+  color: var(--ui-text-3);
+  font-size: 11px;
+}
+
+.live-sound[aria-pressed="false"] {
+  color: var(--ui-text-3);
+}
+
+.live-cover-button {
+  padding-left: 4px;
+}
+
+.live-cover-thumb {
+  width: auto;
+  max-width: 40px;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--media-well);
+}
+
+.live-summary {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ui-text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ===== 舞台上的实况预览：播放时视频盖在封面上，其余时间透出画布上的封面 ===== */
+.stage-live {
+  position: absolute;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.stage-live-video {
+  position: absolute;
+  max-width: none;
+  object-fit: fill;
+  opacity: 0;
+  transition: opacity var(--motion-moderate) var(--ease-standard);
+}
+
+.stage-live[data-state="playing"] .stage-live-video {
+  opacity: 1;
+}
+
+.stage-live-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/* ===== 检查器「图片」 ===== */
+.image-panel-scope {
+  color: var(--ui-text-3);
+  font-size: 11px;
+}
+
+.image-panel-summary {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--ui-layer);
+}
+
+.image-panel-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  background: var(--ui-window);
+  object-fit: cover;
+}
+
+.image-panel-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.image-panel-meta strong,
+.image-panel-meta span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-panel-meta strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.image-panel-meta span {
+  color: var(--ui-text-3);
+  font-size: 11px;
+}
+
+.image-align-row {
+  align-items: center;
+}
+
+.image-align-row .segmented {
+  flex: 1;
+}
+
+.image-fixed-size {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.image-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.image-panel-delete {
+  color: var(--ui-danger);
+}

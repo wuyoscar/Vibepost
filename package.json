@@ -1,0 +1,16 @@
+{
+  "name": "mediacraft",
+  "version": "1.0.0",
+  "license": "CC-BY-NC-SA-4.0",
+  "private": true,
+  "scripts": {
+    "start": "python3 -m http.server 5173 --bind 127.0.0.1",
+    "build:codemirror": "node scripts/build-codemirror.mjs"
+  },
+  "devDependencies": {
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.13",
+    "esbuild": "0.28.2"
+  }
+}

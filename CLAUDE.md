@@ -1,0 +1,33 @@
+# Vibepost
+
+macOS 排版工具：把 Markdown 排成小红书图文卡片 / 长文长图 / 实况 Live Photo，一键 AirDrop 到 iPhone 发布。
+
+- 名字：对外叫 Vibepost（2026-09-30 由 MediaCraft 改名），图标源文件 `brand/icon.png`（Codex 生图）。bundle id `com.wuyoscar.mediacraft`、`mediacraft://app`、`Application Support/MediaCraft`、存储键名、MCP 服务名 `mediacraft`、代码里的 `MediaCraft*` 标识符都不改：改了会丢稿子或让已登记的 Agent 失联。GitHub 仓库 2026-10-01 改名 `wuyoscar/Vibepost`（旧地址自动跳转），本地目录名照旧。
+- 许可证：CC BY-NC-SA 4.0（署名、非商业、相同方式共享，ADR 0005）；第三方组件保留各自的许可证，清单见 README。
+- 架构：网页（`index.html` + `src/`，原生 JS，无构建）跑在原生壳 `macos/`（Swift + WKWebView）里。壳只提供网页做不到的能力（AirDrop、写文件），通过一个 JS ↔ Swift 桥暴露。一个窗口一篇稿子：全 App 共用一份 `ShellCore.swift`（AI 进程、实况合成、外部 Agent、出图、存储），每个窗口一个 `ShellWebView`（它的原生桥带着窗口 id，AI 的事件只推给发起那一轮的窗口），窗口由 `macos/Sources/MediaCraft/main.swift` 管（文件 › 新建窗口、`window/open`，启动时照 `windows.json` 恢复）；页面照地址 `?draft=` / `?new=1` 打开稿子。同一篇只在一个窗口里：页面 `src/drafts/windows.js` 把这个窗口占着的稿子报给壳（`window/occupy`），开别的窗口占着的那篇时壳把那个窗口调到前面（`window/claim`）；窗口之间经 `BroadcastChannel`（`src/drafts/store.js`）同步稿件列表、署名、我的配色。见 `docs/app-api.md` 的「窗口」。
+- 界面骨架（v3）：`index.html` + `src/styles.css`（浅色、深色两套皮肤令牌，跟随系统外观写在 `<html data-ui-theme>`；卡片主题不影响界面，ADR 0007）+ `src/shell.js`（检查器标签、舞台翻页、窗口外框）+ `src/workspace/`（面板宽度、下拉菜单、检查器的样式表单与署名）。`src/app.js` 只做启动：把各模块接起来、管着正在编辑的这一篇，并挂上 App API `window.mediacraft`（实现在 `src/api/`）。出图在 `src/stage/`（`render.js` 卡片与长文、`pipeline.js` 防抖与只放最新一次、`preview.js` 舞台）；卡片只有 HTML 引擎（ADR 0006）：`src/cards/`（`html.js` 语法树 → HTML、`paginate.js` 在量尺卡里分页与末页回填、`summary.js` 从 DOM 量页面结果、`chrome.js` + `structures.css` 各卡片结构的页面框架、`cards.js` 入口与出图缓存）+ 壳 `CardRasterizer.swift`（不上屏的 WKWebView 截图出 PNG）；卡片结构的数据在 `src/engine/structures.js`，图片的共用规则在 `src/engine/media.js`；当前稿子的图片记录（copy-on-write、可撤销的删图）在 `src/media/image-store.js`，主题与字体在 `src/themes/`（配色库、色轮的配色规则与我的配色在 `palettes.js`，检查器里的两个弹出面板在 `src/workspace/palette-panel.js`）；配色五个角色的名字、用处、对比度门槛、三色规则与颜色计算只在 `src/engine/colors.js`。动效：令牌在 `styles.css` 开头，CSS 做不到的（选中滑块、FLIP、换皮肤、`<html data-motion>`）在 `src/motion.js`，触感走壳 `Haptics.swift`；规范与新控件怎么接见 `docs/design/motion.md`（状态从不等动画）。App 里窗口是原生毛玻璃：WKWebView 透明、网页铺进标题栏（`<html data-glass="native">`）。
+- 正文编辑器（v3）：`src/editor/`，CodeMirror 6 实时预览（ADR 0002），Markdown 文本是唯一的底层格式；应用只经 `MediaCraftEditor.create()` 返回的小接口读写正文与选区；查找栏在 `src/editor/find.js`。卡片内容的纯文本（「复制卡片文字」、长文的「复制全文」与剪贴板）由解析树推出：`src/engine/plain-text.js`。CodeMirror 以预构建文件 `src/vendor/codemirror.js` 离线打包：版本钉在 `package.json` / `package-lock.json`，要用新的导出时 `npm ci && npm run build:codemirror` 重新生成并提交。
+- 稿子：`src/drafts/`（存储、稿件抽屉、标题与字数、小红书正文栏 `caption.js`），布局与升级规则见 `docs/storage.md`。一篇笔记三部分：标题、卡片内容（编辑器里的 Markdown）、小红书正文 `caption`（发布时图片下面的那段，发送时进剪贴板）。
+- 发布助手：`src/publish/`（`check.js` 规则与标题的显示宽度、`lexicon.json` 自己整理的词库、`assistant.js` 页脚「检查」面板、发送前的确认、发完复制话题、系统字体提醒）+ 正文标注 `src/editor/hints.js`；词库出处与字体许可见 `docs/publish-check.md`。
+- AI 会话：`src/ai/`（`session.js` 会话、改稿与权限确认（和后端无关），`backends/` 每个后端的适配（`claude.js`、`codex.js`：输出怎么读、回答怎么写、会话怎么续），`tools.js` App 自己的工具，`review.js` + `diff.js` 修改对比（逐处接受 / 拒绝，编辑器里的标注在 `src/editor/review.js`）、`versions.js` 每轮之前的版本与撤回、`host.js` 审阅时舞台的预览与一步改稿的落点、`panel.js` 检查器里的「AI 助手」：顶上是这篇的会话（标题就是稿子的标题、后端与模型、更多里「重新开始这篇的对话」），会话历史在 `history.js`（聊过的稿子按 `ai.lastActive` 排，接口 `ai.sessions()`））+ 壳 `AISessions.swift`（起进程、转发、收尾）/ `AIBackends.swift`（每个后端的启动参数、开头几行、哪行算说完）/ `AgentLocator.swift`（在终端环境里找 claude / codex）/ `AICandidates.swift`（配图候选，Codex 自带生图生成的图也在读输出时存进来）/ `AIImages.swift`（用 Claude Code 时的生图工具 `generate_image`，直接调 OpenAI）：用本机的 Codex 或 Claude Code（每篇稿子选一个，有了对话就锁定，「重新开始这篇的对话」才能换，ADR 0008；一轮一个进程，在工作副本里改 `draft.md` / `title.txt` / `caption.txt`）。Claude Code 是 `claude -p` stream-json（启动时关掉后台任务），stdin 开到这一轮说完（`result`），权限确认（`--permission-prompt-tool stdio`）与 App 的工具（SDK MCP 服务 `mediacraft`）都走这条控制通道；Codex 是 `codex app-server` 的 JSON-RPC（`thread/start` / `thread/resume` + `turn/start`，App 的工具是动态工具，审批请求弹同样的确认框，`turn/completed` 就说完）；都由页面回答。接口见 `docs/app-api.md` 的 ai 一节；测试用假的 claude（`macos/Tests/Fixtures/ai/fake-claude`，能发控制请求、记下页面的回答）、假的 codex（`fake-codex`，回放脚本里的通知与服务端请求，记下每次调用的 stdin 与回答）与假的生图接口（`fake-image-api`），不调真接口；`MEDIACRAFT_SCREENSHOTS=<目录>` 时部分测试存界面截图。
+- 外部 Agent（MCP）：`src/mcp/`（`server.js` 分派、每个连接认定的稿子（认定由壳 `ShellCore` 记着，请求交给开着那篇的窗口，新建的开新窗口）与「外部 Agent 的操作」，`tools.js` 外部 Agent 另外要的工具，`panel.js` 顶栏提示、开关与操作记录；换主题、分页、摆图片直接用 `src/ai/tools.js` 里标了 shared 的工具）+ 壳 `ExternalAgents.swift`（Unix 域套接字 `~/Library/Application Support/MediaCraft/mcp.sock`、开关 `mcp.json`（默认关，用户在 AI 助手 › 设置里打开）、插图与导出时本机文件的读写）+ `macos/Sources/MediaCraftMCP/`（stdio MCP 服务的核心与套接字，`macos/Sources/mediacraft-mcp/` 打包成 `Vibepost.app/Contents/MacOS/mediacraft-mcp`）。接入、协议与工具见 `docs/mcp.md`，Claude Code 技能在 `skills/mediacraft/SKILL.md`；测试的客户端经管道驱动 MCP 服务的核心（`MCPTests.swift`）。
+- 实况：`src/media/live*.js`（实况编辑器、舞台上的预览播放、视频的存取）+ 壳 `LivePhoto.swift`（AVFoundation 合成 `.pvt` 的 JPG + MOV，ADR 0004），接口见 `docs/app-api.md` 的 media 与 output 两节；测试素材由 `macos/Tests/Fixtures/make-live-fixtures.sh` 生成。
+- 页面以 `mediacraft://app/index.html` 加载，origin 固定不变（改 origin 会丢失 localStorage / IndexedDB 草稿）。
+- 测试只在一个 seam：在 WKWebView 里加载真实页面，AirDrop 换成假接收端，断言收到的文件 / 顺序 / 拍摄时间 / 剪贴板。要几个窗口时 `ShellHarness.openWindow(_:)` 另开一个（同一份 ShellCore 与存储），页面经原生桥要开的窗口用 `harness.window(n)` 拿（`MultiWindowTests.swift`）。
+- 跑测试：`macos/run-tests.sh [--filter 名称] [超时秒数]`（带超时看门狗，只输出摘要）；构建 App：`macos/build-app.sh [debug] [--install]`。
+- 打包字体不进 git：跑测试、构建 App 前先运行一次 `python3 scripts/fetch-fonts.py`，按固定版本下载、校验到 `fonts/`（下载缓存在 `~/Library/Caches/MediaCraft/fonts/`，重复运行很快）。没有 `fonts/` 时页面回退系统字体，Release 构建会警告。
+- 分发：最低 macOS 14（`Package.swift` 与 `build-app.sh` 的 `LSMinimumSystemVersion` 一起改），用到比 Safari 17.0 新的 CSS / JS 要有退路，清单与理由见 `docs/compatibility.md`；版本号只在 `VERSION`；`scripts/make-dmg.sh [--sign "Developer ID Application: …"] [--notarize 钥匙串配置名]` 打通用二进制的 DMG 到 `dist/`（不进 git）。
+
+## Agent skills
+
+### Issue tracker
+
+Issues 以本地 markdown 存放在 `.scratch/<feature>/`（只在本机，`.gitignore` 里排除，不进仓库）。See `docs/agents/issue-tracker.md`（同样只在本机）.
+
+### Triage labels
+
+使用默认五个标签（`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`）。See `docs/agents/triage-labels.md`（只在本机）.
+
+### Domain docs
+
+Single-context（根目录 `CONTEXT.md` + `docs/adr/`，按需创建）。See `docs/agents/domain.md`（只在本机）.

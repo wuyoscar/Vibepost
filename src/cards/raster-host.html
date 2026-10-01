@@ -1,0 +1,13 @@
+<!doctype html>
+<!-- HTML 卡片出图的宿主页：原生壳里一个不上屏的 WKWebView 载入它（macos/Sources/MediaCraftShell/CardRasterizer.swift），
+     逐页换上卡片的 HTML 后截图。卡片放在 Shadow DOM 里，结构与舞台上的预览一致（src/cards/cards.js），所见即所得。 -->
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'" />
+    <link rel="stylesheet" href="../../fonts/fonts.css" />
+    <link rel="stylesheet" href="raster-host.css" />
+    <script src="raster-host.js"></script>
+  </head>
+  <body></body>
+</html>

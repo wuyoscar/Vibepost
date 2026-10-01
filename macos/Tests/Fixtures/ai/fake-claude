@@ -1,0 +1,235 @@
+#!/usr/bin/env python3
+"""假的 claude：测试时代替本机 Claude Code（见 AISessionTests.swift）。
+
+测试把它复制进一个临时目录（名字就叫 claude），同目录里放回放脚本：
+  script-<第几次调用>.jsonl，没有时用 script.jsonl。
+每次调用在 calls/<序号>.json 里记下参数、工作目录、进程号、开始时的 draft.md / title.txt / caption.txt、
+环境变量里关后台任务的 CLAUDE_CODE_DISABLE_BACKGROUND_TASKS、
+stdin 收到的每一行、对控制请求的回答（responses，按 request_id）、收到的信号，以及 stdin 有没有被关上。
+
+脚本一行一个 stream-json 事件，原样写到 stdout（{{SESSION}} 换成会话 id，{{CWD}} 换成工作目录）；
+以 # 开头的是动作：
+  #sleep 秒数
+  #write ["文件", "内容"]        在工作目录里写文件（像 Write 工具）
+  #edit ["文件", "旧", "新"]     把文件里的旧文字换成新文字（像 Edit 工具）
+  #wait-file 名字                等测试在本目录里建出这个文件再往下走
+  #keep-writing 秒数             这么多秒里不停往工作目录的 draft.md 写（像 Write 工具，目录没了就重建），写完再往下走
+  #hang                          一直不结束，等着被停止
+  #ignore-sigint                 忽略 SIGINT（测试停止时会不会再发 SIGTERM）
+  #ignore-sigterm                忽略 SIGTERM（测试收尾时会不会再发 SIGKILL）
+  #close-stdin                   关掉自己的 stdin（之后 App 往里写的回答都送不到）
+  #await-eof                     等 App 关上 stdin（读到 EOF）再往下走，像 result 之后还在干活的 claude
+  #stderr "文字"                 往 stderr 写一行
+  #exit 退出码                   马上退出
+  #control {"request_id": …, "request": {…}}   发一个控制请求（can_use_tool、mcp_message……），等到 stdin 上它的回答再往下走
+  #send-control {…}              同上，但不等回答（之后用 #await 等）
+  #await 请求 id                 等 stdin 上这个请求的回答
+  #cancel-control 请求 id        发 control_cancel_request，撤回还没回答的请求
+
+像真的 claude 一样：stdin 先收到 initialize 控制请求时回答它，然后才读用户的话；
+会话 id 用 --session-id 新建（重复就报错）、用 --resume 继续（没有就报错）；
+回放完不马上退出，等 stdin 被关上（读到 EOF）才退出。
+"""
+import json
+import os
+import signal
+import sys
+import time
+
+HERE = os.path.dirname(os.path.abspath(sys.argv[0]))
+ARGS = sys.argv[1:]
+
+if "--version" in ARGS:
+    print("9.9.9 (Claude Code)")
+    sys.exit(0)
+
+
+def option(name):
+    return ARGS[ARGS.index(name) + 1] if name in ARGS else None
+
+
+def read_file(name):
+    try:
+        with open(name, encoding="utf-8") as handle:
+            return handle.read()
+    except OSError:
+        return None
+
+
+calls = os.path.join(HERE, "calls")
+os.makedirs(calls, exist_ok=True)
+index = 1
+while True:
+    try:
+        descriptor = os.open(os.path.join(calls, f"{index}.json"), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.close(descriptor)
+        break
+    except FileExistsError:
+        index += 1
+
+record = {
+    "argv": ARGS,
+    "cwd": os.getcwd(),
+    "pid": os.getpid(),
+    "draft": read_file("draft.md"),
+    "title": read_file("title.txt"),
+    "caption": read_file("caption.txt"),
+    "stdin": [],
+    "responses": {},
+    "signals": [],
+    "stdinClosed": False,
+    "disableBackgroundTasks": os.environ.get("CLAUDE_CODE_DISABLE_BACKGROUND_TASKS"),
+}
+
+
+def save():
+    path = os.path.join(calls, f"{index}.json")
+    with open(path + ".tmp", "w", encoding="utf-8") as handle:
+        json.dump(record, handle, ensure_ascii=False)
+    os.replace(path + ".tmp", path)
+
+
+save()
+
+sessions = os.path.join(HERE, "sessions")
+os.makedirs(sessions, exist_ok=True)
+session = option("--session-id") or option("--resume") or ""
+if option("--resume") and not os.path.exists(os.path.join(sessions, session)):
+    sys.stderr.write(f"No conversation found with session ID: {session}\n")
+    sys.exit(1)
+if option("--session-id"):
+    if os.path.exists(os.path.join(sessions, session)):
+        sys.stderr.write(f"Error: Session ID {session} is already in use.\n")
+        sys.exit(1)
+    open(os.path.join(sessions, session), "w").close()
+
+ignore_sigint = False
+ignore_sigterm = False
+stdin_open = True
+
+
+def on_signal(number, _frame):
+    name = signal.Signals(number).name.replace("SIG", "")
+    record["signals"].append(name)
+    save()
+    if (number == signal.SIGINT and ignore_sigint) or (number == signal.SIGTERM and ignore_sigterm):
+        return
+    sys.exit(128 + number)
+
+
+signal.signal(signal.SIGINT, on_signal)
+signal.signal(signal.SIGTERM, on_signal)
+
+
+def emit(obj):
+    sys.stdout.write(json.dumps(obj, ensure_ascii=False) + "\n")
+    sys.stdout.flush()
+
+
+def read_line():
+    """stdin 的下一行（记下来）；控制请求的回答存进 responses。读到 EOF 为 None。"""
+    line = sys.stdin.readline()
+    if not line:
+        return None
+    record["stdin"].append(line.rstrip("\n"))
+    try:
+        message = json.loads(line)
+    except ValueError:
+        message = {}
+    if not isinstance(message, dict):
+        message = {}
+    if message.get("type") == "control_response":
+        response = message.get("response", {})
+        record["responses"][response.get("request_id")] = response
+    save()
+    return message
+
+
+def await_response(request_id):
+    while request_id not in record["responses"]:
+        if read_line() is None:
+            return
+
+
+# 先回答 initialize（登记 SDK MCP 服务），再等用户的话
+while True:
+    message = read_line()
+    if message is None or message.get("type") == "user":
+        break
+    if message.get("type") == "control_request" and message.get("request", {}).get("subtype") == "initialize":
+        emit({"type": "control_response", "response": {"subtype": "success", "request_id": message["request_id"],
+                                                       "response": {"commands": [], "models": []}}})
+
+script = os.path.join(HERE, f"script-{index}.jsonl")
+if not os.path.exists(script):
+    script = os.path.join(HERE, "script.jsonl")
+workdir = os.getcwd()
+cwd = json.dumps(workdir)[1:-1]
+
+with open(script, encoding="utf-8") as handle:
+    lines = handle.read().splitlines()
+
+for line in lines:
+    if not line.strip():
+        continue
+    if line.startswith("#"):
+        command, _, argument = line[1:].partition(" ")
+        if command == "sleep":
+            time.sleep(float(argument))
+        elif command == "write":
+            name, content = json.loads(argument)
+            with open(name, "w", encoding="utf-8") as target:
+                target.write(content)
+        elif command == "edit":
+            name, old, new = json.loads(argument)
+            text = read_file(name)
+            with open(name, "w", encoding="utf-8") as target:
+                target.write(text.replace(old, new, 1))
+        elif command == "wait-file":
+            while not os.path.exists(os.path.join(HERE, argument)):
+                time.sleep(0.05)
+        elif command == "keep-writing":
+            deadline = time.time() + float(argument)
+            while time.time() < deadline:
+                os.makedirs(workdir, exist_ok=True)
+                with open(os.path.join(workdir, "draft.md"), "w", encoding="utf-8") as target:
+                    target.write("还在写")
+                time.sleep(0.05)
+        elif command == "hang":
+            while True:
+                time.sleep(1)
+        elif command == "ignore-sigint":
+            ignore_sigint = True
+        elif command == "ignore-sigterm":
+            ignore_sigterm = True
+        elif command == "close-stdin":
+            os.close(0)
+            stdin_open = False
+        elif command == "await-eof":
+            while read_line() is not None:
+                pass
+            stdin_open = False
+            record["stdinClosed"] = True
+            save()
+        elif command == "stderr":
+            sys.stderr.write(json.loads(argument) + "\n")
+            sys.stderr.flush()
+        elif command == "exit":
+            sys.exit(int(argument))
+        elif command in ("control", "send-control"):
+            request = json.loads(argument.replace("{{CWD}}", cwd))
+            emit({"type": "control_request", **request})
+            if command == "control":
+                await_response(request["request_id"])
+        elif command == "await":
+            await_response(argument)
+        elif command == "cancel-control":
+            emit({"type": "control_cancel_request", "request_id": argument})
+        continue
+    sys.stdout.write(line.replace("{{SESSION}}", session).replace("{{CWD}}", cwd) + "\n")
+    sys.stdout.flush()
+
+while stdin_open and read_line() is not None:
+    pass
+record["stdinClosed"] = True
+save()

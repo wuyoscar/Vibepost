@@ -1,0 +1,8 @@
+/* 宿主页本身不画任何东西：卡片自己的底色在卡片样式里 */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+}

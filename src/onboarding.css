@@ -1,0 +1,155 @@
+/* 新手引导（src/onboarding.js）：一圈高亮 + 旁边一张小卡片。颜色都用皮肤令牌，系统浅色、深色下自动跟着换。
+ * 整层不挡鼠标，只有卡片本身能点；叠在界面之上、对话框之下。 */
+.onboarding {
+  position: fixed;
+  inset: 0;
+  z-index: var(--layer-onboarding);
+  pointer-events: none;
+}
+
+/* 高亮以外压暗：整屏一层，挖掉高亮那一块（clip-path 由脚本按位置算）；换一步时洞沿弹簧挪过去 */
+.onboarding-dim {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--ui-backdrop) 55%, transparent);
+  transition:
+    clip-path var(--motion-slow) var(--ease-spring),
+    opacity var(--motion-moderate) var(--ease-standard);
+}
+
+/* 引导出现：压暗层淡入，卡片浮上来 */
+.onboarding-card {
+  transition:
+    opacity var(--motion-moderate) var(--ease-standard),
+    translate var(--motion-slow) var(--ease-spring);
+}
+
+@starting-style {
+  .onboarding-dim {
+    opacity: 0;
+  }
+
+  .onboarding-card {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+
+.onboarding-spot {
+  position: fixed;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 2px var(--ui-accent),
+    0 0 0 6px var(--ui-focus);
+}
+
+.onboarding-card {
+  position: fixed;
+  display: grid;
+  gap: 8px;
+  width: 316px;
+  padding: 16px 16px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-popover);
+  box-shadow: var(--ui-dialog-shadow);
+  color: var(--ui-text);
+  pointer-events: auto;
+}
+
+/* 卡片指向高亮处的小尖角：一个转了 45° 的方块，一半压在卡片边上 */
+.onboarding-tail {
+  width: 12px;
+  height: 12px;
+  position: absolute;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-popover);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.onboarding-card[data-side="bottom"] .onboarding-tail {
+  top: 0;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.onboarding-card[data-side="top"] .onboarding-tail {
+  top: 100%;
+  border-top: 0;
+  border-left: 0;
+}
+
+.onboarding-card[data-side="right"] .onboarding-tail {
+  left: 0;
+  border-top: 0;
+  border-right: 0;
+}
+
+.onboarding-card[data-side="left"] .onboarding-tail {
+  left: 100%;
+  border-bottom: 0;
+  border-left: 0;
+}
+
+.onboarding-card[data-side="center"] .onboarding-tail {
+  display: none;
+}
+
+.onboarding-kicker {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  color: var(--ui-accent-text);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.onboarding-kicker span:last-child {
+  color: var(--ui-text-3);
+  font-family: var(--font-mono);
+  font-weight: 400;
+}
+
+.onboarding-title {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.onboarding-body {
+  margin: 0;
+  color: var(--ui-text-2);
+  line-height: 1.6;
+}
+
+.onboarding-dots {
+  display: flex;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.onboarding-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--ui-border);
+  transition: background-color var(--motion-quick) var(--ease-standard);
+}
+
+.onboarding-dots span.is-current {
+  width: 16px;
+  background: var(--ui-accent);
+}
+
+.onboarding-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.onboarding-spacer {
+  flex: 1;
+}
