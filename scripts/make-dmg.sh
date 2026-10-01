@@ -55,7 +55,7 @@ STAGE="$WORK/stage"
 mkdir -p "$STAGE/.background"
 ditto "$APP" "$STAGE/Vibepost.app"
 ln -s /Applications "$STAGE/Applications"
-swift "$REPO/scripts/make_dmg_background.swift" "$STAGE/.background/background.tiff"
+swift "$REPO/scripts/make_dmg_background.swift" "$STAGE/.background/background.tiff" "$REPO/brand/app-icon-256.png"
 
 # 先做可写的镜像，挂上去让 Finder 排好窗口（背景、图标位置记在卷上的 .DS_Store），再压缩成只读的。留 20 MB 给 Finder 写东西。
 SIZE_MB=$(( $(du -sm "$STAGE" | cut -f1) + 20 ))

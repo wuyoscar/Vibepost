@@ -1,15 +1,15 @@
-// 生成 DMG 窗口的背景图（scripts/make-dmg.sh 用）：品牌橘红底，顶上是简化的标志与字标（反白），
+// 生成 DMG 窗口的背景图（scripts/make-dmg.sh 用）：品牌橘红底，顶上是 App 图标（brand/app-icon-256.png，和 Dock 里的一样）与字标，
 // 中间一支从 App 指向「Applications」的箭头，底下一行说明。输出一张同时带 1x 与 2x 的 TIFF，视网膜屏上 Finder 自动用 2x。
 // 画布 640×440 点：窗口内容区 640×400，多出的 40 点垫在底下，标题栏高矮不同的系统上也不露白边。
 // 图标中心（App 在 170,205，「Applications」在 470,205）与 make-dmg.sh 里的 Finder 布局一致。
 // 底色是压深一点的品牌橘红（图标是 #fc4d1f），亮度约 0.18：Finder 写图标名时浅色模式用黑字、深色模式用白字，
 // 两种与底色的对比度都在 4.5:1 以上。
-// 用法：swift scripts/make_dmg_background.swift 输出.tiff
+// 用法：swift scripts/make_dmg_background.swift 输出.tiff brand/app-icon-256.png
 import AppKit
 
 let arguments = CommandLine.arguments
-guard arguments.count == 2 else {
-    FileHandle.standardError.write(Data("用法：swift make_dmg_background.swift 输出.tiff\n".utf8))
+guard arguments.count == 3, let appIcon = NSImage(contentsOfFile: arguments[2]) else {
+    FileHandle.standardError.write(Data("用法：swift make_dmg_background.swift 输出.tiff App图标.png\n".utf8))
     exit(2)
 }
 
@@ -17,28 +17,16 @@ let canvas = NSSize(width: 640, height: 440)
 let base = NSColor(srgbRed: 0xd9 / 255, green: 0x3c / 255, blue: 0x17 / 255, alpha: 1)
 let brand = NSColor(srgbRed: 0xfc / 255, green: 0x4d / 255, blue: 0x1f / 255, alpha: 1)
 
-/// 标志：白色圆角方块上三道品牌色的波纹（App 图标 brand/icon.png 的简化版：方块 48 点见方、圆角 11），
-/// 左上角放在 origin。
+/// App 图标的圆角方块边长（点）。图标图片四周留着透明边与投影（scripts/build_app_icon.swift：1024 的画布里方块占 824），
+/// 所以图片要画得比方块大一圈。
+let markSize: CGFloat = 56
+let iconInset: CGFloat = 100 / 824
+
+/// 标志：App 图标，圆角方块的左上角放在 origin（画布是翻转坐标，y 朝下）
 func drawMark(at origin: NSPoint) {
-    NSGraphicsContext.saveGraphicsState()
-    let shift = NSAffineTransform()
-    shift.translateX(by: origin.x, yBy: origin.y)
-    shift.concat()
-    NSColor.white.setFill()
-    NSBezierPath(roundedRect: NSRect(x: 0, y: 0, width: 48, height: 48), xRadius: 11, yRadius: 11).fill()
-    // SVG：M18 25 c4-3.5 8-3.5 12 0 s8 3.5 12 0 4-2 4-2（方块在 SVG 里从 8,12 起，这里挪到 0,0）
-    for y: CGFloat in [13, 24, 35] {
-        let wave = NSBezierPath()
-        wave.move(to: NSPoint(x: 10, y: y))
-        wave.curve(to: NSPoint(x: 22, y: y), controlPoint1: NSPoint(x: 14, y: y - 3.5), controlPoint2: NSPoint(x: 18, y: y - 3.5))
-        wave.curve(to: NSPoint(x: 34, y: y), controlPoint1: NSPoint(x: 26, y: y + 3.5), controlPoint2: NSPoint(x: 30, y: y + 3.5))
-        wave.curve(to: NSPoint(x: 38, y: y - 2), controlPoint1: NSPoint(x: 38, y: y - 3.5), controlPoint2: NSPoint(x: 38, y: y - 2))
-        wave.lineWidth = 3.2
-        wave.lineCapStyle = .round
-        brand.setStroke()
-        wave.stroke()
-    }
-    NSGraphicsContext.restoreGraphicsState()
+    let margin = markSize * iconInset
+    let rect = NSRect(x: origin.x - margin, y: origin.y - margin, width: markSize + 2 * margin, height: markSize + 2 * margin)
+    appIcon.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
 }
 
 func text(_ string: String, size: CGFloat, weight: NSFont.Weight, alpha: CGFloat = 1) -> NSAttributedString {
@@ -62,11 +50,11 @@ func draw() {
     // 标志 + 字标，整组水平居中（字标 post 淡一点）
     let word = NSMutableAttributedString(attributedString: text("Vibe", size: 30, weight: .semibold))
     word.append(text("post", size: 30, weight: .semibold, alpha: 0.78))
-    let markWidth: CGFloat = 48
-    let gap: CGFloat = 12
-    let left = (canvas.width - markWidth - gap - word.size().width) / 2
-    drawMark(at: NSPoint(x: left, y: 42))
-    word.draw(at: NSPoint(x: left + markWidth + gap, y: 42 + 24 - word.size().height / 2))
+    let gap: CGFloat = 14
+    let left = (canvas.width - markSize - gap - word.size().width) / 2
+    let middle: CGFloat = 66
+    drawMark(at: NSPoint(x: left, y: middle - markSize / 2))
+    word.draw(at: NSPoint(x: left + markSize + gap, y: middle - word.size().height / 2))
 
     // 从 App 指向「Applications」
     let arrow = NSBezierPath()
