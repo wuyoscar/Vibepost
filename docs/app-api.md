@@ -101,7 +101,9 @@
 
 `DraftSummary`：`{ id, title, mode, updatedAt, builtIn, current }`，其中 `title` 是稿件抽屉里显示的名字（没填标题时取正文第一行的文字，最多 24 字）；`list()` 里内置说明书在前，自己的按最近修改在前（只是打开不算修改）。
 
-**模板**（`Template`：`{ id, name, description, tags, theme, builtIn }`）：`id` 自带的是 `template_<登记表里的 id>`（如 `template_checklist`），自己存的是 `user_template_<名字>`；`tags` 是题材一个、风格一个（如 `["清单", "简洁"]`）；`theme` 是主题 id。模板不是稿子：不在 `list()` 与稿件抽屉里，`open(id)` reject，`get(id)` 读得到（`readOnly: true`，用户模板的图片这时才读进来），`firstPage(id)` 能画第一页，`create({ template })` 复制一份成自己的稿子。模板文件的格式与文件夹见[模板](#模板原生桥)。
+**模板**（`Template`：`{ id, name, description, tags, theme, builtIn }`）：`id` 自带的是 `template_<登记表里的 id>`（登记表里的 id 是 front matter 的 `id`，没写时是文件名，如 `template_干货清单`），自己存的是 `user_template_<名字>`；`tags` 是题材一个、风格一个（如 `["清单", "简洁"]`）；`theme` 是主题 id。模板不是稿子：不在 `list()` 与稿件抽屉里，`open(id)` reject，`get(id)` 读得到（`readOnly: true`，用户模板的图片这时才读进来），`firstPage(id)` 能画第一页，`create({ template })` 复制一份成自己的稿子。模板文件的格式与文件夹见[模板](#模板原生桥)。
+
+**模板画廊**（`src/templates/gallery.js`，没有新的 API，全靠上面这几个方法）：稿件抽屉「新建」旁的「从模板新建」、空白稿子的空状态（正文空着、这篇能改时编辑区里浮着的「从模板开始」「看看说明书」，一开始打字就收起）打开对话框「从模板新建」；每格是那套模板经 `firstPage` 真实出的第一页（打开后逐个生成，看得见的先；自带的按 id 缓存，自己存的每次打开重出），顶上按题材 / 风格（`tags` 的第一个、第二个）筛，点一格（方向键挪过去回车也行）就 `create({ template })` 并关上。自己存的排在自带的后面，下面有「在 Finder 中显示」（`revealTemplate`）与「删除」（先确认，`removeTemplate`）。稿件抽屉里右键一篇自己的稿子 ›「存为模板…」弹出名字（预填稿子的名字）、说明、题材与风格（两个下拉列出已有模板的标签），确认后 `saveAsTemplate`（不是正在编辑的那篇时先切过去；同名的先问一句再换掉）。
 
 ## editor：编辑器
 
@@ -609,7 +611,7 @@ images:                             # 可省：图片编号 → 路径（自带�
 …
 ```
 
-色值直接写 `#rrggbb`（不是 YAML 的注释）；值里有「: 」、以 `#` 以外的特殊符号开头时加双引号。不认识的键、认不出的值跳过；图片编号只能是字母、数字、`_`、`-`。`saveAsTemplate` 写回时按这个顺序生成，没有的键不写。
+色值直接写 `#rrggbb`（不是 YAML 的注释）；值里有「: 」、以 `#` 以外的特殊符号开头时加双引号。不认识的键、认不出的值跳过；图片编号只能是字母、数字、`_`、`-`。`colors` / `fonts` / `cover` / `images` 这四张表也能写成一行（`src/templates/README.md` 与 `scripts/check-templates.mjs` 的写法，自带模板都这样写）：`cover: enabled true, subtitle 一行副标题, image cover`——半角逗号分开各项，每项第一个空白前是子键（副标题里不能有半角逗号）。`saveAsTemplate` 写回时按这个顺序生成缩进的几行，没有的键不写。
 
 | 动作 | body | 返回 |
 | --- | --- | --- |

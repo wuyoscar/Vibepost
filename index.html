@@ -71,6 +71,7 @@
       <symbol id="i-more" viewBox="0 0 24 24"><path d="M6 12h.01M12 12h.01M18 12h.01" stroke-width="2.6" /></symbol>
       <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2.2" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" /></symbol>
       <symbol id="i-window" viewBox="0 0 24 24"><rect x="3.5" y="8" width="13" height="12" rx="2" /><path d="M8 8V6.5a2 2 0 0 1 2-2h8.5a2 2 0 0 1 2 2V15a2 2 0 0 1-2 2h-2" /></symbol>
+      <symbol id="i-template" viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="17" rx="2" /><path d="M8.5 8h7M8.5 11.5h7M8.5 15h4" /></symbol>
       <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5" /><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" /></symbol>
       <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" /></symbol>
       <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z" /></symbol>
@@ -151,9 +152,15 @@
         <aside id="draftsDrawer" class="drawer" aria-label="稿件">
           <div class="drawer-head">
             <h2 class="section-label">稿件</h2>
-            <button id="newDraftBtn" class="icon-button" type="button" aria-label="新建稿件" title="新建稿件">
-              <svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg>
-            </button>
+            <div class="drawer-head-actions">
+              <!-- 从模板新建（src/templates/gallery.js）：弹出模板画廊，点一套就复制成自己的稿子 -->
+              <button id="templateGalleryBtn" class="icon-button" type="button" aria-label="从模板新建" title="从模板新建">
+                <svg class="icon" aria-hidden="true"><use href="#i-template" /></svg>
+              </button>
+              <button id="newDraftBtn" class="icon-button" type="button" aria-label="新建稿件" title="新建稿件">
+                <svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg>
+              </button>
+            </div>
           </div>
           <label class="search-field">
             <svg class="icon icon-small" aria-hidden="true"><use href="#i-search" /></svg>
@@ -275,6 +282,13 @@
           </div>
 
           <div id="markdownEditor" class="editor-body"></div>
+
+          <!-- 空白稿子的空状态（src/templates/gallery.js）：正文空着、这篇能改时浮在编辑区里，一开始打字就收起 -->
+          <div id="editorEmptyHint" class="editor-hint" role="note" aria-label="空白稿子" hidden>
+            <span class="editor-hint-text">空白稿子，从哪开始？</span>
+            <button id="editorHintTemplate" class="pill-button" type="button">从模板开始</button>
+            <button id="editorHintGuide" class="text-button" type="button">看看说明书</button>
+          </div>
 
           <footer class="editor-footer">
             <p class="editor-counts">
@@ -929,12 +943,16 @@
       <div class="activity-actions" role="group" aria-label="分别复制" hidden></div>
     </section>
 
-    <!-- 稿件列表里右键一篇（src/drafts/drawer.js）：在新窗口打开（只在 App 里有）、删除 -->
+    <!-- 稿件列表里右键一篇（src/drafts/drawer.js）：在新窗口打开（只在 App 里有）、存为模板（src/templates/gallery.js，自己的稿子）、删除 -->
     <div id="draftMenu" class="pop-menu-panel draft-menu" role="menu" aria-label="这篇稿件" hidden>
       <button class="menu-item" type="button" role="menuitem" data-draft-action="window">
         <svg class="icon icon-small" aria-hidden="true"><use href="#i-window" /></svg>
         <span>在新窗口打开</span>
         <kbd>⌘ 点按</kbd>
+      </button>
+      <button class="menu-item" type="button" role="menuitem" data-draft-action="template">
+        <svg class="icon icon-small" aria-hidden="true"><use href="#i-template" /></svg>
+        <span>存为模板…</span>
       </button>
       <button class="menu-item" type="button" role="menuitem" data-draft-action="delete">
         <svg class="icon icon-small" aria-hidden="true"><use href="#i-trash" /></svg>
@@ -950,6 +968,63 @@
           <button id="confirmOk" class="primary-button" type="button">好</button>
         </div>
       </div>
+    </div>
+
+    <!-- 模板画廊（src/templates/gallery.js）：稿件抽屉的「从模板新建」与空白稿子的空状态打开；每格是那套模板真实出的第一页，
+         顶上按题材 / 风格筛，点一格就复制成自己的稿子；自己存的模板排在自带的后面，能删、能在 Finder 中显示 -->
+    <div id="templateGallery" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="templateGalleryTitle">
+      <div class="dialog gallery-dialog">
+        <header class="dialog-head">
+          <div>
+            <h3 id="templateGalleryTitle" class="dialog-title">从模板新建</h3>
+            <p class="gallery-note">点一套，复制成自己的稿子；主题、配色、封面与示例图都跟着来，之后照常能改。</p>
+          </div>
+          <button id="templateGalleryClose" class="icon-button" type="button" aria-label="关闭模板画廊" title="关闭（Esc）">
+            <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+          </button>
+        </header>
+        <div class="gallery-filters">
+          <div class="gallery-filter" role="group" aria-label="题材">
+            <span class="gallery-filter-label">题材</span>
+            <div class="chip-grid" data-gallery-filter="topic"></div>
+          </div>
+          <div class="gallery-filter" role="group" aria-label="风格">
+            <span class="gallery-filter-label">风格</span>
+            <div class="chip-grid" data-gallery-filter="style"></div>
+          </div>
+        </div>
+        <div class="gallery-well">
+          <div id="templateGalleryGrid" class="gallery-grid" role="group" aria-label="模板" aria-busy="false"></div>
+          <p id="templateGalleryEmpty" class="gallery-empty" hidden>没有这样的模板</p>
+        </div>
+        <footer class="gallery-foot">
+          <p id="templateGalleryStatus" class="gallery-status" role="status"></p>
+          <button id="templateGalleryReveal" class="text-button" type="button" title="自己存的模板都在这个文件夹里" hidden>打开模板文件夹</button>
+        </footer>
+      </div>
+    </div>
+
+    <!-- 存为模板（src/templates/gallery.js）：稿件右键菜单「存为模板…」；名字、说明、题材与风格，存进支持目录的「模板」文件夹 -->
+    <div id="saveTemplateDialog" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="saveTemplateTitle" aria-describedby="saveTemplateNote">
+      <form id="saveTemplateForm" class="dialog save-template-dialog" novalidate>
+        <div>
+          <h3 id="saveTemplateTitle" class="dialog-title">存为模板</h3>
+          <p id="saveTemplateNote" class="dialog-message">存的是这篇的卡片内容、标题、小红书正文、主题、配色、字体、封面与图片。存好后在「从模板新建」里和自带的并列。</p>
+        </div>
+        <div class="save-template-fields">
+          <label class="field save-template-field">名字<input id="saveTemplateName" type="text" autocomplete="off" maxlength="40" required /></label>
+          <label class="field save-template-field">说明<input id="saveTemplateDescription" type="text" autocomplete="off" placeholder="一句话：这套适合写什么" /></label>
+          <div class="save-template-row">
+            <label class="field save-template-field">题材<select id="saveTemplateTopic"></select></label>
+            <label class="field save-template-field">风格<select id="saveTemplateStyle"></select></label>
+          </div>
+        </div>
+        <p id="saveTemplateError" class="save-template-error" role="alert" hidden></p>
+        <div class="dialog-actions">
+          <button id="saveTemplateCancel" class="pill-button" type="button">取消</button>
+          <button id="saveTemplateOk" class="primary-button" type="submit">存为模板</button>
+        </div>
+      </form>
     </div>
 
     <!-- 发送前的发布检查（src/publish/assistant.js）：还有提醒时问一句 -->
@@ -1238,6 +1313,7 @@
     <script src="src/api/api.js"></script>
     <script src="src/app.js"></script>
     <script src="src/drafts/drawer.js"></script>
+    <script src="src/templates/gallery.js"></script>
     <script src="src/drafts/title.js"></script>
     <script src="src/drafts/caption.js"></script>
     <script src="src/drafts/save-button.js"></script>

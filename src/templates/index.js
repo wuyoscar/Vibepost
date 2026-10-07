@@ -18,12 +18,16 @@
       "colors": {},
       "fonts": {},
       "cover": {
-        "enabled": false,
-        "subtitle": "",
-        "image": null
+        "enabled": true,
+        "subtitle": "5 天 4 夜、1600 公里：回来后整理的 7 条",
+        "image": "valley"
       },
       "caption": "国庆和朋友两个人开一辆家用轿车跑了趟川西环线，5 天 4 夜，1600 公里。\n风景没得说，但坑也踩了不少：油箱、高反、住宿、现金、导航、相机、防晒，每一条都是真金白银交过学费的。\n回来后对着行程表整理成 7 条，每条末尾一句「下次怎么办」。第一次去高原自驾的朋友，出发前对照着准备。\n#自驾游 #川西 #踩坑 #旅行攻略",
-      "images": {},
+      "images": {
+        "valley": "docs/guide-assets/valley-morning.jpg",
+        "lake": "docs/guide-assets/night-lake.jpg",
+        "sunset": "docs/guide-assets/sunset-live-cover.jpg"
+      },
       "markdown": [
         "# 第一次自驾川西，我踩的 7 个坑",
         "",
@@ -123,12 +127,16 @@
       "colors": {},
       "fonts": {},
       "cover": {
-        "enabled": false,
-        "subtitle": "",
-        "image": null
+        "enabled": true,
+        "subtitle": "2026 年读完的第 9 本 · 一本关于「别那么赶」的小书",
+        "image": "sunset"
       },
       "caption": "《慢一点的工作》是今年读完的第 9 本，200 页，两个周末读完。它不教时间管理，讲的是为什么我们越忙越没产出。\n读完我改了 3 个习惯：早上先写 15 分钟、一天只定一件要紧事、下午 4 点后不开新任务。坚持了一个月，变化记在卡片里。\n#读书笔记 #读书 #效率 #自我管理",
-      "images": {},
+      "images": {
+        "sunset": "docs/guide-assets/sunset-live-cover.jpg",
+        "valley": "docs/guide-assets/valley-morning.jpg",
+        "lake": "docs/guide-assets/night-lake.jpg"
+      },
       "markdown": [
         "# 读完《慢一点的工作》，我改了 3 个习惯",
         "",
@@ -227,15 +235,22 @@
       ],
       "title": "",
       "theme": "notes",
-      "colors": {},
+      "colors": {
+        "bg": "#ffffff",
+        "text": "#1a1a1a",
+        "accent": "#ffbd2e"
+      },
       "fonts": {},
       "cover": {
-        "enabled": false,
-        "subtitle": "",
-        "image": null
+        "enabled": true,
+        "subtitle": "到手当天、三天内、一周内：照着办就不会漏",
+        "image": "valley"
       },
       "caption": "去年 8 月一个人从合租搬进一居室，第一周手忙脚乱，差点错过水电过户的截止日。\n后来把要办的事按「到手当天 / 三天内 / 一周内」分成三类，一共 12 件，照着做就不会漏。\n这篇把清单整理出来，还有第一周花了多少钱、三件后悔没早做的事。搬家前收藏，搬家那天翻出来对着办。\n#搬家 #一个人住 #租房 #生活清单",
-      "images": {},
+      "images": {
+        "valley": "docs/guide-assets/valley-morning.jpg",
+        "lake": "docs/guide-assets/night-lake.jpg"
+      },
       "markdown": [
         "# 一个人搬家，第一周要办的 12 件事",
         "",
@@ -334,15 +349,22 @@
       ],
       "title": "",
       "theme": "plain",
-      "colors": {},
+      "colors": {
+        "bg": "#ffffff",
+        "text": "#111111",
+        "accent": "#1f6feb"
+      },
       "fonts": {},
       "cover": {
-        "enabled": false,
-        "subtitle": "",
-        "image": null
+        "enabled": true,
+        "subtitle": "同一段 42 分钟录音：字错率、耗时、价格一张表看完",
+        "image": "valley"
       },
       "caption": "三款能在 Mac 上离线跑的转写工具，用同一段 42 分钟的采访录音测了一遍：字错率、耗时、价格、导出格式。\n结论先说：要准选「南风转写」，要快选「鹦鹉听写」，录音环境差的选「Typo Desk」。每款的优缺点在卡片里，表格可以直接存。\n#效率工具 #工具实测 #录音转文字 #Mac",
-      "images": {},
+      "images": {
+        "valley": "docs/guide-assets/valley-morning.jpg",
+        "lake": "docs/guide-assets/night-lake.jpg"
+      },
       "markdown": [
         "# 实测 3 款离线转写工具，谁最准",
         "",
@@ -457,12 +479,15 @@
       "colors": {},
       "fonts": {},
       "cover": {
-        "enabled": false,
-        "subtitle": "",
-        "image": null
+        "enabled": true,
+        "subtitle": "10 月 18 日（周六）· 城西山谷步道 · 限 20 人",
+        "image": "valley"
       },
       "caption": "第 6 期徒步读书会开始报名：10 月 18 日（周六）上午 9 点，城西山谷步道，走 8 公里，中途停下来一起聊这期的书。\n免费，限 20 人，报满为止。时间、流程、要带的东西、常见问题都在卡片里，报名方式在最后一张。\n上一期 18 个人走到天黑才散，这一期我们早点出发。\n#读书会 #徒步 #线下活动 #周末活动",
-      "images": {},
+      "images": {
+        "valley": "docs/guide-assets/valley-morning.jpg",
+        "lake": "docs/guide-assets/night-lake.jpg"
+      },
       "markdown": [
         "# 第 6 期徒步读书会，报名开始",
         "",
@@ -562,12 +587,16 @@
       "colors": {},
       "fonts": {},
       "cover": {
-        "enabled": false,
-        "subtitle": "",
-        "image": null
+        "enabled": true,
+        "subtitle": "9 月 19 日–21 日 · 一个人、一个背包、一个湖",
+        "image": "sunset"
       },
       "caption": "9 月中旬一个人去了湖边的小镇，三天两晚，坐大巴来回。没有行程表，每天就是走路、看湖、吃饭、早睡。\n按天记了下来：每天一两张照片、一段话、吃了什么、花了多少。最后一张是给想去的人的几条建议。\n一共花了 1180 元，比想象中便宜。\n#旅行日记 #一个人旅行 #湖边 #周末去哪儿",
-      "images": {},
+      "images": {
+        "sunset": "docs/guide-assets/sunset-live-cover.jpg",
+        "lake": "docs/guide-assets/night-lake.jpg",
+        "valley": "docs/guide-assets/valley-morning.jpg"
+      },
       "markdown": [
         "# 三天两晚，一个人去了湖边",
         "",
@@ -670,12 +699,16 @@
       "colors": {},
       "fonts": {},
       "cover": {
-        "enabled": false,
-        "subtitle": "",
-        "image": null
+        "enabled": true,
+        "subtitle": "论文速读 · 第 8 期 · 方法、评测、机制各挑了几篇",
+        "image": "valley"
       },
       "caption": "这期读了 5 篇关于模型「什么时候该说不知道」的论文：两篇讲怎么教模型拒答，两篇讲怎么评，一篇从机制上看拒答是怎么发生的。\n每篇一页：小标签是论文原名，标题是我读完的一句话结论，正文讲它做了什么、我怎么看。解读是我的理解，可能有误，欢迎指正。\n#论文解读 #大模型 #AI安全 #读论文",
-      "images": {},
+      "images": {
+        "valley": "docs/guide-assets/valley-morning.jpg",
+        "lake": "docs/guide-assets/night-lake.jpg",
+        "sunset": "docs/guide-assets/sunset-live-cover.jpg"
+      },
       "markdown": [
         "# 5 篇论文：模型什么时候该说「不知道」",
         "",
@@ -804,12 +837,15 @@
       "colors": {},
       "fonts": {},
       "cover": {
-        "enabled": false,
-        "subtitle": "",
-        "image": null
+        "enabled": true,
+        "subtitle": "10 月 1 日–10 月 7 日 · 5 条值得看的 AI 动态",
+        "image": "lake"
       },
       "caption": "本周 5 条值得看的 AI 动态：一个 3B 的中文小模型开源、一份关于模型「拒答」的评测报告、一项数据标注新规开始征求意见、一个把论文变成可跑代码的工具，还有月底的一场线下分享。\n每条写了来源和日期，看法是我自己的，欢迎评论区补充我漏掉的。每周一更新。\n#AI资讯 #一周要闻 #大模型 #开源",
-      "images": {},
+      "images": {
+        "lake": "docs/guide-assets/night-lake.jpg",
+        "valley": "docs/guide-assets/valley-morning.jpg"
+      },
       "markdown": [
         "# 一周要闻 · 第 12 期",
         "",

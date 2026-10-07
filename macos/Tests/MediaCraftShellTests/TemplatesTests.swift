@@ -97,8 +97,14 @@ struct TemplatesTests {
         #expect(result?["stale"] as? [String] == [], "登记表过期了：运行 node scripts/build-templates.mjs")
         #expect(result?["problems"] as? [String] == [], "\(result?["problems"] ?? [])")
         #expect(result?["templates"] as? [[String]] == [
-            ["template_checklist", "干货清单", "清单,简洁", "notes", "true"],
-            ["template_travel-diary", "旅行日记", "日记,柔和", "glow", "true"],
+            ["template_踩坑经验", "踩坑经验", "经验,柔和", "journal", "true"],
+            ["template_读书笔记", "读书笔记", "读书,柔和", "clay", "true"],
+            ["template_干货清单", "干货清单", "清单,简洁", "notes", "true"],
+            ["template_工具实测", "工具实测", "实测,简洁", "plain", "true"],
+            ["template_活动通知", "活动通知", "通知,有态度", "ink", "true"],
+            ["template_旅行日记", "旅行日记", "日记,柔和", "glow", "true"],
+            ["template_论文解读", "论文解读", "解读,有态度", "poster", "true"],
+            ["template_一周要闻", "一周要闻", "新闻,简洁", "editorial", "true"],
         ], "\(result?["templates"] ?? [])")
         #expect(result?["descriptions"] as? Bool == true)
         #expect(result?["inList"] as? Int == 0, "模板不是稿子，不在 drafts.list() 里")
@@ -112,34 +118,34 @@ struct TemplatesTests {
         try await harness.load()
         let result = try await harness.evaluate(Self.helpers + """
             const registry = window.MediaCraftTemplateRegistry;
-            const checklist = registry.find((item) => item.id === "checklist");
+            const checklist = registry.find((item) => item.id === "干货清单");
             const own = () => mc.drafts.list().then((list) => list.filter((item) => !item.builtIn).length);
             const before = await own();
 
             const byName = await mc.drafts.create({ template: "干货清单" });
             const images = await mc.media.list();
-            const src = await mc.media.src("cover");
+            const src = await mc.media.src("valley");
             const issues = await layoutIssues();
             const pages = (await mc.render.pages()).length;
             const decoded = await imagesDecode();
             const edited = await mc.drafts.update({ markdown: byName.markdown + "\\n\\n加一段" });
             const listed = (await mc.drafts.list()).find((item) => item.id === byName.id);
 
-            const withInit = await mc.drafts.create({ template: "template_travel-diary", title: "我的标题", colors: { bg: "#fffaf3", text: "#3a3330", accent: "#f08a8a" } });
+            const withInit = await mc.drafts.create({ template: "template_旅行日记", title: "我的标题", colors: { bg: "#fffaf3", text: "#3a3330", accent: "#f08a8a" } });
             const travelImages = (await mc.media.list()).map((info) => info.id).sort();
             const travelIssues = await layoutIssues();
 
-            const asDraft = await mc.drafts.get("template_checklist");
-            const opened = await rejects(() => mc.drafts.open("template_checklist"));
+            const asDraft = await mc.drafts.get("template_干货清单");
+            const opened = await rejects(() => mc.drafts.open("template_干货清单"));
             const unknown = await rejects(() => mc.drafts.create({ template: "没有这个" }));
             const badKey = await rejects(() => mc.drafts.create({ template: 3 }));
-            const first = await mc.drafts.firstPage("template_checklist");
-            const firstTravel = await mc.drafts.firstPage("template_travel-diary");
+            const first = await mc.drafts.firstPage("template_干货清单");
+            const firstTravel = await mc.drafts.firstPage("template_旅行日记");
             const stillCurrent = (await mc.drafts.current()).id === withInit.id;
             return {
               created: await own() - before,
               byName: { readOnly: byName.readOnly, title: byName.title, theme: byName.theme, cover: byName.cover, caption: byName.caption, markdown: byName.markdown === checklist.markdown.join("\\n"), colors: byName.colors },
-              images: images.map((info) => [info.id, info.kind]), src, issues, pages, decoded,
+              images: images.map((info) => [info.id, info.kind]).sort(), src, issues, pages, decoded,
               edited: edited.markdown.endsWith("加一段"), listed: listed ? [listed.title, listed.builtIn] : null,
               withInit: { title: withInit.title, theme: withInit.theme, colors: withInit.colors, cover: withInit.cover.enabled, subtitle: withInit.cover.subtitle },
               travelImages, travelIssues,
@@ -154,28 +160,28 @@ struct TemplatesTests {
         let theme = result?["byName"] as? [String: Any]
         #expect(result?["created"] as? Int == 2, "两次都新建了一篇自己的稿子")
         #expect(theme?["readOnly"] as? Bool == false, "复制出来的是自己的稿子，可以改")
-        #expect(theme?["title"] as? String == "租房第一年，我踩过的 5 个坑")
+        #expect(theme?["title"] as? String == "", "自带模板不填 title：封面与稿件名从正文第一行取")
         #expect(theme?["theme"] as? String == "notes")
         #expect(theme?["markdown"] as? Bool == true, "卡片内容照模板")
-        #expect((theme?["caption"] as? String ?? "").hasPrefix("租房第一年踩过的坑") && (theme?["caption"] as? String ?? "").contains("#租房"), "小红书正文照模板：\(theme?["caption"] ?? "")")
+        #expect((theme?["caption"] as? String ?? "").hasPrefix("去年 8 月一个人从合租搬进一居室") && (theme?["caption"] as? String ?? "").contains("#搬家"), "小红书正文照模板：\(theme?["caption"] ?? "")")
         let cover = theme?["cover"] as? [String: Any]
-        #expect(cover?["enabled"] as? Bool == true && cover?["subtitle"] as? String == "看完至少省下一个月房租" && cover?["image"] as? String == "cover", "封面照模板：\(cover ?? [:])")
-        #expect((theme?["colors"] as? [String: String])?["bg"] == "#ffffff", "没给配色时用主题的")
-        #expect(result?["images"] as? [[String]] == [["cover", "image"]], "图片跟着进来")
+        #expect(cover?["enabled"] as? Bool == true && cover?["subtitle"] as? String == "到手当天、三天内、一周内：照着办就不会漏" && cover?["image"] as? String == "valley", "封面照模板：\(cover ?? [:])")
+        #expect((theme?["colors"] as? [String: String])?["bg"] == "#ffffff" && (theme?["colors"] as? [String: String])?["accent"] == "#ffbd2e", "配色照模板的 colors")
+        #expect(result?["images"] as? [[String]] == [["lake", "image"], ["valley", "image"]], "图片跟着进来")
         #expect(result?["src"] as? String == "docs/guide-assets/valley-morning.jpg", "自带模板的图片留相对路径")
         #expect(result?["issues"] as? [String] == [], "出图没有溢出、只有标题、偏挤的页")
         #expect((result?["pages"] as? Int ?? 0) >= 6, "封面 + 五条 + 结尾页：\(result?["pages"] ?? 0)")
-        #expect(result?["decoded"] as? [Bool] == [true])
+        #expect(result?["decoded"] as? [Bool] == [true, true])
         #expect(result?["edited"] as? Bool == true, "改得动")
-        #expect(result?["listed"] as? [AnyHashable] == ["租房第一年，我踩过的 5 个坑", false] as [AnyHashable], "在稿件列表里是自己的稿子")
+        #expect(result?["listed"] as? [AnyHashable] == ["一个人搬家，第一周要办的 12 件事", false] as [AnyHashable], "在稿件列表里是自己的稿子，名字取正文第一行")
         let withInit = result?["withInit"] as? [String: Any]
         #expect(withInit?["title"] as? String == "我的标题", "init 里的字段在模板之后套用")
         #expect(withInit?["theme"] as? String == "glow")
         #expect((withInit?["colors"] as? [String: String])?["accent"] == "#f08a8a")
-        #expect(withInit?["cover"] as? Bool == true && withInit?["subtitle"] as? String == "一个人的周末，不赶路")
-        #expect(result?["travelImages"] as? [String] == ["lake", "valley"])
+        #expect(withInit?["cover"] as? Bool == true && withInit?["subtitle"] as? String == "9 月 19 日–21 日 · 一个人、一个背包、一个湖")
+        #expect(result?["travelImages"] as? [String] == ["lake", "sunset", "valley"])
         #expect(result?["travelIssues"] as? [String] == [])
-        #expect(result?["asDraft"] as? [AnyHashable] == [true, "notes", "租房第一年，我踩过的 5 个坑"] as [AnyHashable], "模板本身读得到，只读")
+        #expect(result?["asDraft"] as? [AnyHashable] == [true, "notes", ""] as [AnyHashable], "模板本身读得到，只读")
         #expect((result?["opened"] as? String ?? "").contains("模板"), "模板打不开：\(result?["opened"] ?? "")")
         #expect((result?["unknown"] as? String ?? "").contains("没有这个模板"))
         #expect((result?["badKey"] as? String ?? "").contains("template"))
@@ -205,12 +211,15 @@ struct TemplatesTests {
             const badName = await rejects(() => mc.drafts.saveAsTemplate({ name: "a/b" }));
             const template = await mc.drafts.saveAsTemplate({ name: "我的清单", description: "自己存的", tags: ["清单", "柔和"] });
             const replaced = await mc.drafts.saveAsTemplate({ name: "我的清单", description: "改了说明", tags: ["清单", "柔和"] });
-            const listed = (await mc.drafts.templates()).map(({ id, name, description, builtIn }) => [id, name, description, String(builtIn)]);
+            const all = await mc.drafts.templates();
+            const listed = all.filter((item) => !item.builtIn).map(({ id, name, description, builtIn }) => [id, name, description, String(builtIn)]);
+            const builtInCount = all.filter((item) => item.builtIn).length;
+            const userLast = all.findIndex((item) => !item.builtIn) === builtInCount;
             const markdown = (await mc.drafts.current()).markdown;
             await mc.drafts.revealTemplate(template.id);
             await mc.drafts.revealTemplate();
-            const revealBuiltIn = await rejects(() => mc.drafts.revealTemplate("template_checklist"));
-            return { imageId, badName, template, replaced: replaced.description, listed, folderBefore, markdown, revealBuiltIn };
+            const revealBuiltIn = await rejects(() => mc.drafts.revealTemplate("template_干货清单"));
+            return { imageId, badName, template, replaced: replaced.description, listed, builtInCount, userLast, folderBefore, markdown, revealBuiltIn };
         """) as? [String: Any]
         let imageId = saved?["imageId"] as? String ?? ""
         let templateFolder = folder.appendingPathComponent("我的清单")
@@ -231,7 +240,7 @@ struct TemplatesTests {
             const src = await mc.media.src("\(imageId)");
             const issues = await layoutIssues();
             const decoded = await imagesDecode();
-            const removeBuiltIn = await rejects(() => mc.drafts.removeTemplate("template_checklist"));
+            const removeBuiltIn = await rejects(() => mc.drafts.removeTemplate("template_干货清单"));
             await mc.drafts.removeTemplate("user_template_我的清单");
             const afterRemove = (await mc.drafts.templates()).map((item) => item.id);
             const removeAgain = await rejects(() => mc.drafts.removeTemplate("user_template_我的清单"));
@@ -250,12 +259,9 @@ struct TemplatesTests {
         #expect(template?["id"] as? String == "user_template_我的清单" && template?["builtIn"] as? Bool == false && template?["theme"] as? String == "glow", "\(template ?? [:])")
         #expect(template?["tags"] as? [String] == ["清单", "柔和"])
         #expect(saved?["replaced"] as? String == "改了说明", "同名的整套换掉")
-        #expect(saved?["listed"] as? [[String]] == [
-            ["template_checklist", "干货清单", "一条一页的经验清单：封面点题，每条一个小标题加两三句理由，最后一页收尾", "true"],
-            ["template_travel-diary", "旅行日记", "按一天的时间线写的旅行日记：封面一张大图，每一段一个地点与一句感受，末页是路线小结", "true"],
-            ["user_template_我的清单", "我的清单", "改了说明", "false"],
-        ], "自带的在前，自己的在后：\(saved?["listed"] ?? [])")
-        #expect(saved?["folderBefore"] as? Int == 2, "存之前只有自带的")
+        #expect(saved?["listed"] as? [[String]] == [["user_template_我的清单", "我的清单", "改了说明", "false"]], "自己的只有这一套：\(saved?["listed"] ?? [])")
+        #expect(saved?["builtInCount"] as? Int == 8 && saved?["userLast"] as? Bool == true, "自带的 8 套在前，自己的在后")
+        #expect(saved?["folderBefore"] as? Int == 8, "存之前只有自带的")
         #expect((saved?["revealBuiltIn"] as? String ?? "").contains("自带"))
         #expect(revealed == [templateFolder.resolvingSymlinksInPath().path, folder.resolvingSymlinksInPath().path], "在 Finder 中显示那一套的文件夹、模板文件夹：\(revealed)")
         #expect(onDisk == ["\(imageId).jpg", "模板.md"], "文件夹里是 模板.md 与图片：\(onDisk)")
@@ -269,7 +275,7 @@ struct TemplatesTests {
         #expect(!content.contains("secondary") && !content.contains("surface"), "没单独调过的辅助、衬底不写")
         #expect(content.hasSuffix("\n\n" + (saved?["markdown"] as? String ?? "?").trimmingCharacters(in: .whitespacesAndNewlines) + "\n"), "正文在后面：\(content.suffix(120))")
 
-        #expect(reopened?["listed"] as? [String] == ["template_checklist", "template_travel-diary", "user_template_我的清单"], "重新打开 App 还在")
+        #expect((reopened?["listed"] as? [String])?.count == 9 && (reopened?["listed"] as? [String])?.last == "user_template_我的清单", "重新打开 App 还在，排在自带的后面：\(reopened?["listed"] ?? [])")
         #expect(reopened?["asDraft"] as? [AnyHashable] == [true, "glow", "湖边一晚"] as [AnyHashable])
         let first = reopened?["first"] as? [Int] ?? []
         #expect(first.count == 2 && first[0] >= 2 && first[1] > 0, "firstPage 认得用户模板：\(first)")
@@ -287,7 +293,7 @@ struct TemplatesTests {
         #expect(reopened?["issues"] as? [String] == [])
         #expect(reopened?["decoded"] as? [Bool] == [true], "读回来的图片能出图")
         #expect((reopened?["removeBuiltIn"] as? String ?? "").contains("自带"), "自带的不能删")
-        #expect(reopened?["afterRemove"] as? [String] == ["template_checklist", "template_travel-diary"])
+        #expect((reopened?["afterRemove"] as? [String])?.count == 8 && (reopened?["afterRemove"] as? [String])?.contains("user_template_我的清单") == false)
         #expect((reopened?["removeAgain"] as? String ?? "").contains("没有这个模板"))
         #expect(removedOnDisk && folderStays, "删的是那一套的文件夹，模板文件夹本身留着")
         #expect(harness.pageErrors == [])
