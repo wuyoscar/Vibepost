@@ -119,7 +119,7 @@
         "柔和"
       ],
       "title": "",
-      "theme": "clay",
+      "theme": "scroll",
       "colors": {},
       "fonts": {},
       "cover": {
@@ -453,7 +453,7 @@
         "有态度"
       ],
       "title": "",
-      "theme": "ink",
+      "theme": "neon",
       "colors": {},
       "fonts": {},
       "cover": {
@@ -558,7 +558,7 @@
         "柔和"
       ],
       "title": "",
-      "theme": "glow",
+      "theme": "fresh",
       "colors": {},
       "fonts": {},
       "cover": {
@@ -800,7 +800,7 @@
         "简洁"
       ],
       "title": "",
-      "theme": "editorial",
+      "theme": "press",
       "colors": {},
       "fonts": {},
       "cover": {

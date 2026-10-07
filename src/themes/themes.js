@@ -4,7 +4,8 @@
 // 每篇稿子记住自己的主题；配色（五个色块、配色库、色轮）是在主题配色上的单篇调整。
 // 主题配色里的辅助色与衬底就是三色规则推出来的值（src/engine/colors.js 的 derive）：主题原来的样子不变，
 // 只存了三色的旧稿子打开后也和主题配色一致。配色的方向：干净的浅底、利落的近黑正文、每个主题一个清楚的强调色。
-// 加主题 = 这里登记一项（+ 需要时一份卡片结构）。登记顺序就是主题面板里的顺序。
+// 加主题 = 这里登记一项（+ 需要时一份卡片结构），写上 group。主题面板按 GROUPS 的顺序分三组，组里照登记顺序：
+// 简洁（白底黑线一路）、柔和（纸感、浅色、圆角）、有态度（撞色、深色、刊物感）。每组四个，面板一组一行。
 (function (root) {
   "use strict";
 
@@ -15,6 +16,7 @@
       id: "notes",
       name: "备忘",
       label: "干净的随手记 · 黄色小签",
+      group: "simple",
       structure: "notes",
       colors: { bg: "#ffffff", text: "#1c1c1e", accent: "#ffbd2e", secondary: "#1c1c1e", surface: "#e8e8e9" },
       fonts: { zh: "noto-sans-sc", en: "inter", code: "jetbrains-mono" },
@@ -23,14 +25,45 @@
       id: "plain",
       name: "纯白",
       label: "白底黑线 · 极简",
+      group: "simple",
       structure: "plain",
       colors: { bg: "#ffffff", text: "#111111", accent: "#111111", secondary: "#111111", surface: "#e7e7e7" },
       fonts: { zh: "noto-sans-sc", en: "inter", code: "jetbrains-mono" },
     },
     {
+      id: "ink",
+      name: "纯黑",
+      label: "黑底白线 · 极简",
+      group: "simple",
+      structure: "ink",
+      colors: { bg: "#0c0c0c", text: "#e8e8e5", accent: "#e8e8e5", secondary: "#e8e8e5", surface: "#222222" },
+      fonts: { zh: "noto-sans-sc", en: "inter", code: "jetbrains-mono" },
+    },
+    // 报刊：书卷的结构只用黑白（强调色也是墨色：印章、引用的双线都成了黑的）
+    {
+      id: "press",
+      name: "报刊",
+      label: "黑白两色的报纸感，宋体与双线，适合新闻、评论",
+      group: "simple",
+      structure: "scroll",
+      colors: { bg: "#ffffff", text: "#111111", accent: "#111111", secondary: "#111111", surface: "#e7e7e7" },
+      fonts: { zh: "noto-serif-sc", en: "source-serif-4", code: "ibm-plex-mono" },
+    },
+    {
+      id: "fresh",
+      name: "清新",
+      label: "奶油白底 · 圆角白卡片 · 粉与薄荷的小点缀",
+      group: "soft",
+      structure: "fresh",
+      colors: { bg: "#fffaf3", text: "#3a3330", accent: "#f08a8a", secondary: "#3a3330", surface: "#ebe6e0" },
+      fonts: { zh: "noto-sans-sc", en: "inter", code: "jetbrains-mono" },
+      titleFonts: { zh: "lxgw-wenkai", en: "lxgw-wenkai" },
+    },
+    {
       id: "journal",
       name: "手帐",
       label: "文楷 · 薄荷胶带 · 照片白边",
+      group: "soft",
       structure: "journal",
       colors: { bg: "#fbf9f3", text: "#2a2825", accent: "#4ca585", secondary: "#2a2825", surface: "#e6e4de" },
       fonts: { zh: "lxgw-wenkai", en: "source-serif-4", code: "ibm-plex-mono" },
@@ -40,6 +73,7 @@
       id: "glow",
       name: "柔光",
       label: "淡紫的柔和渐变",
+      group: "soft",
       structure: "glow",
       colors: { bg: "#f5f3ff", text: "#25223d", accent: "#7a68ee", secondary: "#25223d", surface: "#e0deec" },
       fonts: { zh: "noto-sans-sc", en: "inter", code: "jetbrains-mono" },
@@ -48,6 +82,7 @@
       id: "clay",
       name: "陶土",
       label: "淡蜜桃纸 · 衬线标题 · 珊瑚点缀",
+      group: "soft",
       structure: "clay",
       colors: { bg: "#fff6f0", text: "#1d1b18", accent: "#e5704f", secondary: "#1d1b18", surface: "#e8e0da" },
       fonts: { zh: "noto-sans-sc", en: "inter", code: "ibm-plex-mono" },
@@ -57,61 +92,46 @@
       id: "editorial",
       name: "杂志",
       label: "淡天蓝纸 · 全衬线 · 居中刊头",
+      group: "bold",
       structure: "editorial",
       colors: { bg: "#f2f6fa", text: "#1b2430", accent: "#2f67b1", secondary: "#1b2430", surface: "#dde1e6" },
+      fonts: { zh: "noto-serif-sc", en: "source-serif-4", code: "ibm-plex-mono" },
+    },
+    {
+      id: "scroll",
+      name: "书卷",
+      label: "宣纸米底、宋体报头、朱砂一点，适合读书、观点、养生",
+      group: "bold",
+      structure: "scroll",
+      colors: { bg: "#f6f1e6", text: "#2b2a28", accent: "#b4342f", secondary: "#2b2a28", surface: "#e2ddd3" },
       fonts: { zh: "noto-serif-sc", en: "source-serif-4", code: "ibm-plex-mono" },
     },
     {
       id: "poster",
       name: "撞色",
       label: "柠檬黄封面 · 黑色页眉条",
+      group: "bold",
       structure: "poster",
       colors: { bg: "#fffdf5", text: "#111111", accent: "#ffe047", secondary: "#111111", surface: "#e7e5de" },
       fonts: { zh: "noto-sans-sc", en: "inter", code: "jetbrains-mono" },
       titleFonts: { zh: "smiley-sans", en: "smiley-sans" },
     },
     {
-      id: "ink",
-      name: "纯黑",
-      label: "黑底白线 · 极简",
-      structure: "ink",
-      colors: { bg: "#0c0c0c", text: "#e8e8e5", accent: "#e8e8e5", secondary: "#e8e8e5", surface: "#222222" },
-      fonts: { zh: "noto-sans-sc", en: "inter", code: "jetbrains-mono" },
-    },
-    {
-      id: "fresh",
-      name: "清新",
-      label: "奶油白底 · 圆角白卡片 · 粉与薄荷的小点缀",
-      structure: "fresh",
-      colors: { bg: "#fffaf3", text: "#3a3330", accent: "#f08a8a", secondary: "#3a3330", surface: "#ebe6e0" },
-      fonts: { zh: "noto-sans-sc", en: "inter", code: "jetbrains-mono" },
-      titleFonts: { zh: "lxgw-wenkai", en: "lxgw-wenkai" },
-    },
-    {
       id: "neon",
       name: "电光",
       label: "深蓝底 · 一抹电蓝 · 等宽标签",
+      group: "bold",
       structure: "neon",
       colors: { bg: "#0f172a", text: "#e6edf7", accent: "#4cc9ff", secondary: "#e6edf7", surface: "#252c3f" },
       fonts: { zh: "noto-sans-sc", en: "inter", code: "jetbrains-mono" },
     },
-    {
-      id: "scroll",
-      name: "书卷",
-      label: "宣纸米底、宋体报头、朱砂一点，适合读书、观点、养生",
-      structure: "scroll",
-      colors: { bg: "#f6f1e6", text: "#2b2a28", accent: "#b4342f", secondary: "#2b2a28", surface: "#e2ddd3" },
-      fonts: { zh: "noto-serif-sc", en: "source-serif-4", code: "ibm-plex-mono" },
-    },
-    // 报刊：书卷的结构只用黑白（强调色也是墨色：印章、引用的双线都成了黑的）
-    {
-      id: "press",
-      name: "报刊",
-      label: "黑白两色的报纸感，宋体与双线，适合新闻、评论",
-      structure: "scroll",
-      colors: { bg: "#ffffff", text: "#111111", accent: "#111111", secondary: "#111111", surface: "#e7e7e7" },
-      fonts: { zh: "noto-serif-sc", en: "source-serif-4", code: "ibm-plex-mono" },
-    },
+  ]);
+
+  // 主题面板里的三组：顺序就是面板里的顺序，每个主题的 group 对上一组；组内按 REGISTRY 的登记顺序
+  const GROUPS = freeze([
+    { id: "simple", name: "简洁" },
+    { id: "soft", name: "柔和" },
+    { id: "bold", name: "有态度" },
   ]);
 
   // 没选过主题时新稿子用它；认不出的主题也按它
@@ -154,6 +174,8 @@
   root.MediaCraftThemes = {
     DEFAULT,
     list: () => REGISTRY,
+    // 主题面板的分组，按面板里的顺序：[{ id, name }]；每个主题的 group 是其中一个 id
+    groups: () => GROUPS,
     has,
     normalize,
     migrate,

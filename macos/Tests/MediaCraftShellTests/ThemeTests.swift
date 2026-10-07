@@ -4,13 +4,20 @@ import Testing
 /// 主题：一次选择决定卡片结构、卡片配色与跟随主题的字体（界面皮肤跟随系统，ADR 0007）；每篇稿子记住自己的主题。
 @MainActor
 struct ThemeTests {
-    /// 主题注册表（src/themes/themes.js）的顺序：id 与名字（v5 定稿的八个，第 03 张票；v7 追加的清新、电光、书卷、报刊）
-    static let ids = ["notes", "plain", "journal", "glow", "clay", "editorial", "poster", "ink", "fresh", "neon", "scroll", "press"]
-    static let names = ["备忘", "纯白", "手帐", "柔光", "陶土", "杂志", "撞色", "纯黑", "清新", "电光", "书卷", "报刊"]
+    /// 主题注册表（src/themes/themes.js）的顺序：id 与名字，按主题面板里的三组——简洁、柔和、有态度（v5 定稿的八个，第 03 张票；
+    /// v7 追加的清新、电光、书卷、报刊，第 08 张票分组重排）
+    static let ids = ["notes", "plain", "ink", "press", "fresh", "journal", "glow", "clay", "editorial", "scroll", "poster", "neon"]
+    static let names = ["备忘", "纯白", "纯黑", "报刊", "清新", "手帐", "柔光", "陶土", "杂志", "书卷", "撞色", "电光"]
+    /// 三组：id、名字与各自的四个主题（面板里一组一行）
+    static let groups: [(id: String, name: String, themes: [String])] = [
+        ("simple", "简洁", ["notes", "plain", "ink", "press"]),
+        ("soft", "柔和", ["fresh", "journal", "glow", "clay"]),
+        ("bold", "有态度", ["editorial", "scroll", "poster", "neon"]),
+    ]
     /// 主题 → 卡片结构（每个主题一种；报刊共用书卷的结构，只换黑白配色）
     static let structures: [String: String] = [
-        "notes": "notes", "plain": "plain", "journal": "journal", "glow": "glow", "clay": "clay",
-        "editorial": "editorial", "poster": "poster", "ink": "ink", "fresh": "fresh", "neon": "neon", "scroll": "scroll", "press": "scroll",
+        "notes": "notes", "plain": "plain", "ink": "ink", "press": "scroll", "fresh": "fresh", "journal": "journal", "glow": "glow", "clay": "clay",
+        "editorial": "editorial", "scroll": "scroll", "poster": "poster", "neon": "neon",
     ]
     /// 全部卡片结构，按主题顺序、去重（按结构跑的测试用它）
     static let structureIds: [String] = ids.reduce(into: []) { list, id in
@@ -118,6 +125,12 @@ struct ThemeTests {
               pressed: option.getAttribute("aria-pressed"),
               disabled: option.disabled,
             }));
+            // 三组各一行：组的名字（读屏当组名读出）与组里的格子
+            const groups = [...themeGroup().querySelectorAll('[role="group"][aria-labelledby]')].map((section) => ({
+              id: section.dataset.group,
+              name: ui.name(section),
+              themes: [...section.querySelectorAll("[aria-pressed]")].map((option) => option.dataset.theme),
+            }));
             ui.click("AI 助手");
             const aiShown = ui.find("样式").getAttribute("aria-selected") === "false";
             const before = ui.find("主题：").getAttribute("aria-label");
@@ -128,6 +141,9 @@ struct ThemeTests {
             return {
               ids: options.map((option) => option.id),
               apiIds: themes.map((theme) => theme.id),
+              apiGroups: themes.map((theme) => theme.group),
+              groupList: (await mc.themes.groups()).map(({ id, name }) => [id, name]),
+              groups,
               names: options.map((option) => option.name),
               descriptions: options.map((option) => option.description),
               labels: themes.map((theme) => theme.label),
@@ -145,9 +161,14 @@ struct ThemeTests {
         #expect(result?["ids"] as? [String] == Self.ids)
         #expect(result?["apiIds"] as? [String] == Self.ids)
         #expect(result?["names"] as? [String] == Self.names)
+        #expect(result?["groupList"] as? [[String]] == Self.groups.map { [$0.id, $0.name] }, "themes.groups() 按面板的顺序")
+        #expect(result?["apiGroups"] as? [String] == Self.groups.flatMap { group in group.themes.map { _ in group.id } }, "每个主题的 group")
+        let groups = result?["groups"] as? [[String: Any]] ?? []
+        #expect(groups.map { $0["id"] as? String } == Self.groups.map(\.id) && groups.map { $0["name"] as? String } == Self.groups.map(\.name), "面板分三组：\(groups)")
+        #expect(groups.map { $0["themes"] as? [String] ?? [] } == Self.groups.map(\.themes), "每组四个、顺序照注册表：\(groups)")
         let descriptions = result?["descriptions"] as? [String] ?? []
         let labels = result?["labels"] as? [String] ?? []
-        #expect(labels.first == "干净的随手记 · 黄色小签" && labels.last == "黑白两色的报纸感，宋体与双线，适合新闻、评论", "\(labels)")
+        #expect(labels.first == "干净的随手记 · 黄色小签" && labels.last == "深蓝底 · 一抹电蓝 · 等宽标签", "\(labels)")
         #expect(descriptions.count == Self.ids.count && zip(descriptions, labels).allSatisfy { $0.hasPrefix($1) }, "描述先说主题的说明：\(descriptions)")
         #expect(result?["pressed"] as? [String] == ["true"] + Array(repeating: "false", count: Self.ids.count - 1), "新环境默认是备忘")
         #expect(result?["disabled"] as? Bool == false, "所有主题都能点")
@@ -189,18 +210,21 @@ struct ThemeTests {
 
         // 主题 → 卡片结构、卡片配色、跟随主题的字体；界面皮肤不跟主题变，一直是浅色（测试固定在系统浅色外观）
         let expected: [(id: String, template: String, colors: [String], fonts: [String])] = [
+            // 简洁
             ("notes", "notes", ["#ffffff", "#1c1c1e", "#ffbd2e"], ["MC Noto Sans SC", "MC Inter", "MC JetBrains Mono"]),
             ("plain", "plain", ["#ffffff", "#111111", "#111111"], ["MC Noto Sans SC", "MC Inter", "MC JetBrains Mono"]),
+            ("ink", "ink", ["#0c0c0c", "#e8e8e5", "#e8e8e5"], ["MC Noto Sans SC", "MC Inter", "MC JetBrains Mono"]),
+            ("press", "scroll", ["#ffffff", "#111111", "#111111"], ["MC Noto Serif SC", "MC Source Serif 4", "MC IBM Plex Mono"]),
+            // 柔和
+            ("fresh", "fresh", ["#fffaf3", "#3a3330", "#f08a8a"], ["MC Noto Sans SC", "MC Inter", "MC JetBrains Mono"]),
             ("journal", "journal", ["#fbf9f3", "#2a2825", "#4ca585"], ["MC LXGW WenKai", "MC Source Serif 4", "MC IBM Plex Mono"]),
             ("glow", "glow", ["#f5f3ff", "#25223d", "#7a68ee"], ["MC Noto Sans SC", "MC Inter", "MC JetBrains Mono"]),
             ("clay", "clay", ["#fff6f0", "#1d1b18", "#e5704f"], ["MC Noto Sans SC", "MC Inter", "MC IBM Plex Mono"]),
+            // 有态度
             ("editorial", "editorial", ["#f2f6fa", "#1b2430", "#2f67b1"], ["MC Noto Serif SC", "MC Source Serif 4", "MC IBM Plex Mono"]),
-            ("poster", "poster", ["#fffdf5", "#111111", "#ffe047"], ["MC Noto Sans SC", "MC Inter", "MC JetBrains Mono"]),
-            ("ink", "ink", ["#0c0c0c", "#e8e8e5", "#e8e8e5"], ["MC Noto Sans SC", "MC Inter", "MC JetBrains Mono"]),
-            ("fresh", "fresh", ["#fffaf3", "#3a3330", "#f08a8a"], ["MC Noto Sans SC", "MC Inter", "MC JetBrains Mono"]),
-            ("neon", "neon", ["#0f172a", "#e6edf7", "#4cc9ff"], ["MC Noto Sans SC", "MC Inter", "MC JetBrains Mono"]),
             ("scroll", "scroll", ["#f6f1e6", "#2b2a28", "#b4342f"], ["MC Noto Serif SC", "MC Source Serif 4", "MC IBM Plex Mono"]),
-            ("press", "scroll", ["#ffffff", "#111111", "#111111"], ["MC Noto Serif SC", "MC Source Serif 4", "MC IBM Plex Mono"]),
+            ("poster", "poster", ["#fffdf5", "#111111", "#ffe047"], ["MC Noto Sans SC", "MC Inter", "MC JetBrains Mono"]),
+            ("neon", "neon", ["#0f172a", "#e6edf7", "#4cc9ff"], ["MC Noto Sans SC", "MC Inter", "MC JetBrains Mono"]),
         ]
         #expect(expected.map(\.id) == Self.ids, "表里列全注册表的主题")
         #expect(Dictionary(uniqueKeysWithValues: expected.map { ($0.id, $0.template) }) == Self.structures, "主题 → 结构的映射与表一致")

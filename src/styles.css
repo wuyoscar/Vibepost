@@ -3475,13 +3475,35 @@ body[data-layout-mode="article"] .card-only {
   display: none;
 }
 
-/* 主题格子：上面是当前稿子第一页换成这个主题的缩略图，下面是名字与换过去的页数 */
+/* 主题格子：三组各一行（简洁、柔和、有态度），每行一个小标题与四格；一格上面是当前稿子第一页换成这个主题的缩略图，
+   下面是名字与换过去的页数。选中的底色画在整个区域的 ::before 上（见下），所以组与组里的格子都不定位，offsetTop 仍相对这里量 */
 .theme-grid {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  isolation: isolate;
+}
+
+.theme-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* 组的小标题：同菜单里的分组标题（.menu-heading），只是对齐格子的内边距 */
+.theme-group-label {
+  margin: 0 0 0 4px;
+  color: var(--ui-text-3);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.theme-group-tiles {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px 6px;
-  isolation: isolate;
 }
 
 /* 选中主题的底色：src/theme-panel.js 用 motion.track() 量出选中格子的位置，底色滑过去（格子一样大，clip-path 裁出） */
@@ -3539,7 +3561,7 @@ body[data-layout-mode="article"] .card-only {
   color: var(--ui-accent-text);
 }
 
-.theme-grid.has-selection > .theme-option[aria-pressed="true"]:not(:hover, :active) {
+.theme-grid.has-selection .theme-option[aria-pressed="true"]:not(:hover, :active) {
   background: transparent;
 }
 

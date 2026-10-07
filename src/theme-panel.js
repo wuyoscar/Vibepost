@@ -1,6 +1,7 @@
-// 主题面板（检查器「样式」标签里的「主题」）：8 个主题各一格，缩略图是当前稿子第一页换成这个主题的样子，
-// 下面预告换过去是几页（「9 → 11 页」，页数不变时「9 页」）。点一格就换主题。
-// 缩略图在停手后逐个主题生成，按（主题、正文与各项设置）缓存；一有按键、点按或输入就停下，停手后接着来，不跟打字抢时间。
+// 主题面板（检查器「样式」标签里的「主题」）：12 个主题各一格，按注册表的三组（简洁、柔和、有态度）各一行、每行一个小标题；
+// 缩略图是当前稿子第一页换成这个主题的样子，下面预告换过去是几页（「9 → 11 页」，页数不变时「9 页」）。点一格就换主题。
+// 缩略图在停手后逐个主题生成，先出当前主题所在的那一组（用户正看着的那一行），再出其余两组；按（主题、正文与各项设置）缓存；
+// 一有按键、点按或输入就停下，停手后接着来，不跟打字抢时间。
 // 只通过 App API（window.mediacraft）和界面元素工作，不碰 src/app.js 的内部名字。
 (() => {
   const mc = window.mediacraft;
@@ -61,6 +62,12 @@
   }
 
   const sameDraft = (a, b) => cacheKey(a.theme, a) === cacheKey(b.theme, b) && a.mode === b.mode;
+
+  // 生成的先后：当前主题那一组在前（面板里正看着的那一行），其余照面板顺序
+  function queue(draft) {
+    const current = themes.find((theme) => theme.id === draft.theme)?.group;
+    return [...themes.filter((theme) => theme.group === current), ...themes.filter((theme) => theme.group !== current)];
+  }
 
   function shrink(canvas) {
     const thumb = document.createElement("canvas");
@@ -124,6 +131,24 @@
     return { button, canvas, pages, shown: null };
   }
 
+  // 一组一行：小标题（读屏时是这一组的名字）加这一组的格子
+  function createGroup({ id, name }) {
+    const section = document.createElement("div");
+    section.className = "theme-group";
+    section.dataset.group = id;
+    section.setAttribute("role", "group");
+    const heading = document.createElement("h3");
+    heading.id = `theme-group-${id}`;
+    heading.className = "theme-group-label";
+    heading.textContent = name;
+    section.setAttribute("aria-labelledby", heading.id);
+    const grid = document.createElement("div");
+    grid.className = "theme-group-tiles";
+    grid.append(...themes.filter((theme) => theme.group === id).map((theme) => tiles.get(theme.id).button));
+    section.append(heading, grid);
+    return section;
+  }
+
   function markCurrent(themeId) {
     for (const [id, tile] of tiles) tile.button.setAttribute("aria-pressed", String(id === themeId));
   }
@@ -167,13 +192,13 @@
     if (snapshot?.mode === "cards" && shown()) idleTimer = setTimeout(() => void generate().catch(() => undefined), IDLE_DELAY);
   }
 
-  // 一次出一个主题；出图期间稿子变了（按键、App API 改稿）这一张作废，等下一次出图后重来。
+  // 一次出一个主题，当前主题那一组先；出图期间稿子变了（按键、App API 改稿）这一张作废，等下一次出图后重来。
   async function generate() {
     const run = ++job;
     while (run === job) {
       const before = await readDraft();
       if (run !== job || !snapshot || !sameDraft(before, snapshot)) return;
-      const theme = themes.find((item) => !cache.has(cacheKey(item.id, before)));
+      const theme = queue(before).find((item) => !cache.has(cacheKey(item.id, before)));
       if (!theme) return;
       const { pageCount, canvas } = await mc.themes.preview(theme.id);
       if (run !== job) return;
@@ -203,7 +228,7 @@
   async function init() {
     themes = await mc.themes.list();
     for (const theme of themes) tiles.set(theme.id, createTile(theme));
-    group.replaceChildren(...[...tiles.values()].map((tile) => tile.button));
+    group.replaceChildren(...(await mc.themes.groups()).map(createGroup));
     markCurrent(document.documentElement.dataset.cardTheme);
     // 选中的底色跟着换上的主题滑过去
     window.MediaCraftMotion.track(group, '[aria-pressed="true"]');

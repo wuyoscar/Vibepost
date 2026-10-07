@@ -367,9 +367,13 @@
     const themes = root.MediaCraftThemes;
     return {
       async list() {
-        return themes.list().map(({ id, name, label, structure, colors, fonts }) => ({
-          id, name, label, structure, colors: { ...colors }, fonts: { ...fonts },
+        return themes.list().map(({ id, name, label, group, structure, colors, fonts }) => ({
+          id, name, label, group, structure, colors: { ...colors }, fonts: { ...fonts },
         }));
+      },
+      // 主题面板里的三组（简洁、柔和、有态度），按面板里的顺序；每个主题的 group 是其中一个 id
+      async groups() {
+        return themes.groups().map(({ id, name }) => ({ id, name }));
       },
       // 与主题面板里点选相同：换皮肤、结构与配色，颜色微调重置，记为新稿子沿用的主题。
       async apply(id) {
