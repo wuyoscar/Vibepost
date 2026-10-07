@@ -129,11 +129,13 @@
     };
   }
 
-  // 「/」菜单与格式条「插入」里的命令。pickImages / pickLivePhoto 由应用打开文件选择。
-  // 「/」菜单与格式条「插入」里的项：名字、字形、拼音缩写与说明都在操作手册（src/engine/manual.js），组件插入的是中文写法。
+  // 「/」菜单与格式条「插入」里的命令。pickImages / pickLivePhoto 由应用打开文件选择，notify 把插不进去的原因写到状态栏。
+  // 「/」菜单与格式条「插入」里的项：名字、字形、拼音缩写与说明都在操作手册（src/engine/manual.js），组件插入的是中文写法；
+  // 最后一组是片段（src/engine/snippets.js 的登记表：写好的示范段落，整段插进来）。
   // 标题、列表、引用这类段落样式不在这里：用格式条的「样式」，或在预览里点选那一块换（直接写 # 、- 、> 也行）
   function insertCommands(hooks) {
     const manual = window.MediaCraftManual;
+    const snippets = window.MediaCraftSnippets;
     const runs = {
       image: () => hooks.pickImages(),
       live: () => hooks.pickLivePhoto(),
@@ -151,6 +153,18 @@
         id: `component-${style.id}`, glyph: style.glyph, label: style.name, aliases: [...style.aliases, ...style.keys], hint: style.summary,
         run: (view) => commands.insertComponent(view, style.name, style.body ?? ""),
       })),
+      // 片段：插不进去（结尾引导不在末尾、已有结尾页）时说一声，稿子不动
+      ...snippets.list.map((snippet) => ({
+        id: `snippet-${snippet.id}`, glyph: snippet.glyph, label: snippet.name, aliases: [...snippet.keys, snippet.name], hint: snippet.summary,
+        run: (view) => {
+          try {
+            return commands.insertSnippet(view, snippet.markdown);
+          } catch (error) {
+            hooks.notify?.(error.message || String(error));
+            return false;
+          }
+        },
+      })),
     ];
   }
 
@@ -164,6 +178,7 @@
   //   onPasteFiles(files, at)   粘贴进来图片文件
   //   onDropFiles(transfer, at) 从 Finder 拖进来文件，at 是松手的那一行之前或之后（整行插入的位置）
   //   pickImages() / pickLivePhoto()  「/」菜单里的插图片、插实况
+  //   notify(message)           插入项插不进去时的提示（片段：结尾引导不在末尾、已有结尾页）；不给就不提示
   function create(options) {
     const listeners = new Set();
     const historySlot = new Compartment();

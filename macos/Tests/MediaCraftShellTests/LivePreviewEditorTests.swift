@@ -364,7 +364,10 @@ struct LivePreviewEditorTests {
         """) as? [String: Any]
         await harness.tearDown()
 
-        #expect(result?["all"] as? [String] == ["图片或 PDF", "实况视频", "分割线", "分页", "结尾页", "代码块", "小标签", "提示", "页尾", "等宽", "标签列表", "步骤"])
+        #expect(result?["all"] as? [String] == [
+            "图片或 PDF", "实况视频", "分割线", "分页", "结尾页", "代码块", "小标签", "提示", "页尾", "等宽", "标签列表", "步骤",
+            "三步教程", "对比", "金句页", "论文卡", "时间线", "FAQ", "清单", "前后对比", "数据卡", "结尾引导",
+        ], "插入项、组件之后是片段（SnippetTests）")
         #expect(result?["filtered"] as? [String] == ["分页"], "拼音缩写 fy 筛出「分页」")
         #expect(result?["pageBreak"] as? String == "第一段\n[[分页]]\n")
         #expect(result?["selected"] as? [String] == ["实况视频"], "↓ 选中下一项")

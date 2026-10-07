@@ -190,7 +190,7 @@
                 <svg class="icon icon-small" aria-hidden="true"><use href="#i-plus" /></svg>
                 <span>插入</span>
               </summary>
-              <div class="pop-menu-panel menu">
+              <div class="pop-menu-panel menu insert-menu-panel">
                 <label class="menu-item">
                   <span class="menu-glyph" aria-hidden="true"><svg class="icon icon-small"><use href="#i-image" /></svg></span>图片或 PDF
                   <input id="imageFileInput" class="visually-hidden" type="file" accept="image/*,application/pdf,.pdf" multiple />
@@ -199,7 +199,7 @@
                   <span class="menu-glyph" aria-hidden="true"><svg class="icon icon-small"><use href="#i-live" /></svg></span>实况视频
                   <input id="videoFileInput" class="visually-hidden" type="file" accept="video/mp4,video/quicktime,.mp4,.m4v,.mov" multiple />
                 </label>
-                <!-- 其余各项（分割线、分页、结尾页、代码块与组件）由 src/editor/toolbars.js 照操作手册（src/engine/manual.js）生成 -->
+                <!-- 其余各项（分割线、分页、结尾页、代码块与组件，最后一组是片段）由 src/editor/toolbars.js 照操作手册（src/engine/manual.js）与片段登记表（src/engine/snippets.js）生成 -->
                 <div class="menu-section" data-insert-items></div>
               </div>
             </details>
@@ -1157,6 +1157,7 @@
     <script src="src/engine/colors.js"></script>
     <script src="src/engine/media.js"></script>
     <script src="src/engine/manual.js"></script>
+    <script src="src/engine/snippets.js"></script>
     <script src="src/engine/markdown.js"></script>
     <script src="src/engine/plain-text.js"></script>
     <script src="src/engine/structures.js"></script>

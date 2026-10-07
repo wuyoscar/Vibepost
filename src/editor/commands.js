@@ -1,4 +1,4 @@
-// 编辑命令：段落样式、行内格式、颜色、链接、插入整行的块、回车续写列表。
+// 编辑命令：段落样式、行内格式、颜色、链接、插入整行的块与片段、回车续写列表。
 // 只改 Markdown 文本（写法见 docs/markdown-syntax.md）；每条命令是撤销历史里单独的一步。
 (() => {
   const { EditorSelection, isolateHistory } = window.CodeMirror;
@@ -327,6 +327,15 @@
     return edit(view, { changes, selection: cursor(start + name.length + 4 + body.length) }, "input.insert");
   }
 
+  // 片段（src/engine/snippets.js 登记表里的 markdown，或任何一段 Markdown）：整段插在光标处，前后隔开空行、首尾多余的 [[分页]] 去掉
+  // （规则都在 MediaCraftSnippets.insert）；一步历史，光标停在片段末尾。插不进去（结尾引导不在末尾、已有结尾页）时抛出说明，由调用方提示。
+  function insertSnippet(view, markdown, at = view.state.selection.main.head) {
+    if (view.state.readOnly) return false;
+    const { change, end } = window.MediaCraftSnippets.insert(view.state.doc.toString(), at, markdown);
+    if (!change) return false;
+    return edit(view, { changes: change, selection: cursor(end) }, "input.insert");
+  }
+
   // ===== 回车 =====
 
   // 列表项、引用行里回车：下一行接着写同样的标记（编号加一）；空着的列表项回车就结束列表。
@@ -363,6 +372,7 @@
     insertDivider,
     insertCodeBlock,
     insertComponent,
+    insertSnippet,
     continueMarkup,
     blockInsertion,
   };
