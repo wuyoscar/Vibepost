@@ -856,6 +856,58 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   font-size: 11px;
 }
 
+/* 保存（src/drafts/save-button.js）：平时是一行灰字「已保存」，有改动时图标轻轻闪着「保存中」，没存上时变成警示色；
+   按了保存（⌘S）对勾跳一下 */
+.save-button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px 0 6px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ui-text-3);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.save-button:hover {
+  background: var(--ui-hover);
+  color: var(--ui-text);
+}
+
+.save-button:active {
+  background: var(--ui-pressed);
+}
+
+.save-button[data-state="pending"] .icon,
+.save-button[data-state="saving"] .icon {
+  animation: ai-pulse 1.2s var(--ease-standard) infinite;
+}
+
+.save-button[data-state="error"] {
+  color: var(--ui-danger);
+}
+
+.save-button.is-confirmed .icon {
+  animation: save-confirm 600ms var(--ease-spring);
+}
+
+@keyframes save-confirm {
+  0% {
+    transform: scale(0.6);
+  }
+  45% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 .titlebar-trailing,
 .export-actions {
   display: flex;

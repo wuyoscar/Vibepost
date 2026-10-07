@@ -55,6 +55,7 @@
       <symbol id="i-close" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" /></symbol>
       <symbol id="i-swap" viewBox="0 0 24 24"><path d="M5 8.5h13M15 5l3.5 3.5L15 12" /><path d="M19 15.5H6M9 12l-3.5 3.5L9 19" /></symbol>
       <symbol id="i-check" viewBox="0 0 24 24"><path d="M5.5 12.5l4.2 4.2 8.8-9.4" /></symbol>
+      <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 5.5c0-.6.4-1 1-1h10.3L19 7.2v11.3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1z" /><path d="M8.5 4.5v4h6v-4M8 19.5V14h8v5.5" /></symbol>
       <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.8v5M12 16.2v.01" /></symbol>
       <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V5.2c0-.4.3-.7.7-.7h3.6c.4 0 .7.3.7.7V7M6.5 7l.9 11.6c.1.8.7 1.4 1.5 1.4h6.2c.8 0 1.4-.6 1.5-1.4L17.5 7" /><path d="M10.2 11v5.5M13.8 11v5.5" /></symbol>
       <symbol id="i-align-left" viewBox="0 0 24 24"><path d="M4.5 4v16" /><rect x="7.5" y="8" width="9" height="8" rx="1.5" /></symbol>
@@ -94,6 +95,11 @@
             <span id="draftHeading" class="draft-heading-title">Vibepost</span>
             <span id="statusText" class="draft-heading-status" role="status"></span>
           </div>
+          <!-- 保存（src/drafts/save-button.js）：这篇存好了没有，点它或 ⌘S 马上存；内置说明书不存，藏起来 -->
+          <button id="saveButton" class="save-button" type="button" data-state="saved" aria-label="保存" aria-describedby="saveStateText" aria-keyshortcuts="Meta+S" hidden>
+            <svg class="icon icon-small" aria-hidden="true"><use href="#i-check" /></svg>
+            <span id="saveStateText" class="save-label">已保存</span>
+          </button>
         </div>
 
         <div id="layoutModeSwitch" class="segmented layout-mode-switch" role="group" aria-label="排版模式">
@@ -1203,6 +1209,7 @@
     <script src="src/drafts/drawer.js"></script>
     <script src="src/drafts/title.js"></script>
     <script src="src/drafts/caption.js"></script>
+    <script src="src/drafts/save-button.js"></script>
     <script src="src/shell.js"></script>
     <script src="src/theme-panel.js"></script>
     <script src="src/workspace/palette-panel.js"></script>

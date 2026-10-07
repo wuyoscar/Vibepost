@@ -70,15 +70,21 @@ function assertEditable() {
   if (MediaCraftGuides.isGuide(draft.id)) throw new Error("内置说明书不可修改，请先新建稿子");
 }
 
+// 界面上的改动：交给稿件模块过一会儿存（不等出图：出图失败或很慢时也存得进去），停一下再出图
+function edited() {
+  MediaCraftDrafts.saveSoon();
+  requestRender();
+}
+
 // ===== 检查器：样式与署名 =====
-const styleForm = MediaCraftStyleForm.create(() => requestRender());
-const byline = MediaCraftByline.create(DEFAULT_PROFILE, () => requestRender());
+const styleForm = MediaCraftStyleForm.create(() => edited());
+const byline = MediaCraftByline.create(DEFAULT_PROFILE, () => edited());
 
 // ===== 检查器：封面（src/workspace/cover-form.js）。封面的标题取标题框，所以开着封面时改标题也要重新出图 =====
 const coverForm = MediaCraftCoverForm.create({
   onChange(cover) {
     draft.cover = cover;
-    requestRender();
+    edited();
   },
   importImage: (file) => media.importDetached(file),
 });
@@ -95,7 +101,7 @@ function setCover(value) {
 const cardCssForm = MediaCraftCardCss.create({
   onChange(value) {
     draft.cardCss = value;
-    requestRender();
+    edited();
   },
 });
 
@@ -141,7 +147,7 @@ const media = window.MediaCraftMedia.create({
   editor,
   store: imageStore,
   readOnly: () => MediaCraftGuides.isGuide(draft.id) || ai.preview() !== null,
-  render: () => requestRender(),
+  render: () => edited(),
   notify,
   editLivePhoto: (id) => void livePhotos.edit(id),
   isVideo: (file) => livePhotos.isVideo(file),
@@ -178,7 +184,7 @@ const livePhotos = window.MediaCraftMedia.createLivePhotos({
 // 用户在编辑器里改了正文。撤销 / 重做时，预览里删过的图片跟着这一步的正文回来或消失。
 function handleEditorChange({ history }) {
   if (history) imageStore.syncDeletions(editor.getText());
-  requestRender();
+  edited();
 }
 
 // ===== 稿子的字段：界面 ↔ 稿件记录 =====
@@ -242,6 +248,7 @@ async function chooseTheme(id) {
   colorPreview = null;
   styleForm.write({ colors: theme.colors, tunedColors: [] });
   MediaCraftDrafts.setLastTheme(draft.theme);
+  MediaCraftDrafts.saveSoon();
   await pipeline.render();
   notify(`已切换为「${theme.name}」主题`);
 }
@@ -263,6 +270,7 @@ function setMode(mode) {
 
 async function switchMode(mode) {
   setMode(mode);
+  MediaCraftDrafts.saveSoon();
   await renderNow();
 }
 
@@ -314,7 +322,7 @@ function applyFieldEdits(edits) {
   }
   applyColorEdits(edits);
   media.refresh();
-  requestRender();
+  edited();
 }
 
 // 颜色与「单独调过」的标记一起落（同一步里两个字段的先后不影响结果；这一步没改标记时照旧）
@@ -348,7 +356,7 @@ const stageBlocks = MediaCraftStageBlocks.create({
     text: () => editor.getText(),
     apply(next) {
       editor.edit({ text: next });
-      requestRender();
+      edited();
     },
     reveal: ([start, end]) => editor.select(start, end),
     annotate: (block) => stageNotes.add(block),
@@ -478,6 +486,7 @@ async function startDrafts() {
     toolbars.refreshSwatches();
     appApi.emit("change", detail);
   });
+  MediaCraftDrafts.on("save-state", (detail) => appApi.emit("save-state", detail));
   // 这个窗口打开哪篇：地址上的 ?draft=<id>（「在新窗口打开」）、?new（「新建窗口」），都没有时打开上次那篇
   const params = new URLSearchParams(location.search);
   const opened = await MediaCraftDrafts.start(draftHost, { initialId: params.get("draft"), fresh: params.has("new") });

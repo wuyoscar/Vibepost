@@ -19,7 +19,18 @@ public final class ShellWebView: NSObject {
     /// 下载完成前文件还不在磁盘上，同时进行的下载靠这里避开同名。
     private var reservedDownloads: [ObjectIdentifier: URL] = [:]
     private var pendingLoad: CheckedContinuation<Void, Error>?
-    private var observers: [NSObjectProtocol] = []
+    var observers: [NSObjectProtocol] = []
+    /// 系统（NSWorkspace）那边的通知：唤醒
+    var workspaceObservers: [NSObjectProtocol] = []
+    /// 窗口现在看得见吗：自愈只在看得见时查画面（看不见的页面本来就不出新帧）。测试换成总是看得见
+    public var isShown: () -> Bool = { false }
+    /// 最近一次自愈做了什么（系统日志里也有）
+    public internal(set) var lastRepair: Repair?
+    /// 一秒内连着来的几次合成一次（显示器编号会接连变两次）
+    var repairTask: Task<Void, Never>?
+    var repairPending: RepairReason?
+    /// 窗口看不见时来的那次：等它回到前面再修
+    var repairDeferred: RepairReason?
 
     public init(core: ShellCore, windowId: String = UUID().uuidString) {
         self.core = core
@@ -54,8 +65,15 @@ public final class ShellWebView: NSObject {
         super.init()
         webView.navigationDelegate = self
         webView.uiDelegate = self
+        isShown = { [weak self] in
+            MainActor.assumeIsolated {
+                guard let window = self?.webView.window else { return false }
+                return window.isVisible && !window.isMiniaturized && window.occlusionState.contains(.visible)
+            }
+        }
         core.register(self)
         observeWindow()
+        observeDisplays()
         if core.glass {
             webView.setValue(false, forKey: "drawsBackground")
             config.userContentController.add(WindowChromeMessages(webView: chromeView), name: WindowChromeMessages.name)
@@ -165,9 +183,25 @@ public final class ShellWebView: NSObject {
             ?? "\"\""
     }
 
-    /// 重新载入这个窗口（⌘R）：页面地址上记着它开着的那篇，还是打开那篇
+    /// 重新载入这个窗口（⌘R）：页面地址上记着它开着的那篇，还是打开那篇。先让页面把稿子存完（刚打的字不丢）
     public func reload() async throws {
+        await saveDrafts()
         try await waitForLoad { webView.reload() }
+    }
+
+    /// 让这个窗口的页面马上把稿子存进本机、等它写完（退出、关窗、重新载入、更新重启之前）。页面没有 App API
+    /// （测试页、还在载入）时直接算完；timeout 内没回（页面卡住了）也不再等。返回页面是否确认存好了
+    @discardableResult
+    public func saveDrafts(timeout: Duration = .seconds(3)) async -> Bool {
+        let script = """
+            const drafts = window.mediacraft?.drafts;
+            if (!drafts?.saveNow) return true;
+            try { await drafts.saveNow(); return true; } catch { return false; }
+        """
+        let webView = webView
+        return await firstOf(timeout: timeout) {
+            (try? await webView.callAsyncJavaScript(script, arguments: [:], in: nil, contentWorld: .page)) as? Bool ?? false
+        } ?? false
     }
 
     /// 这个窗口关掉了：结束它发起的 AI 进程，之后不再往它的页面推事件
@@ -176,6 +210,9 @@ public final class ShellWebView: NSObject {
         core.aiSessions.close(window: windowId)
         observers.forEach(NotificationCenter.default.removeObserver)
         observers = []
+        workspaceObservers.forEach(NSWorkspace.shared.notificationCenter.removeObserver)
+        workspaceObservers = []
+        repairTask?.cancel()
     }
 
     /// 只开一个窗口时，App 退出、测试结束前调用：同 `ShellCore.shutdown`
@@ -348,4 +385,29 @@ extension ShellWebView: WKUIDelegate {
         }
         return nil
     }
+}
+
+/// 先完成的那个：operation 在 timeout 之内返回就用它的结果，否则 nil（operation 还在跑也不再等它；页面卡住时
+/// callAsyncJavaScript 可能永远不回，任务组会一直等它，所以不用任务组）
+@MainActor
+func firstOf<T>(timeout: Duration, _ operation: @escaping @MainActor () async -> T) async -> T? {
+    let once = Once()
+    return await withCheckedContinuation { (continuation: CheckedContinuation<T?, Never>) in
+        let finish: @MainActor (T?) -> Void = { value in
+            guard !once.done else { return }
+            once.done = true
+            continuation.resume(returning: value)
+        }
+        Task { @MainActor in finish(await operation()) }
+        Task { @MainActor in
+            try? await Task.sleep(for: timeout)
+            finish(nil)
+        }
+    }
+}
+
+/// 只做一次的记号（firstOf 用）
+@MainActor
+private final class Once {
+    var done = false
 }

@@ -1,4 +1,5 @@
-// 稿子管理：全部稿子常驻内存（不含图片、视频本体），改动随出图自动存进本机；新建、打开、删除、署名、上次的主题。
+// 稿子管理：全部稿子常驻内存（不含图片、视频本体），改动后自动存进本机（停手约 0.4 秒，一直在改时至少每 2 秒一次，
+// 不等出图），也能马上存（saveNow：保存按钮、⌘S、壳在退出 / 关窗 / 重新载入前）；新建、打开、删除、署名、上次的主题。
 // 界面（编辑器、表单）由宿主适配：start(host) 时传进来，这里不碰 src/app.js 的内部名字。
 //   host.builtIns        内置说明书：[{ id, title, record }]，只读，不存盘
 //   host.defaultProfile  默认署名 { name, handle, avatar, avatarCrop }（还没存过署名时用）
@@ -44,8 +45,9 @@
   let writeError = null;
   // 新建、打开、删除依次进行，免得连点时交错
   let switching = Promise.resolve();
-  // change：当前稿子改了；list：稿子列表变了；removed-elsewhere：正开着的这篇在别的窗口里删了，已经换到另一篇
-  const listeners = { change: new Set(), list: new Set(), "removed-elsewhere": new Set() };
+  // change：当前稿子改了；list：稿子列表变了；removed-elsewhere：正开着的这篇在别的窗口里删了，已经换到另一篇；
+  // save-state：存盘状态变了（见下面「存盘状态」）
+  const listeners = { change: new Set(), list: new Set(), "removed-elsewhere": new Set(), "save-state": new Set() };
   // 别的窗口删掉的稿子：排着的写入里它的那部分到写的时候丢掉；这个窗口写过的稿子（只有开着它的窗口会写）
   const forgotten = new Set();
   const written = new Set();
@@ -150,6 +152,65 @@
     return list().filter((item) => (mode === "all" || item.mode === mode) && (!needle || summaryOf(get(item.id)).haystack.includes(needle)));
   }
 
+  // ===== 存盘状态（顶栏的保存按钮 src/drafts/save-button.js、窗口的「有改动」标记）=====
+  // status：saved 都存好了（savedAt 是最近一次写好的时间，刚打开时是这篇的修改时间）；pending 有改动、过一会儿就存；
+  // saving 正在写；error 没存上（error 是原因；过一会儿自动再试，也可以 saveNow）；none 没有要存的（内置说明书、正在换稿子）。
+
+  const SAVE_DELAY = 400; // 停手这么久就存
+  const SAVE_MAX_WAIT = 2000; // 一直在改时至少隔这么久存一次
+  const RETRY_DELAY = 5000; // 没存上时隔这么久再试
+  let saveTimer = 0;
+  let retryTimer = 0;
+  let pendingSince = 0;
+  let savesInFlight = 0;
+  let saveFailure = null;
+  let savedAt = null;
+  let saveState = { status: "none", savedAt: null, error: null };
+
+  // 按现在的情况算出状态，变了才发 save-state；explicit（马上存之后）总是发，保存按钮借它告诉用户「存好了」
+  function settle({ explicit = false } = {}) {
+    let status = "saved";
+    if (!currentId || isBuiltIn(currentId)) status = "none";
+    else if (saveFailure) status = "error";
+    else if (saveTimer) status = "pending";
+    else if (savesInFlight) status = "saving";
+    const next = { status, savedAt: status === "none" ? null : savedAt, error: status === "error" ? saveFailure : null };
+    const same = next.status === saveState.status && next.savedAt === saveState.savedAt && next.error === saveState.error;
+    saveState = next;
+    if (!same || explicit) emit("save-state", { ...next, draftId: currentId, explicit });
+  }
+
+  // 界面上改了点什么：过一会儿存（连续改动顺延，但最多等 SAVE_MAX_WAIT）
+  function saveSoon() {
+    if (!currentId || isBuiltIn(currentId)) return;
+    const now = Date.now();
+    if (!saveTimer) pendingSince = now;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(save, Math.max(0, Math.min(SAVE_DELAY, pendingSince + SAVE_MAX_WAIT - now)));
+    settle();
+  }
+
+  // 马上存（保存按钮、⌘S、壳在退出 / 关窗 / 重新载入前）：不再等、存、等写完；没存上时 reject 原因。之前没存上过就整篇重写
+  async function saveNow() {
+    if (currentId && !isBuiltIn(currentId)) {
+      if (saveFailure || writeError) baseline = null;
+      save();
+    }
+    try {
+      await flush();
+    } finally {
+      settle({ explicit: true });
+    }
+    return { ...saveState, draftId: currentId };
+  }
+
+  function retryLater() {
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(() => {
+      if (saveFailure) save();
+    }, RETRY_DELAY);
+  }
+
   // ===== 存盘 =====
 
   // 排队写：写的时候丢掉别的窗口已经删了的稿子（连同它的媒体），不把它写回去
@@ -187,7 +248,9 @@
 
   // 存当前稿子：界面上的内容与上次存下的不同才写。内置说明书不存。改动（含切换到另一篇）会发 change。
   function save() {
-    if (!currentId || isBuiltIn(currentId)) return;
+    clearTimeout(saveTimer);
+    saveTimer = 0;
+    if (!currentId || isBuiltIn(currentId)) return settle();
     const { fields, sources, profile: nextProfile } = host.capture();
     const changes = { drafts: [], media: [], deleteMedia: [], meta: [] };
     profile = nextProfile;
@@ -222,13 +285,30 @@
       lastChangeSignature = changeSignature;
       emit("change", { draftId });
     }
-    if (!changes.drafts.length && !changes.meta.length) return;
-    void enqueue(changes, () => {
+    if (!changes.drafts.length && !changes.meta.length) return settle();
+    savesInFlight += 1;
+    settle();
+    enqueue(changes, () => {
       savedProfile = "";
       if (currentId !== draftId) return;
       baseline = null;
       for (const [id] of puts) persistedImages.delete(id);
-    }).catch(() => undefined);
+    })
+      .then(
+        () => {
+          savedAt = Date.now();
+          saveFailure = null;
+        },
+        (error) => {
+          if (currentId !== draftId) return;
+          saveFailure = error?.message || String(error);
+          retryLater();
+        },
+      )
+      .finally(() => {
+        savesInFlight -= 1;
+        settle();
+      });
     if (changed) emit("list");
   }
 
@@ -261,6 +341,10 @@
     // 打开时界面会把旧值规范化（比如字体、行距的写法），这不算改动，不改修改时间。
     baseline = isBuiltIn(id) ? null : JSON.stringify(host.capture().fields);
     persistedImages = new Map(Object.entries(media.images));
+    // 刚打开：都存好了，「已保存」的时间是这篇的修改时间（离开上一篇前已经存完）
+    saveFailure = null;
+    savedAt = isBuiltIn(id) ? null : record.updatedAt ?? null;
+    settle();
     emit("list");
     await host.opened(record);
   }
@@ -449,7 +533,12 @@
     const gone = new Set(deleted);
     // 正开着的这篇在别处删了：马上不再存它（界面上的改动都不再写），等排着的事做完再换到另一篇
     const removed = currentId && gone.has(currentId) && records.has(currentId) ? summaryOf(records.get(currentId)).title : null;
-    if (removed !== null) currentId = null;
+    if (removed !== null) {
+      currentId = null;
+      clearTimeout(saveTimer);
+      saveTimer = 0;
+      settle();
+    }
     for (const id of changed) {
       if (id === currentId || gone.has(id)) continue;
       const record = await store.readDraft(id).then(upgrade, () => undefined);
@@ -534,6 +623,10 @@
     open,
     remove,
     save,
+    saveSoon,
+    saveNow,
+    // { status: "saved" | "pending" | "saving" | "error" | "none", savedAt, error, draftId }
+    saveState: () => ({ ...saveState, draftId: currentId }),
     flush,
     aiSession,
     setAiSession,

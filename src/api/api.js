@@ -8,7 +8,7 @@
   // update(patch, { undoable: true }) 时随正文一起进撤销历史的字段
   const HISTORY_FIELDS = ["title", "caption", "mode", "theme", "colors", "tunedColors", "fonts", "cardCss", ...NUMBER_FIELDS];
   const HEX_COLOR = /^#[0-9a-f]{6}$/i;
-  const EVENTS = ["change", "rendered", "ai"];
+  const EVENTS = ["change", "rendered", "ai", "save-state"];
   const { deepFreeze } = root.MediaCraftEngine;
 
   // ===== 校验：先整体校验再落地，不会只改一半 =====
@@ -242,6 +242,10 @@
       async remove(id) {
         await drafts.remove(id);
       },
+      // 存盘状态：{ status: "saved" | "pending" | "saving" | "error" | "none", savedAt, error, draftId }
+      saveState: async () => drafts.saveState(),
+      // 马上存（保存按钮、⌘S、壳在退出 / 关窗 / 重新载入前）：等写进本机后返回状态，没存上时 reject
+      saveNow: async () => drafts.saveNow(),
       update,
       // 页内专用：这篇（不切换过去）的第一张卡片，按它自己的正文、主题、配色、字体与图片出图，不管模式；
       // 正在编辑的这篇按界面上的样子。只画第一页；不改稿子、不等预览出图。
@@ -388,7 +392,8 @@
 
     const api = {
       version: "5",
-      // 订阅事件：change（当前稿子存盘后有变化，含切换稿子）/ rendered（一次出图画完）/ ai（AI 会话，见 src/ai/session.js）。
+      // 订阅事件：change（当前稿子存盘后有变化，含切换稿子）/ rendered（一次出图画完）/ ai（AI 会话，见 src/ai/session.js）/
+      // save-state（存盘状态变了：已保存、等着存、正在写、没存上）。
       // 返回取消订阅的函数。
       on(type, handler) {
         if (!EVENTS.includes(type)) throw new TypeError(`没有这个事件：${type}`);

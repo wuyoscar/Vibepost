@@ -10,6 +10,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var windows: [ObjectIdentifier: (window: NSWindow, shell: ShellWebView)] = [:]
     /// 新窗口在最前面那个窗口的基础上往右下错开这么多
     private static let cascade: CGFloat = 28
+    /// 正在关的窗口：先等它的页面存完稿（windowShouldClose），存完再真正关上
+    private var closing: Set<ObjectIdentifier> = []
+    /// 已经在退出了（存稿、结束 AI 进程中）：再按 ⌘Q 不重来一遍
+    private var terminating = false
 
     /// 启动：照退出前开着的窗口恢复（各自的稿子、位置大小），没有记录时开一个窗口打开上次那篇
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -82,27 +86,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         openWindow(WindowRequest(fresh: true))
     }
 
+    /// 文件 › 保存（⌘S）：最前面那个窗口的稿子马上存（页面自己也接 ⌘S，这一项是给点菜单的）
+    @objc func saveDraft(_ sender: Any?) {
+        guard let window = NSApp.keyWindow, let entry = windows[ObjectIdentifier(window)] else { return }
+        Task { await entry.shell.saveDrafts() }
+    }
+
+    /// 点了关闭：先让这个窗口的页面把稿子存完（最多等 3 秒，页面卡住也照样关），再真正关上。存的途中再点关闭不重来
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        let key = ObjectIdentifier(sender)
+        guard let entry = windows[key] else { return true }
+        guard !closing.contains(key) else { return false }
+        closing.insert(key)
+        Task {
+            await entry.shell.saveDrafts()
+            sender.close()
+        }
+        return false
+    }
+
     /// 关掉一个窗口：只结束它自己发起的 AI 进程；最后一个关掉时 App 退出（见下）
     func windowWillClose(_ notification: Notification) {
-        guard let window = notification.object as? NSWindow,
-              let entry = windows.removeValue(forKey: ObjectIdentifier(window))
-        else { return }
+        guard let window = notification.object as? NSWindow else { return }
+        closing.remove(ObjectIdentifier(window))
+        guard let entry = windows.removeValue(forKey: ObjectIdentifier(window)) else { return }
         entry.shell.close()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
-    /// 退出：记下开着的窗口（下次照着恢复），先结束所有窗口的 AI 进程（不卡主线程），都退出了再退。
+    /// 退出：记下开着的窗口（下次照着恢复），每个窗口先把稿子存完（各最多等 3 秒），再结束所有窗口的 AI 进程
+    /// （不卡主线程），都退出了再退。
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !terminating else { return .terminateLater }
+        terminating = true
         core.freezeSession()
-        core.shutdown { NSApp.reply(toApplicationShouldTerminate: true) }
+        Task {
+            await core.saveAllDrafts()
+            core.shutdown { NSApp.reply(toApplicationShouldTerminate: true) }
+        }
         return .terminateLater
     }
 
-    /// 显示 › 重新载入：最前面的那个窗口
+    /// 显示 › 重新载入：最前面的那个窗口（先存稿）
     @objc func reloadPage(_ sender: Any?) {
         guard let window = NSApp.keyWindow, let entry = windows[ObjectIdentifier(window)] else { return }
-        entry.shell.webView.reload()
+        Task { try? await entry.shell.reload() }
     }
 
     /// 窗口后面的原生毛玻璃：网页透明处（工具栏、稿件栏）透出它，内容区自己画不透明底色。
@@ -145,6 +174,8 @@ enum MainMenu {
         // 一个窗口一篇稿子；新窗口里是一篇新稿子（稿件列表里 ⌘ 点一篇也会在新窗口打开）
         menu.addItem(submenu("文件", [
             item("新建窗口", #selector(AppDelegate.newWindow(_:)), "N"),
+            .separator(),
+            item("保存", #selector(AppDelegate.saveDraft(_:)), "s"),
         ]))
         // 没有 Edit 菜单时，⌘C / ⌘V 在 WKWebView 里不生效。
         menu.addItem(submenu("编辑", [

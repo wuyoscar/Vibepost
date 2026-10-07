@@ -8,7 +8,6 @@
   const mc = root.mediacraft;
   const publish = root.MediaCraftPublish;
   const TITLE_LIMIT = publish.LIMITS.title;
-  const SAVE_DELAY = 300;
   const titleInput = document.querySelector("#titleInput");
   const titleCount = document.querySelector("#titleCount");
 
@@ -20,11 +19,10 @@
     titleInput.setAttribute("aria-invalid", String(over));
   }
 
-  let saveTimer = 0;
+  // 改了就交给稿件模块过一会儿存（顶栏的保存按钮跟着显示状态）
   titleInput.addEventListener("input", () => {
     showTitleCount();
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(drafts.save, SAVE_DELAY);
+    drafts.saveSoon();
   });
   // 20 字是小红书的限制，只在图文卡片模式下显示；长文（公众号）不显示，也不占地方
   mc.on("rendered", ({ mode }) => {

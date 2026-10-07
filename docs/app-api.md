@@ -43,6 +43,7 @@
 | `change` | 当前稿子存盘后与上次不同（含切换到另一篇） | `{ draftId }` |
 | `rendered` | 一次出图画完（被更新的出图取代的那次不触发） | `{ draftId, mode, pageCount }`（长文模式 `pageCount` 为 0） |
 | `ai` | AI 会话有动静（任何一篇稿子的），见下面 [ai](#aiai-会话本机-claude-code-或-codex) | `AIEvent` |
+| `save-state` | 当前稿子的存盘状态变了（见 [drafts](#drafts稿子) 的 `saveState`）；`saveNow()` 之后总会发一次（`explicit: true`） | `SaveState & { explicit }` |
 
 ## drafts：稿子
 
@@ -60,6 +61,12 @@
 | `update(patch, options?)` | 改当前稿子的任意字段，出图并存盘（返回时已写进本机，写不进时 reject）；先整体校验，不会只改一半。`options.undoable: true` 时正文与改了的字段（标题、小红书正文、模式、主题、配色、字体、字号、行距、图片最大高）合成撤销历史里的一步，⌘Z / `undo()` 一起撤回（App 的工具与外部 Agent 都这样改）；不给时只有正文的改动进撤销历史 | `Draft` |
 | `firstPage(id)` 〔页内〕 | 这篇（不切换过去）的第一张卡片：按它自己存下的正文、主题、配色、字体与图片出图，不管它的模式，署名用现在的；正在编辑的这篇按界面上的样子。只画第一页；不改稿子、不等预览出图。手机预览的发现页、主页用它画别的稿子的首图。没有这篇时 reject | `{ pageCount, canvas }`（没有内容时 `canvas` 为 `null`） |
 | `undo()` / `redo()` | 撤销 / 重做正文的改动（与 ⌘Z / ⇧⌘Z 相同）；图片的版式、裁剪和正文在同一条撤销历史里 | `Draft` |
+| `saveState()` | 当前稿子的存盘状态（顶栏的保存按钮显示的就是它） | `SaveState` |
+| `saveNow()` | 马上存（与点保存按钮、⌘S 相同）：不再等自动存、写进本机后返回；之前没存上过就整篇重写；写不进时 reject 原因。内置说明书什么都不做 | `SaveState` |
+
+**存盘**：界面上的改动（正文、标题、小红书正文、样式、封面、卡片样式、图片、主题、模式、署名）由稿件模块过一会儿自动存进本机：停手约 0.4 秒，一直在改时至少每 2 秒一次，不等出图（出图失败或很慢时照样存）；出图画完后也顺手存一次（没变就不写）。没存上时 5 秒后自动再试，改动留在内存里。App 里壳在退出、关窗、⌘R 重新载入（以及更新重启）之前让每个窗口的页面 `saveNow()`（各最多等 3 秒）。
+
+`SaveState`：`{ status, savedAt, error, draftId }`。`status`：`"saved"` 都存好了；`"pending"` 有改动、过一会儿就存；`"saving"` 正在写；`"error"` 没存上（`error` 是原因）；`"none"` 没有要存的（内置说明书、正在换稿子）。`savedAt` 是最近一次写好的时间（毫秒；刚打开时是这篇的修改时间）。
 
 `Draft`：
 
@@ -517,6 +524,8 @@ App 可以开几个窗口，每个窗口开着一篇稿子，各改各存（都�
 - 文件 › 新建窗口（⌘⇧N）：新窗口里是一篇新稿子。
 - 稿件列表里 ⌘ 点一篇、或右键「在新窗口打开」：在新窗口打开那篇，这个窗口不换（浏览器里没有这一项，⌘ 点照常打开）。右键菜单另有「删除…」（内置说明书没有）。
 - 关掉一个窗口不影响别的窗口；关掉最后一个窗口时 App 退出（先结束所有 AI 进程）。
+- 关窗、退出、⌘R 重新载入之前，壳先让页面把稿子存完（`drafts.saveNow()`，每个窗口最多等 3 秒，页面卡住也照样往下走）。
+- 文件 › 保存（⌘S）：最前面那个窗口马上存（页面自己也接 ⌘S，见 [drafts](#drafts稿子) 的存盘）。
 
 壳（`macos/Sources/MediaCraftShell/`）：全 App 共用一份 `ShellCore`（AI 会话的进程、实况合成、外部 Agent 的套接字、卡片出图、网页的数据存储），每个窗口一个 `ShellWebView`，它的原生桥知道请求来自哪个窗口。AI 的一轮只推给发起它的窗口（`ai/*` 也只能动这个窗口自己发起的那一轮）；一个窗口重新载入只结束它自己发起的那几轮，关掉一个窗口时结束它发起的，之后它的页面还在路上的请求也不再起进程。实况合成的进度与外部 Agent 的状态推给所有窗口；外部 Agent 的请求按它认定的那篇交给开着它的窗口（新建的开新窗口，见 [mcp.md](mcp.md)），没认定时交给最前面的窗口。App 的窗口由 `macos/Sources/MediaCraft/main.swift` 管。
 
@@ -526,9 +535,10 @@ App 可以开几个窗口，每个窗口开着一篇稿子，各改各存（都�
 | `window/claim` | `{ draftId, focus? }` | 这个窗口能不能开这篇：别的窗口占着时 `{ elsewhere: true }`（`focus` 默认为真：把那个窗口调到前面、让它的页面换到那篇），否则先替这个窗口占着，`{ elsewhere: false }` |
 | `window/occupy` | `{ current, drafts, page, sequence }`：这个窗口正开着的那篇（可以是说明书），与别的窗口不能再开的（正开着的自己的稿子、AI 还在跑的）；`page` 是页面启动时自己起的 id，`sequence` 是它第几次报 | `{ ok }`；同时更新 `windows.json`。同一个页面序号旧的丢掉；窗口换了页面（重新载入、页面进程崩了）之后，旧页面迟到的报告也丢掉，新页面报来之前壳照旧替它占着正开着的那篇 |
 | `window/missing` | — | 这个窗口要开的那篇已经不在了：还有别的窗口时关掉它，`{ closed }` |
+| `window/edited` | `{ edited }` | 这个窗口有没有还没存进本机的改动（存盘状态是 pending / saving / error）：壳设窗口的 `isDocumentEdited`，关闭按钮上显示小圆点；`{ ok }` |
 | `window/bind-agent` | `{ session, draftId }` | 外部 Agent 的这次会话（`mediacraft-mcp` 的会话编号）认定这篇：壳记着，之后它的请求交给开着这篇的窗口（`src/mcp/server.js` 认定、新建、打开之后调用） |
 
-壳 → 页面：`mediacraft:native-window` 事件，`{ type: "show", draftId }` 让这个窗口换到那篇（别的窗口要开它）。`src/native-bridge.js` 包成 `MediaCraftNative.windows.open / claim / occupy / missing`，页面这边在 `src/drafts/windows.js`。
+壳 → 页面：`mediacraft:native-window` 事件，`{ type: "show", draftId }` 让这个窗口换到那篇（别的窗口要开它）。`src/native-bridge.js` 包成 `MediaCraftNative.windows.open / claim / occupy / missing / edited`，页面这边在 `src/drafts/windows.js`。
 
 ## mcp：外部 Agent
 

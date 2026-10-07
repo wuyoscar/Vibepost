@@ -158,6 +158,8 @@
       claim: (request) => callJson("window/claim", request),
       occupy: (request) => callJson("window/occupy", request),
       missing: () => callJson("window/missing"),
+      // 这个窗口有没有还没存进本机的改动：壳在关闭按钮上显示小圆点（isDocumentEdited）
+      edited: (edited) => callJson("window/edited", { edited }),
       // 外部 Agent 的这次会话（session）认定了这篇：壳记着，之后它的请求交给开着这篇的窗口
       bindAgent: (session, draftId) => callJson("window/bind-agent", { session, draftId }),
     },

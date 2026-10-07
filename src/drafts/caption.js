@@ -9,7 +9,6 @@
   const mc = root.mediacraft;
   const publish = root.MediaCraftPublish;
   const LIMIT = publish.LIMITS.caption;
-  const SAVE_DELAY = 300;
   // 输入框最多长到这么高（CSS 像素），再多就在框里滚动
   const MAX_HEIGHT = 320;
   const field = document.querySelector("#captionField");
@@ -36,11 +35,10 @@
     grow();
   }
 
-  let saveTimer = 0;
+  // 改了就交给稿件模块过一会儿存（顶栏的保存按钮跟着显示状态）
   input.addEventListener("input", () => {
     show();
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(drafts.save, SAVE_DELAY);
+    drafts.saveSoon();
   });
   field.addEventListener("toggle", grow);
   mc.on("change", show);

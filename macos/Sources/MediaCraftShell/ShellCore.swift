@@ -238,6 +238,16 @@ public final class ShellCore {
         }
     }
 
+    /// 所有窗口的页面马上存稿并等写完（退出、更新重启之前），每个窗口最多等 timeout
+    public func saveAllDrafts(timeout: Duration = .seconds(3)) async {
+        let pages = pages
+        await withTaskGroup(of: Void.self) { group in
+            for page in pages {
+                group.addTask { @MainActor in _ = await page.saveDrafts(timeout: timeout) }
+            }
+        }
+    }
+
     /// App 退出前：记下所有窗口，之后它们一个个关掉时不再改记录
     public func freezeSession() {
         saveSession()
@@ -321,6 +331,7 @@ public final class ShellCore {
     /// - occupy `{ current, drafts, page, sequence }`：这个窗口占着的稿子（page 是页面自己起的 id，sequence 是它的第几次报告）
     /// - missing：这个窗口要开的那篇已经不在了，还有别的窗口时关掉它
     /// - bind-agent `{ session, draftId }`：外部 Agent 的这次会话认定这篇
+    /// - edited `{ edited }`：这个窗口有没有还没存进本机的改动（关闭按钮上的小圆点）
     nonisolated func windowAction(_ action: String, _ request: [String: Any], from window: String) async -> NativeBridge.Reply {
         let draftId = (request["draftId"] as? String).flatMap { $0.isEmpty || $0.count > 200 ? nil : $0 }
         switch action {
@@ -351,6 +362,10 @@ public final class ShellCore {
                 return .failure(400, "会话或稿子 id 不对")
             }
             await MainActor.run { bindAgent(session, to: draftId) }
+            return .ok()
+        case "edited":
+            let edited = request["edited"] as? Bool ?? false
+            await MainActor.run { pages.first { $0.windowId == window }?.webView.window?.isDocumentEdited = edited }
             return .ok()
         case "missing":
             return await MainActor.run {
