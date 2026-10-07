@@ -963,21 +963,45 @@
 /* ---------- 电光：深色底、极淡的网格、一抹强调色；页眉像终端的一条，标签与页码都是等宽字 ----------
    装饰色一律从配色推（正文色的一点点、强调色的一点点叠在底色上）：换成别的深色或浅色配色也清楚。 */
 
-/* 网格：1px 的线、48px 一格，颜色是正文色的 4%，对齐版心（横竖都从 72 起），压在正文下面 */
+/* 网格：1px 的线、48px 一格，颜色是正文色的 4% 叠在底色上，横竖都从 72 起对齐版心，压在正文下面。
+   线是两个伪元素各一条实色的线，再用没有模糊的 box-shadow 每 48px 复制一条（竖 17 条、横 23 条，页面固定 864 × 1152），
+   不用 CSS 渐变：渐变里的细线每次光栅化出来的颜色会差一两个值，同一篇在不同进程里出的图就不一样，像素基准
+   （CardGoldenTests / CoverGoldenTests）会漂。z-index: -1 要页面自成一层（isolation），才会压在底色之上、正文之下 */
 .mc-page[data-structure="neon"] {
-  --neon-line: color-mix(in oklab, var(--mc-text) 4%, transparent);
-  --neon-grid:
-    linear-gradient(to right, var(--neon-line) 1px, transparent 1px) 72px 72px / 48px 48px repeat,
-    linear-gradient(to bottom, var(--neon-line) 1px, transparent 1px) 72px 72px / 48px 48px repeat;
+  --neon-line: color-mix(in oklab, var(--mc-text) 4%, var(--mc-bg));
 
-  background: var(--neon-grid), var(--mc-bg);
+  isolation: isolate;
 }
 
-/* 封面与结尾页：右上角一团很淡的强调色光，网格照旧 */
+.mc-page[data-structure="neon"]::before,
+.mc-page[data-structure="neon"]::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  background: var(--neon-line);
+  pointer-events: none;
+}
+
+.mc-page[data-structure="neon"]::before {
+  top: 0;
+  left: 72px;
+  width: 1px;
+  height: 1152px;
+  box-shadow: 48px 0 var(--neon-line), 96px 0 var(--neon-line), 144px 0 var(--neon-line), 192px 0 var(--neon-line), 240px 0 var(--neon-line), 288px 0 var(--neon-line), 336px 0 var(--neon-line), 384px 0 var(--neon-line), 432px 0 var(--neon-line), 480px 0 var(--neon-line), 528px 0 var(--neon-line), 576px 0 var(--neon-line), 624px 0 var(--neon-line), 672px 0 var(--neon-line), 720px 0 var(--neon-line), 768px 0 var(--neon-line);
+}
+
+.mc-page[data-structure="neon"]::after {
+  top: 72px;
+  left: 0;
+  width: 864px;
+  height: 1px;
+  box-shadow: 0 48px var(--neon-line), 0 96px var(--neon-line), 0 144px var(--neon-line), 0 192px var(--neon-line), 0 240px var(--neon-line), 0 288px var(--neon-line), 0 336px var(--neon-line), 0 384px var(--neon-line), 0 432px var(--neon-line), 0 480px var(--neon-line), 0 528px var(--neon-line), 0 576px var(--neon-line), 0 624px var(--neon-line), 0 672px var(--neon-line), 0 720px var(--neon-line), 0 768px var(--neon-line), 0 816px var(--neon-line), 0 864px var(--neon-line), 0 912px var(--neon-line), 0 960px var(--neon-line), 0 1008px var(--neon-line), 0 1056px var(--neon-line);
+}
+
+/* 封面与结尾页：右上角一团很淡的强调色光（页面的底色层，网格压在它上面） */
 .mc-page[data-structure="neon"]:is([data-kind="cover"], [data-kind="end"]) {
   background:
     radial-gradient(56% 42% at 100% 0%, color-mix(in oklab, var(--mc-accent) 18%, transparent), transparent 70%) 0 0 / 100% 100% no-repeat,
-    var(--neon-grid),
     var(--mc-bg);
 }
 

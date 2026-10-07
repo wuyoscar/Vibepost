@@ -72,6 +72,42 @@
     },
     "structure" : "editorial"
   },
+  "fresh" : {
+    "pageCount" : 6,
+    "roles" : [
+      "cover",
+      "end",
+      "cover"
+    ],
+    "shots" : {
+      "cover" : {
+        "lines" : [
+          "title 116 用 AI 读论文",
+          "title 116 的三个习惯",
+          "subtitle 32 先问再读，三周读完二十篇"
+        ],
+        "sha256" : "7dc2c4bd47fadb83d1f271ec8904e4407bf1bfa3438c0b2d8711c457575a1d9b"
+      },
+      "coverImage" : {
+        "lines" : [
+          "title 88 用 AI 读论文",
+          "title 88 的三个习惯",
+          "subtitle 32 先问再读，三周读完二十篇"
+        ],
+        "sha256" : "7c60ad0e917182e1b529fbdbf73528cd2ea255643eba74e7227e9dfce94232be"
+      },
+      "end" : {
+        "lines" : [
+          "h2 44.200001 下期预告",
+          "p 34 关注我，下期讲怎么用 AI 写综述。",
+          "p 34 觉得有用就收藏一下。",
+          "p 34 第 3 期"
+        ],
+        "sha256" : "edd691c2f5e2520b58cc29d4bbda3f60053f9d197e16f7329c85b85e84b7cf96"
+      }
+    },
+    "structure" : "fresh"
+  },
   "glow" : {
     "pageCount" : 6,
     "roles" : [
@@ -180,6 +216,42 @@
       }
     },
     "structure" : "journal"
+  },
+  "neon" : {
+    "pageCount" : 6,
+    "roles" : [
+      "cover",
+      "end",
+      "cover"
+    ],
+    "shots" : {
+      "cover" : {
+        "lines" : [
+          "title 128 用 AI 读论文",
+          "title 128 的三个习惯",
+          "subtitle 30 先问再读，三周读完二十篇"
+        ],
+        "sha256" : "ba483fcbcc70e1e9437c19a55ac39d43189cee80612dc5fdb03f81a23cb157ac"
+      },
+      "coverImage" : {
+        "lines" : [
+          "title 96 用 AI 读论文",
+          "title 96 的三个习惯",
+          "subtitle 30 先问再读，三周读完二十篇"
+        ],
+        "sha256" : "849ef919b615dacea2d22d4bef45dd39b695b4584539faf253d367ba20aa8574"
+      },
+      "end" : {
+        "lines" : [
+          "h2 44.200001 下期预告",
+          "p 34 关注我，下期讲怎么用 AI 写综述。",
+          "p 34 觉得有用就收藏一下。",
+          "p 34 第 3 期"
+        ],
+        "sha256" : "774db3085b78475ce55cfe8349278c043ab280156083c39f223abae7d27ac622"
+      }
+    },
+    "structure" : "neon"
   },
   "notes" : {
     "pageCount" : 6,
@@ -290,5 +362,77 @@
       }
     },
     "structure" : "poster"
+  },
+  "press" : {
+    "pageCount" : 7,
+    "roles" : [
+      "cover",
+      "end",
+      "cover"
+    ],
+    "shots" : {
+      "cover" : {
+        "lines" : [
+          "title 116 用 AI 读论文",
+          "title 116 的三个习惯",
+          "subtitle 30 先问再读，三周读完二十篇"
+        ],
+        "sha256" : "a49eb7e199731b9b3b50c6d05d8442eb0c24fcf83991a144ffa36cb84e02df7c"
+      },
+      "coverImage" : {
+        "lines" : [
+          "title 92 用 AI 读论文",
+          "title 92 的三个习惯",
+          "subtitle 30 先问再读，三周读完二十篇"
+        ],
+        "sha256" : "20ebe2a25f117bebafa07e9dac2d96d64b360247a413134bbf9c7de53b9c516b"
+      },
+      "end" : {
+        "lines" : [
+          "h2 43.52 下期预告",
+          "p 34 关注我，下期讲怎么用 AI 写综述。",
+          "p 34 觉得有用就收藏一下。",
+          "p 34 第 3 期"
+        ],
+        "sha256" : "6028493a6d2dca3d50b0e37bcb1ac384f701364092c09493f7ee60f0d8132431"
+      }
+    },
+    "structure" : "scroll"
+  },
+  "scroll" : {
+    "pageCount" : 7,
+    "roles" : [
+      "cover",
+      "end",
+      "cover"
+    ],
+    "shots" : {
+      "cover" : {
+        "lines" : [
+          "title 116 用 AI 读论文",
+          "title 116 的三个习惯",
+          "subtitle 30 先问再读，三周读完二十篇"
+        ],
+        "sha256" : "d9c3bf4d8d1fe938503892c8cf2ce4765811098e9888686eabe25e639919114e"
+      },
+      "coverImage" : {
+        "lines" : [
+          "title 92 用 AI 读论文",
+          "title 92 的三个习惯",
+          "subtitle 30 先问再读，三周读完二十篇"
+        ],
+        "sha256" : "59925e64a45895bb9c50ee7dd767da266c1e7651509b6f66328a9ca9d138d3a0"
+      },
+      "end" : {
+        "lines" : [
+          "h2 43.52 下期预告",
+          "p 34 关注我，下期讲怎么用 AI 写综述。",
+          "p 34 觉得有用就收藏一下。",
+          "p 34 第 3 期"
+        ],
+        "sha256" : "834eef4133efe95d4538488b254d39a7779364fcdd39a9d538647768e9eb72d8"
+      }
+    },
+    "structure" : "scroll"
   }
 }

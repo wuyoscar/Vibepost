@@ -34,7 +34,7 @@ struct CardStructureTests {
         });
     """
 
-    /// 卡片结构的 id（不是主题：报刊与书卷共用一种）
+    /// 卡片结构的 id，按主题面板三组（简洁、柔和、有态度）的顺序去重（不是主题：报刊与书卷共用一种）
     static let structures = ThemeTests.structureIds
 
     @Test("每种结构：第一页有头像（杂志只有刊头的名字）与名字；内页有页码与名字、不再画头像；内容不越出正文区")

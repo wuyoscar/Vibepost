@@ -86,6 +86,49 @@
     ],
     "structure" : "editorial"
   },
+  "fresh" : {
+    "pageCount" : 4,
+    "pages" : [
+      {
+        "bounds" : [
+          88,
+          180,
+          776,
+          1060
+        ],
+        "dropTargets" : [
+          "block y 180 h 80 src 2-15",
+          "text-line y 306 h 230 src 17-81",
+          "text-line y 610 h 104 src 83-109"
+        ],
+        "imageHits" : [
+
+        ],
+        "sha256" : "d7c38b8782ec80db1c5562183f450d60d764b5dba285012939b737c8c57169d7"
+      },
+      {
+        "bounds" : [
+          88,
+          180,
+          776,
+          1060
+        ],
+        "dropTargets" : [
+          "block y 180 h 63 src 114-124",
+          "text-line y 278 h 63 src 126-138",
+          "text-line y 347 h 63 src 139-151",
+          "text-line y 416 h 63 src 152-161",
+          "text-line y 524 h 167 src 163-228",
+          "block single.png y 739 h 319 src 230-263"
+        ],
+        "imageHits" : [
+          "single.png 219,739 426x319 base 688 max 688 resize 688 src 230-263"
+        ],
+        "sha256" : "812680978e63a04b9999eea434d3701a778f80058c67a76e9dab44a2cb3a5dc7"
+      }
+    ],
+    "structure" : "fresh"
+  },
   "glow" : {
     "pageCount" : 4,
     "pages" : [
@@ -221,6 +264,51 @@
     ],
     "structure" : "journal"
   },
+  "neon" : {
+    "pageCount" : 4,
+    "pages" : [
+      {
+        "bounds" : [
+          72,
+          168,
+          792,
+          1052
+        ],
+        "dropTargets" : [
+          "block y 168 h 76 src 2-15",
+          "text-line y 290 h 230 src 17-81",
+          "text-line y 590 h 104 src 83-109",
+          "block y 754 h 57 src 114-124",
+          "text-line y 845 h 63 src 126-138",
+          "text-line y 914 h 63 src 139-151",
+          "text-line y 983 h 63 src 152-161"
+        ],
+        "imageHits" : [
+
+        ],
+        "sha256" : "869224ab293dba17537c6679fbb537ee8aac6def6fe37097a0b540ddfaa7236e"
+      },
+      {
+        "bounds" : [
+          72,
+          168,
+          792,
+          1052
+        ],
+        "dropTargets" : [
+          "text-line y 179 h 167 src 163-228",
+          "block single.png y 394 h 432 src 230-263",
+          "block y 860 h 57 src 268-278",
+          "text-line y 963 h 41 src 280-393"
+        ],
+        "imageHits" : [
+          "single.png 144,394 576x432 base 720 max 720 resize 720 src 230-263"
+        ],
+        "sha256" : "00c973d3ea7c0ba6bf69b269d209660594a0cc6be69bae25d6887c8ba188651a"
+      }
+    ],
+    "structure" : "neon"
+  },
   "notes" : {
     "pageCount" : 4,
     "pages" : [
@@ -353,5 +441,91 @@
       }
     ],
     "structure" : "poster"
+  },
+  "press" : {
+    "pageCount" : 5,
+    "pages" : [
+      {
+        "bounds" : [
+          80,
+          168,
+          784,
+          1032
+        ],
+        "dropTargets" : [
+          "block y 168 h 78 src 2-15",
+          "text-line y 289 h 235 src 17-81",
+          "text-line y 578 h 112 src 83-109"
+        ],
+        "imageHits" : [
+
+        ],
+        "sha256" : "43ec8ed60519f5dfabb1f016d16fc9bed6b5bfb349687cd0586a5d93d3794c8d"
+      },
+      {
+        "bounds" : [
+          80,
+          168,
+          784,
+          1032
+        ],
+        "dropTargets" : [
+          "block y 168 h 62 src 114-124",
+          "text-line y 265 h 63 src 126-138",
+          "text-line y 334 h 63 src 139-151",
+          "text-line y 403 h 63 src 152-161",
+          "text-line y 508 h 172 src 163-228",
+          "block single.png y 724 h 306 src 230-263"
+        ],
+        "imageHits" : [
+          "single.png 228,724 408x306 base 704 max 704 resize 704 src 230-263"
+        ],
+        "sha256" : "7db85ac8f2b009d84a42e8eb03699df5c97ff9e997028222cad07a2263d3c959"
+      }
+    ],
+    "structure" : "scroll"
+  },
+  "scroll" : {
+    "pageCount" : 5,
+    "pages" : [
+      {
+        "bounds" : [
+          80,
+          168,
+          784,
+          1032
+        ],
+        "dropTargets" : [
+          "block y 168 h 78 src 2-15",
+          "text-line y 289 h 235 src 17-81",
+          "text-line y 578 h 112 src 83-109"
+        ],
+        "imageHits" : [
+
+        ],
+        "sha256" : "e503ddde68802bf2467aa749a3c560b85e23ecab3c08bb6d9de89ed0577b036e"
+      },
+      {
+        "bounds" : [
+          80,
+          168,
+          784,
+          1032
+        ],
+        "dropTargets" : [
+          "block y 168 h 62 src 114-124",
+          "text-line y 265 h 63 src 126-138",
+          "text-line y 334 h 63 src 139-151",
+          "text-line y 403 h 63 src 152-161",
+          "text-line y 508 h 172 src 163-228",
+          "block single.png y 724 h 306 src 230-263"
+        ],
+        "imageHits" : [
+          "single.png 228,724 408x306 base 704 max 704 resize 704 src 230-263"
+        ],
+        "sha256" : "009aca8f1b737bfd9dc4b62dc5405d9fb7fbebbf775d52965061f556e87bacc9"
+      }
+    ],
+    "structure" : "scroll"
   }
 }

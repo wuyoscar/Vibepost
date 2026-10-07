@@ -5,7 +5,8 @@ import WebKit
 
 /// 看主题用的一套图（不是断言）：`THEME_REVIEW_DIR=目录 macos/run-tests.sh --filter ThemeReview` 时，
 /// 用说明书素材里的三张照片排一篇旅行笔记，按每个主题（`THEME_REVIEW_THEMES=id,id` 可只出几个）存封面（有底图、没底图）、
-/// 前两张正文页与结尾页的 PNG：`<主题>-<序号>-<页>.png`。没设目录时跳过。
+/// 前两张正文页与结尾页的 PNG：`<主题>-<序号>-<页>.png`；README 的几张截图也在这里出，主题总览 `themes.png`
+/// 是 12 个主题的封面按面板的三组拼成的 4×3（设 `MEDIACRAFT_SCREENSHOTS` 也出它）。没设目录时跳过。
 @MainActor
 struct ThemeReviewTests {
     static let markdown = """
@@ -78,6 +79,8 @@ struct ThemeReviewTests {
         const last = pictured.pages.length - 1;
         await mc.drafts.update({ cover: { enabled: true, subtitle: "凌晨四点出发，值了", image: null } });
         const plain = await mc.render.offscreen();
+        // 主题总览（exportThemesSheet）要拼每个主题带底图的封面：留在页面里
+        (window.reviewCovers ??= {})[themeId] = pictured.canvases[0];
         const shots = [
           ["1-cover-photo", pictured.canvases[0]],
           ["2-cover", plain.canvases[0]],
@@ -109,6 +112,70 @@ struct ThemeReviewTests {
                 try data.write(to: directory.appendingPathComponent("\(themeId)-\(shot[0]).png"))
             }
         }
+        await harness.tearDown()
+        #expect(harness.pageErrors == [])
+    }
+
+    /// 把每个主题带底图的封面拼成一张：面板的三组各一行（行首是组名），每行四张，每张下面是主题名；灰底，同舞台的底色
+    static let sheetScript = """
+        const mc = window.mediacraft;
+        const themes = await mc.themes.list();
+        const groups = await mc.themes.groups();
+        const COLS = 4, GAP = 16, MARGIN = 20, CARD_W = 363, CARD_H = 484, GROUP_H = 28, NAME_H = 40;
+        const ROW_H = GROUP_H + CARD_H + NAME_H;
+        const sheet = document.createElement("canvas");
+        sheet.width = MARGIN * 2 + COLS * CARD_W + (COLS - 1) * GAP;
+        sheet.height = MARGIN * 2 + groups.length * ROW_H + (groups.length - 1) * GAP;
+        const context = sheet.getContext("2d");
+        context.imageSmoothingQuality = "high";
+        context.fillStyle = "#e8e8e8";
+        context.fillRect(0, 0, sheet.width, sheet.height);
+        context.textBaseline = "middle";
+        const font = (size, weight) => `${weight} ${size}px -apple-system, "PingFang SC", "Helvetica Neue", sans-serif`;
+        groups.forEach((group, row) => {
+          const top = MARGIN + row * (ROW_H + GAP);
+          context.fillStyle = "#6e6e73";
+          context.font = font(18, 600);
+          context.textAlign = "left";
+          context.fillText(group.name, MARGIN + 2, top + GROUP_H / 2);
+          themes.filter((theme) => theme.group === group.id).forEach((theme, column) => {
+            const left = MARGIN + column * (CARD_W + GAP);
+            const card = reviewCovers[theme.id];
+            if (!card) throw new Error(`没有 ${theme.id} 的封面`);
+            context.save();
+            context.beginPath();
+            context.roundRect(left, top + GROUP_H, CARD_W, CARD_H, 10);
+            context.clip();
+            context.drawImage(card, left, top + GROUP_H, CARD_W, CARD_H);
+            context.restore();
+            context.fillStyle = "#1d1d1f";
+            context.font = font(20, 600);
+            context.textAlign = "center";
+            context.fillText(theme.name, left + CARD_W / 2, top + GROUP_H + CARD_H + NAME_H / 2);
+          });
+        });
+        return sheet.toDataURL("image/png");
+    """
+
+    @Test(
+        "README 的主题总览：12 个主题下同一篇稿子带底图的封面，按面板的三组拼成 4×3、每张下面是主题名（themes.png）",
+        .enabled(if: ProcessInfo.processInfo.environment["THEME_REVIEW_DIR"] != nil || ProcessInfo.processInfo.environment["MEDIACRAFT_SCREENSHOTS"] != nil)
+    )
+    func exportThemesSheet() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        let directory = URL(fileURLWithPath: environment["THEME_REVIEW_DIR"] ?? environment["MEDIACRAFT_SCREENSHOTS"]!)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let harness = ShellHarness(onboarding: false)
+        try await harness.load()
+        let all = try await harness.evaluate("return (await window.mediacraft.themes.list()).map((theme) => theme.id)") as? [String] ?? []
+        #expect(all.count == ThemeTests.ids.count, "12 个主题都拼进去")
+        for themeId in all {
+            _ = try await harness.evaluate(Self.script, arguments: ["themeId": themeId, "markdown": Self.markdown])
+        }
+        let sheet = try await harness.evaluate(Self.sheetScript) as? String ?? ""
+        let data = Data(base64Encoded: String(sheet.dropFirst("data:image/png;base64,".count))) ?? Data()
+        #expect(data.count > 100_000, "拼出来的图不该是空的：\(data.count) 字节")
+        try data.write(to: directory.appendingPathComponent("themes.png"))
         await harness.tearDown()
         #expect(harness.pageErrors == [])
     }

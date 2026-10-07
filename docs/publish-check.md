@@ -86,6 +86,6 @@
 | OFL 可商用 | 全部打包字体：思源黑体、思源宋体、霞鹜文楷、得意黑、Inter、IBM Plex Sans / Serif / Mono、Source Serif 4、JetBrains Mono、Fira Code | 按随字体下载的许可证文本（`scripts/fetch-fonts.py` 从各字体的 npm 包与发布仓库取来，放在 `fonts/licenses/`）逐个核对过，都是 SIL Open Font License 1.1：可以免费商用，排出来的图不受限制 |
 | 系统字体 · 仅限个人 | 苹方、宋体、SF、Georgia、Menlo | macOS 自带，授权只随这台 Mac；拿去做商用的图要另外取得授权 |
 
-「跟随主题」不标：8 个主题用的都是打包字体。许可记在 `src/themes/fonts.js` 每个选项的 `license` 上（`ofl` / `system`），App API `fonts.list()` 的每项也带着它。
+「跟随主题」不标：12 个主题用的都是打包字体。许可记在 `src/themes/fonts.js` 每个选项的 `license` 上（`ofl` / `system`），App API `fonts.list()` 的每项也带着它。
 
 导出（单张、整组、长图）与发送时，这篇用到系统字体（中文、英文字体，有代码时还有代码字体）就在进度卡片上提醒一次：同一篇、同样的字体这次打开 App 里只提醒一次，换了字体再提醒；点「不再提醒」以后都不提醒。复制公众号格式不提醒（粘过去的是文字，用的是读者手机上的字体）。
