@@ -437,7 +437,7 @@ Claude 用它们直接操作 App（工具全名 `mcp__mediacraft__<名字>`）�
 
 - **定位**用稿子里的一段原文（照抄 `draft.md`、不跨行、只出现在一处），定位到包含它的那一块；标题指它连同下面的整节（到下一个同级或更高级的标题为止）。
 - **动作**：会改稿子的工具每次在会话里记一行 `action`，行尾「撤销」只撤这一个（正文结构的改动与之后别处的改动三方合并，重叠时说明原因、请你用 ⌘Z）；每个动作同时是撤销历史里的一步（⌘Z）：正文、图片，以及主题、样式、模式（`drafts.update(patch, { undoable: true })`）。
-- **外部 Agent 也用**：标了 shared 的工具（`get_pages`、`set_theme`、`set_style`、`set_mode`、分页、挪段落、摆图片、`save_writing_manual`）同样给外部 Agent 的 MCP 服务用（[mcp.md](mcp.md)），描述里提到 `draft.md`、`propose_images`、工作副本的那一句只给 AI 助手。
+- **外部 Agent 也用**：标了 shared 的工具（`get_pages`、`set_theme`、`set_style`、`set_mode`、分页、挪段落、`insert_section`、摆图片、`save_writing_manual`、`list_templates`）同样给外部 Agent 的 MCP 服务用（[mcp.md](mcp.md)），描述里提到 `draft.md`、`propose_images`、工作副本的那一句只给 AI 助手。
 - **写作手册**（只管写什么、什么口味；文件见 [storage.md](storage.md#写作手册写作手册)）：每轮开始时壳把它们拷进工作副本的 `写作手册/`，`AGENTS.md` 末尾列出目录（名字、说明、路径）；说明书里写明按这篇的题材自己挑一份（你在对话里点名的优先），要把经验记进写作手册时用 `save_writing_manual` 提议。
 - **同步 draft.md**：分页、挪段落、摆图片这类结构改动是纯函数（Markdown → Markdown），在编辑器里生效后，同样的改动套到工作副本的 `draft.md` 与这一轮的比对基准上（`ai/work-file`），Claude 之后读到的与编辑器一致，这一轮结束时也不会再套用一次；`draft.md` 那一带被 Claude 改过、套不上时不同步，工具结果里会说。
 - 工具看到的是编辑器里的稿子：Claude 在 `draft.md` 里的文字修改要等这一轮结束才进编辑器。
@@ -455,12 +455,15 @@ Claude 用它们直接操作 App（工具全名 `mcp__mediacraft__<名字>`）�
 | `move_section` | 把一块或一整节挪到某一块之前或之后 |
 | `set_card_css` | 这一篇自己的卡片样式（CSS）：整段换掉或接在后面，可撤销 |
 | `restyle_block` | 给一块换样式：套成 / 换成 / 拆掉组件（小标签、提示、页尾、等宽、标签列表、步骤），组件对齐，标题改级别（与预览里点选一块后的「换样式」同一套，`src/cards/blocks.js`） |
+| `insert_section` | 插一个片段（`snippet`：登记表 `src/engine/snippets.js` 里的 id 或中文名）或 Claude 自己写的一段 Markdown（`markdown`，先 `engine.localizeMarkers` 换成中文记号），二选一；位置 `before` / `after` 的原文（标题指整节）或 `position` 为 `start` / `end`，都不给时插在末尾。规则与「插入」菜单里插片段同一套（`MediaCraftSnippets.insert`：前后隔开空行、首尾多余的 `[[分页]]` 去掉、含 `[[结尾]]` 的只能在末尾且一篇只能有一个，不合规矩时回它的原因）；是一步可撤销的结构改动，同步 `draft.md`。片段里没有图片，描述里让 Claude 用 `insert_image` / `propose_images` 配图 |
 | `move_image` | 把一张图（或它所在的拼图）挪到某一块之前或之后 |
 | `insert_image` | 把素材里有、正文里没有的一张图插回正文 |
 | `resize_image` | 宽度百分比或固定宽高、对齐，或恢复默认（同 `media.update` 的 `layout`） |
 | `crop_image` | 按比例居中裁（`aspect: "3:4"`）或按原图百分比给裁剪框，或取消裁剪（同 `media.update` 的 `crop`）；实况不能裁 |
 | `generate_image` | 只在用 Claude Code 时有（Codex 用它自带的生图，见上面的「Codex」）。按提示词生成配图：`prompt`、`count`（1–4，默认 1）、`size`（「宽x高」，每边 256–3840，默认 `1024x1536` 竖图，配 3:4 卡片）、`style?`（接在提示词后面「风格：…」）。原生壳直接调 OpenAI 的生图接口（`ai/generate-image`），不经 Bash、不用确认（所以一轮最多生 8 张，超出的那次不发请求、告诉 Claude 原因）：默认模型 `gpt-image-2`（与作者自用的 gpt-image 技能一样 `POST /v1/images/generations`，`quality: "high"`，一次出 `n` 张），在 AI 助手 › 设置 › 生图里可以换模型。密钥取终端环境里的 `OPENAI_API_KEY`，没有时重新读一次登录 shell，再找 `~/.env`（`KEY=值` 或 `export KEY=值`）；密钥只进请求头，不进日志、错误与页面（接口的错误原因里出现密钥时换成「…」）。生成的图和 `propose_images` 的一样存进 `.candidates/`、在会话里显示缩略图（说明是提示词），你点了才插进稿子。生成中会话里一行进度（服务、模型、张数、尺寸、用时）和「停止生成」；没有密钥（说明去哪设）、接口出错（带上接口给的原因）、停止（「已停止生图」）时 Claude 收到原因，会话里记一行「生成图片没成功：…」。按张计费，费用记在你自己的 OpenAI 账户上（工具说明与设置里都这样写）；系统提示词让 Claude 生图用它，不自己跑脚本或 curl |
 | `save_writing_manual` | 提议新建或整份改写一份写作手册：`name`（已有的名字就是改写，新名字就是新建；1–40 字，不能有 `/ \ :` 与控制字符、不以 `.` 开头）、`description`（一句话，最多 200 字）、`content`（正文 Markdown，最多 200 KB）。页面先照壳的规矩查一遍（不合规矩直接回错误、不弹框），再用确认框（`MediaCraftConfirm`）问你：标题「新建写作手册「X」」或「修改写作手册「X」」，内容是说明（改了时前后都给）与正文开头 300 字（新建），或正文 +N / −M 行与前几行改动（修改）；你同意才经原生桥 `manuals/save` 存，拒绝时 Claude 收到「用户没有同意保存这份写作手册」，和原来一模一样时不弹框、直接说没有改动。存好后会话里记一行「新建写作手册「X」」，下一轮起生效。不看、不改稿子（你切到别的稿子也能用）；标了 shared，外部 Agent 也用（见 [mcp.md](mcp.md)）。浏览器里没有 |
+| `list_templates` | 模板库（`drafts.templates()`：仓库自带的与你自己存的）：每套一行「名字（id）— 说明（题材 / 风格，主题）」。不看、不改稿子（你切到别的稿子也能用）；标了 shared，外部 Agent 也用 |
+| `create_draft_from_template` | 照一套模板（`template`：id 或名字，没有时回错误）在这个窗口里新建一篇并切过去（`drafts.create({ template })`，和你在稿件抽屉里点一套模板一样）：原来那篇已经存好、留在稿件抽屉里；这一轮仍属于原来那篇（工作副本、之后的工具都是它的），新稿子要在它自己的会话里改，工具结果里让 Claude 告诉你到新稿子里接着说。会话里记一行「照模板「X」新建稿子「Y」」（没有撤销）。只给 AI 助手：外部 Agent 用 `create_draft` 的 `template`（[mcp.md](mcp.md)） |
 | `propose_images` | 把 Claude 找到的图片（本机路径、`file://` 或 http(s) 网址，最多 8 张）登记成配图候选：这篇工作目录里的直接载入；网上的、工作目录以外的先用确认框问你（一批问一次，和终端里打开网页、读目录外的文件要问一样），不同意时 Claude 收到原因。「本次会话都允许」只放行这批图片所在的**同一目录**（不含子目录），别的目录照样问；**网上的图每批都问**，确认框里写出每个网址，不提供「本次会话都允许」（防提示词注入：放行整个网站的话，被注入的模型能把读到的内容拼进那个网站的网址里带出去），网址里带着一长串编码（base64、十六进制、百分号编码）或特别长的，在确认框里单独点名提醒，超过 2048 字的直接不载入；下载途中重定向到别的站点时停下再问一次（确认框写明「原网址 → 跳去的网址」），同一站点的重定向照跟；主机名解析到本机、局域网、链路本地地址的不载入（网址里直接写的 IP 地址、`localhost`、`.local` 是你在确认框里看得到的，照常问）。同意与放行的范围都由壳记，页面自己说「同意了」不算（见下面原生桥的 `ai/candidate`）。壳读进来、确认真是图片（最多 20 MB、6400 万像素）、存进 `.candidates/`、做缩略图；会话里显示缩略图，你点了才插进稿子 |
 
 调研这类事 Claude 自己用技能与 MCP（agent-reach……）去做，和终端里一样，App 不另外提供；生图用 App 的 `generate_image`，免得 Claude 跑脚本时要一次次确认命令，生成的图也直接进配图候选。

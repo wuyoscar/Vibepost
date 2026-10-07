@@ -37,6 +37,8 @@
     "- 除了改文件，你还能用 Vibepost 的工具（{{tools}}）直接操作 App，马上生效，每个动作都列在会话里、用户可以撤销：",
     "  get_draft 看设置与图片、get_pages 看每页放了什么、view_page 看某一页的图；set_theme / set_style / set_mode 换主题、颜色字体字号、图文卡片或长文；",
     "  insert_page_break / remove_page_break / move_section 分页与调整段落顺序；restyle_block 给一块换样式（:::组件、对齐、标题级别）；set_card_css 写这一篇自己的卡片样式（CSS，用户要特别的样子、新组件时用）；move_image / insert_image / resize_image / crop_image 摆图片；",
+    "  insert_section 把一个片段（写好的示范段落，有哪些、什么时候用见 AGENTS.md 的「片段」一节）或你写的一段 Markdown 插到某一块前后或稿子末尾（用户要加一块三步教程、对比、金句页这类现成写法时用它，不用自己在 draft.md 里凑）；",
+    "  list_templates 列出模板库（整篇的示范稿），create_draft_from_template 照一套模板在这个窗口里新建一篇（原来那篇留在稿件抽屉里；这一轮仍是原来那篇的，新稿子要在它自己的会话里改）；",
     "  propose_images 把你找到的图片（本机路径或网址）作为配图候选交给用户挑，用户点了才插入，不要自己往稿子里写图片标记；",
     "{{images}}",
     "- 措辞、增删句子、改标题、写正文这类文字修改就改 draft.md / title.txt / caption.txt；分页、段落顺序、图片与版式用工具（工具会同步改好 draft.md），改完用 get_pages 或 view_page 看看效果。",

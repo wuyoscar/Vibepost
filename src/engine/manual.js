@@ -262,7 +262,7 @@
       "- 块样式（列表类）：" + STYLES.filter((item) => item.family === "list").map((item) => `${item.name} ${item.component ? `:::${item.name}` : item.syntax}`).join("；") + "。",
       "- 组件：单独一行 :::名字（对齐写在后面，如 :::提示 居中）到单独一行 :::，开头和收尾两行都要留着。",
       "- 记号：" + MARKERS.map((item) => `${item.syntax.replace(/　/g, " 或 ")} ${item.name}`).join("；") + "。",
-      "- 片段（写好的示范段落，写法见 AGENTS.md 的「片段」一节）：" + root.MediaCraftSnippets.list.map((item) => item.name).join("、") + "。",
+      "- 片段（写好的示范段落，用工具 insert_section 插，写法见 AGENTS.md 的「片段」一节）：" + root.MediaCraftSnippets.list.map((item) => item.name).join("、") + "。",
       ...LESSONS.map((lesson) => `- ${lesson}`),
     ].join("\n");
   }

@@ -1,5 +1,5 @@
-// 外部 Agent（MCP）另外要的工具：操作手册与写作手册、列稿子、新建、打开、写正文、配色库、从本机路径插图、出图（PNG）、导出到目录、发送到 iPhone。
-// 换主题、调样式、分页、挪段落、摆图片这些直接用 AI 助手的工具（src/ai/tools.js 里标了 shared 的），分派与操作记录在 src/mcp/server.js。
+// 外部 Agent（MCP）另外要的工具：操作手册与写作手册、列稿子、新建（可以照模板）、打开、写正文、配色库、从本机路径插图、出图（PNG）、导出到目录、发送到 iPhone。
+// 换主题、调样式、分页、挪段落、插片段、摆图片、列模板这些直接用 AI 助手的工具（src/ai/tools.js 里标了 shared 的），分派与操作记录在 src/mcp/server.js。
 // 只经 App API（window.mediacraft）读写。本机文件只由壳碰：插图时壳按 Agent 给的路径读好、校验过交过来（request.files），
 // 导出时页面把做好的文件交给壳（MediaCraftNative.mcp.write），写进 Agent 指定、壳校验过的目录。
 (function (root) {
@@ -54,12 +54,18 @@
       init.mode = args.mode;
     }
     if (args.theme !== undefined) init.theme = (await shared.findTheme(args.theme)).id;
-    // 壳为这次新建开的新窗口里已经有一篇刚新建的空稿子：就用它（只认那一篇，别的稿子不会被改）；否则新建一篇
+    // 照模板（id 或名字）：先复制模板，再套用上面给的字段
+    const template = args.template === undefined ? null : await shared.findTemplate(args.template);
+    if (template) init.template = template.id;
+    // 壳为这次新建开的新窗口里已经有一篇刚新建的空稿子：就用它（只认那一篇，别的稿子不会被改）；否则新建一篇。
+    // 照模板时只能另建（模板要连图片一起复制），那篇空稿子就删掉，免得抽屉里多出一篇空的
     const blank = context.reuseBlank && root.MediaCraftDrafts.freshId();
-    const draft = blank ? await mc().drafts.update(init) : await mc().drafts.create(init);
+    const draft = blank && !template ? await mc().drafts.update(init) : await mc().drafts.create(init);
+    if (blank && template) await mc().drafts.remove(blank).catch(() => undefined);
     await context.bind(draft.id);
-    context.record(`新建稿子「${clip(await listedTitle(draft.id))}」`);
-    return reply(json({ id: draft.id, title: draft.title, mode: draft.mode, theme: draft.theme }));
+    const title = clip(await listedTitle(draft.id));
+    context.record(template ? `照模板「${template.name}」新建稿子「${title}」` : `新建稿子「${title}」`);
+    return reply(json({ id: draft.id, title: draft.title, mode: draft.mode, theme: draft.theme, ...(template ? { template: template.name } : {}) }));
   }
 
   async function openDraft(args, context) {
@@ -273,10 +279,13 @@
     {
       name: "create_draft",
       free: true,
-      description: "新建一篇稿子并在 App 里打开它，之后的工具都改这篇。可以同时给标题、卡片内容 markdown、小红书正文 caption、模式与主题（id 或中文名，不给时沿用用户上次选的）。写法看操作手册（工具 get_manual）：中文是规范写法（:::小标签、{{字色:#色值|文字}}、[[分页]]），英文写法也认、App 收下时换成中文；图片用 import_images 插。",
+      description: "新建一篇稿子并在 App 里打开它，之后的工具都改这篇。可以同时给标题、卡片内容 markdown、小红书正文 caption、模式与主题（id 或中文名，不给时沿用用户上次选的）。"
+        + "template 给模板的 id 或名字（见 list_templates）时先照那套模板复制（卡片内容、标题、小红书正文、主题、配色、字体、封面与示例图），再套用这里给的其余字段。"
+        + "写法看操作手册（工具 get_manual）：中文是规范写法（:::小标签、{{字色:#色值|文字}}、[[分页]]），英文写法也认、App 收下时换成中文；图片用 import_images 插。",
       inputSchema: {
         type: "object",
         properties: {
+          template: { type: "string", description: "模板的 id 或名字（见 list_templates）" },
           title: { type: "string", description: "标题，建议不超过 20 字" },
           markdown: { type: "string", description: "卡片内容 Markdown：排在一张张图片上的字" },
           caption: { type: "string", description: "小红书正文：发布时图片下面的那段纯文本（不用 Markdown，可以有 emoji、换行，#话题 写在这里，最多 1000 字）" },
