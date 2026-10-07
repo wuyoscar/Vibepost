@@ -22,7 +22,7 @@ struct ManualTests {
         window.styleLabel = () => document.querySelector("#styleMenu [data-style-current]").textContent;
         // 在左上角「样式」里点一项（展开菜单再点）
         window.pickStyle = async (name) => {
-          ui.expand("样式");
+          ui.expand("段落样式");
           ui.click(name, { within: stylePanel() });
           await settle();
         };
@@ -109,7 +109,7 @@ struct ManualTests {
             await pickStyle("小标签");
             const kicker = await markdown();
             const onKicker = styleLabel();
-            ui.expand("样式");
+            ui.expand("段落样式");
             const alignEnabled = !ui.find("居中", { within: stylePanel() }).disabled;
             ui.click("居中", { within: stylePanel() });
             await settle();
@@ -122,9 +122,9 @@ struct ManualTests {
             const undone = await markdown();
             await mc.editor.select(2, 2);
             const onHeading = styleLabel();
-            ui.expand("样式");
+            ui.expand("段落样式");
             const alignOnHeading = ui.find("居中", { within: stylePanel() }).disabled;
-            ui.expand("样式");
+            ui.expand("段落样式");
             return { onParagraph, kicker, onKicker, alignEnabled, centered, quoted, undone, onHeading, alignOnHeading };
         """) as? [String: Any]
         _ = try await harness.evaluate("const menu = document.querySelector('#styleMenu'); menu.open = true; await new Promise((resolve) => setTimeout(resolve, 400));")

@@ -50,7 +50,7 @@ struct ToolbarShortcutsTests {
         """) as? [String: Any]
         await harness.tearDown()
 
-        #expect(result?["styleMenu"] as? [String] == ["样式", "正文"], "格式条最左边是「样式」，写着光标所在那块是正文")
+        #expect(result?["styleMenu"] as? [String] == ["段落样式", "正文"], "格式条最左边是「样式」（可访问名称「段落样式」，和检查器的「样式」标签区分），写着光标所在那块是正文")
         #expect(result?["divided"] as? String == "第一段\n\n---\n\n第二段")
         #expect(result?["caretBeforeSecond"] as? Bool == true)
         #expect(harness.pageErrors == [])
