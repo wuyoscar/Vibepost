@@ -99,7 +99,7 @@ struct DarkCardLegibilityTests {
         };
     """
 
-    static let structures = ThemeTests.ids
+    static let structures = ThemeTests.structureIds
 
     @Test("深色配色、每种卡片结构：每个高亮色块上的字对高亮底 ≥ 4.5:1，正文对底色 ≥ 4.5:1，署名页码等次要文字 ≥ 3:1，表格线清楚")
     func darkPalettesStayLegible() async throws {

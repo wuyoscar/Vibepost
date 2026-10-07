@@ -237,6 +237,41 @@
         signature: { avatar: 96, name: { size: 32, weight: 600, font: "body", upper: false, spacing: 0 }, handle: { size: 24 } },
       },
     },
+    // 书卷（报刊主题共用，只换黑白配色）：宋体报头居中、下面一条双线，页码在页脚正中；版心与杂志一样宽
+    // （说明书的每一节都要放得下），标题居中、引用是竖排双线、分割线是一小段居中的双线；封面与结尾页各一方朱砂印。
+    // 页眉页脚用正文字体（宋体）。
+    scroll: {
+      name: "书卷",
+      pages: { inner: { top: 168, right: 80, bottom: 120, left: 80 }, first: { top: 168, right: 80, bottom: 120, left: 80 } },
+      body: { scale: 1 },
+      headings: {
+        h1: { scale: 1.76, lineHeight: 1.3, weight: 600, align: "center" },
+        h2: { scale: 1.28, lineHeight: 1.42, weight: 600 },
+        h3: { scale: 1.08, lineHeight: 1.5, weight: 600 },
+      },
+      imageRadius: 0,
+      labelFont: "body",
+      board: null,
+      cover: {
+        title: { weight: 600, max: 116, min: 60, lineHeight: 1.26, maxLines: 4 },
+        subtitle: { size: 30, weight: 400, lineHeight: 1.7, gap: 32, maxLines: 3, pin: null },
+        align: "center",
+        column: { left: 96, right: 96 },
+        area: { top: 220, bottom: 960, anchor: "center" },
+        image: {
+          mode: "plate",
+          box: { x: 80, y: 176, width: 704, height: 500, radius: 0 },
+          area: { top: 740, bottom: 1040, anchor: "top" },
+          lead: 0,
+          titleMax: 92,
+          subtitleLines: 2,
+        },
+      },
+      end: {
+        inset: 80,
+        signature: { avatar: 88, name: { size: 26, weight: 600, font: "body", upper: false, spacing: 3 }, handle: { size: 22 } },
+      },
+    },
   };
 
   const { deepFreeze } = root.MediaCraftEngine;

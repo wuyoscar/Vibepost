@@ -67,6 +67,12 @@
         + `<span class="mc-count">${counter(page)}</span></div>`,
       foot: () => "",
     },
+    scroll: {
+      // 报头：名字居中（第一页带头像），下面一条双线；页码在页脚正中「第 2 页 / 共 8 页」（封面不标）
+      head: (page, context) => `<div class="mc-scroll-head"><span class="mc-scroll-sign">${first(page) ? avatar(context) : ""}`
+        + `<span class="mc-sign">${name(context)}</span></span><span class="mc-scroll-rule"></span></div>`,
+      foot: (page) => (page.kind === "cover" ? "" : `<span class="mc-folio">第 ${page.index + 1} 页 / 共 ${page.total} 页</span>`),
+    },
   };
 
   // 封面这一页用结构另写的 cover（有的话），否则和第一页一样

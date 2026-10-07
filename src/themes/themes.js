@@ -78,6 +78,23 @@
       colors: { bg: "#0c0c0c", text: "#e8e8e5", accent: "#e8e8e5", secondary: "#e8e8e5", surface: "#222222" },
       fonts: { zh: "noto-sans-sc", en: "inter", code: "jetbrains-mono" },
     },
+    {
+      id: "scroll",
+      name: "书卷",
+      label: "宣纸米底、宋体报头、朱砂一点，适合读书、观点、养生",
+      structure: "scroll",
+      colors: { bg: "#f6f1e6", text: "#2b2a28", accent: "#b4342f", secondary: "#2b2a28", surface: "#e2ddd3" },
+      fonts: { zh: "noto-serif-sc", en: "source-serif-4", code: "ibm-plex-mono" },
+    },
+    // 报刊：书卷的结构只用黑白（强调色也是墨色：印章、引用的双线都成了黑的）
+    {
+      id: "press",
+      name: "报刊",
+      label: "黑白两色的报纸感，宋体与双线，适合新闻、评论",
+      structure: "scroll",
+      colors: { bg: "#ffffff", text: "#111111", accent: "#111111", secondary: "#111111", surface: "#e7e7e7" },
+      fonts: { zh: "noto-serif-sc", en: "source-serif-4", code: "ibm-plex-mono" },
+    },
   ]);
 
   // 没选过主题时新稿子用它；认不出的主题也按它

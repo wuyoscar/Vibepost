@@ -52,8 +52,9 @@
 
   // 结构的标签字体（页眉页脚）用哪个打包字体
   const LABEL_FONTS = Object.freeze({ mono: "ibm-plex-mono", sans: "ibm-plex-sans" });
-  // 卡片上会画出、但稿子原文里未必有的字：页脚的间隔点与破折号、夜读的大引号、知识卡的标签，以及页码、大写署名一类的 ASCII。
-  const CARD_EXTRA_TEXT = `·—“知识卡${Array.from({ length: 95 }, (_, index) => String.fromCharCode(32 + index)).join("")}`;
+  // 卡片上会画出、但稿子原文里未必有的字：页脚的间隔点与破折号、夜读的大引号、知识卡的标签、书卷的页码「第 N 页 / 共 N 页」，
+  // 以及页码、大写署名一类的 ASCII。
+  const CARD_EXTRA_TEXT = `·—“知识卡第页共${Array.from({ length: 95 }, (_, index) => String.fromCharCode(32 + index)).join("")}`;
 
   // 打包字体：key → { family, weights }。没下载字体时为空，选了也回退系统字体。
   let bundled = new Map();
