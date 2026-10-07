@@ -55,9 +55,9 @@
 | `list()` | 所有稿子，含内置说明书 | `DraftSummary[]` |
 | `get(id)` | 读一篇（不切换）；没有时为 `null` | `Draft \| null` |
 | `current()` | 正在编辑的这篇 | `Draft` |
-| `create(init?)` | 新建并切过去；`init` 同 `update` 的字段，另可带 `template`（模板的 id 或名字，见 `templates()`）：先照模板复制一份（卡片内容、标题、小红书正文、主题、配色、字体、封面、图片都照它），再套用其余的字段；没有这个模板时 reject。不带 `template` 时是空白稿子，沿用上一次选的主题。到上限时 reject（不删旧稿） | `Draft` |
+| `create(init?)` | 新建并切过去；`init` 同 `update` 的字段，另可带 `template`（模板的 id 或名字，见 `templates()`）：先照模板复制一份（卡片内容、标题、小红书正文、主题、配色、字体、字号 / 行距 / 图片最大高、封面、图片都照它），再套用其余的字段；没有这个模板时 reject。不带 `template` 时是空白稿子，沿用上一次选的主题。到上限时 reject（不删旧稿） | `Draft` |
 | `templates()` | 模板库：仓库自带的（`src/templates/*.md`，按登记表顺序在前）与自己存的（App 支持目录「模板」文件夹，每次都重新读目录；浏览器里没有），见[模板](#模板原生桥) | `Template[]` |
-| `saveAsTemplate({ name, description?, tags? })` | 把正在编辑的这篇存成自己的模板：写进「模板/<名字>/模板.md」+ 图片文件（画面存成文件，实况只存封面那张；随网页打包的图片先取回来）；存的是卡片内容、标题、小红书正文、主题、配色（背景、文字、强调与单独调过的辅助、衬底）、字体（不跟随主题的）、封面与图片，不存字号、行距、卡片样式。`name` 1–40 字，不能有 `/ \ :` 与控制字符、不以 `.` 开头（`TypeError`）；同名的整套换掉。内置说明书、浏览器里 reject | `Template` |
+| `saveAsTemplate({ name, description?, tags? })` | 把正在编辑的这篇存成自己的模板：写进「模板/<名字>/模板.md」+ 图片文件（画面存成文件，实况只存封面那张；随网页打包的图片先取回来）；存的是卡片内容、标题、小红书正文、主题、配色（背景、文字、强调与单独调过的辅助、衬底）、字体（不跟随主题的）、字号 / 行距 / 图片最大高（和默认值不同的）、封面与图片，不存卡片样式。`name` 1–40 字，不能有 `/ \ :` 与控制字符、不以 `.` 开头（`TypeError`）；同名的整套换掉。内置说明书、浏览器里 reject | `Template` |
 | `removeTemplate(id)` | 删自己存的那一套（整个文件夹）；自带的 reject | — |
 | `revealTemplate(id?)` | 在 Finder 中显示自己存的那一套的文件夹；不给 `id` 时打开模板文件夹（不在时先建好）；自带的 reject | — |
 | `open(id)` | 切换到这篇 | `Draft` |
@@ -598,6 +598,8 @@ colors:                             # 可省：只给 bg / text / accent 时辅�
   accent: #ffbd2e
 fonts:                              # 可省：zh / en / code 的字体 id，没给跟随主题
   zh: lxgw-wenkai
+fontSize: 30                        # 可省：字号（24–40）、行距（1–2.4）、图片最大高（220–1048）；没给用默认值 34 / 1.85 / 1048
+lineHeight: 1.6
 cover:                              # 可省：首页做封面
   enabled: true
   subtitle: 看完至少省下一个月房租

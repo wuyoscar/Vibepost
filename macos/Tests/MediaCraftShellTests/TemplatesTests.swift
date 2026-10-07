@@ -210,6 +210,10 @@ struct TemplatesTests {
               const images = await mc.media.list();
               report.push({
                 name: entry.name, theme: draft.theme === entry.theme, pages: pages.length,
+                // 字多了会被悄悄拆到下一页：正文页（封面页、结尾页之外）要正好是分页记号数 + 1
+                splits: pages.filter((page) => page.role === "body").length - draft.markdown.split("[[分页]]").length,
+                sparse: pages.filter((page) => page.issues.some((issue) => issue.id === "sparse")).map((page) => page.index + 1),
+                type: [draft.fontSize, draft.lineHeight],
                 issues: pages.flatMap((page) => page.issues.filter((issue) => issue.id !== "sparse").map((issue) => `${page.index + 1}:${issue.id}`)),
                 images: images.length === Object.keys(entry.images).length, decoded: (await imagesDecode()).every(Boolean),
                 english: /\\[\\[image:|\\{\\{(?:color|bg|underline|mark):|:::(?:kicker|note|footnote|mono|rows|steps)\\b|align=/.test(draft.markdown),
@@ -225,6 +229,9 @@ struct TemplatesTests {
             let name = item["name"] as? String ?? "?"
             #expect(item["theme"] as? Bool == true, "\(name) 的主题")
             #expect((item["pages"] as? Int ?? 0) >= 6, "\(name) 页数 \(item["pages"] ?? 0)")
+            #expect(item["splits"] as? Int == 0, "\(name) 有卡片字多到被拆页：多出 \(item["splits"] ?? 0) 页")
+            #expect(item["sparse"] as? [Int] == [], "\(name) 太空的页：\(item["sparse"] ?? [])")
+            #expect(item["type"] as? [Double] == [30, 1.6], "\(name) 的字号与行距照模板")
             #expect(item["issues"] as? [String] == [], "\(name) 的排版自检：\(item["issues"] ?? [])")
             #expect(item["images"] as? Bool == true && item["decoded"] as? Bool == true, "\(name) 的图片")
             #expect(item["english"] as? Bool == false, "\(name) 只用中文记号")
@@ -245,6 +252,7 @@ struct TemplatesTests {
             const [imageId] = await mc.media.import([new File([blob], "night-lake.jpg", { type: "image/jpeg" })]);
             await mc.drafts.update({
               theme: "glow", colors: { bg: "#fff8f0", text: "#222222", accent: "#d9480f" }, fonts: { zh: "lxgw-wenkai" },
+              fontSize: 30, lineHeight: 1.6,
               cover: { enabled: true, subtitle: "副标题", image: imageId }, caption: "第一段\\n\\n#话题",
             });
             const folderBefore = (await mc.drafts.templates()).length;
@@ -284,7 +292,7 @@ struct TemplatesTests {
             const removeAgain = await rejects(() => mc.drafts.removeTemplate("user_template_我的清单"));
             return {
               listed, asDraft: asDraft ? [asDraft.readOnly, asDraft.theme, asDraft.title] : null, first: [first.pageCount, first.canvas ? first.canvas.width : 0],
-              draft: { title: draft.title, theme: draft.theme, colors: draft.colors, tuned: draft.tunedColors, fonts: draft.fonts, cover: draft.cover, caption: draft.caption, markdown: draft.markdown, readOnly: draft.readOnly },
+              draft: { title: draft.title, theme: draft.theme, colors: draft.colors, tuned: draft.tunedColors, fonts: draft.fonts, cover: draft.cover, caption: draft.caption, markdown: draft.markdown, readOnly: draft.readOnly, type: [draft.fontSize, draft.lineHeight, draft.imageMaxHeight] },
               src: src.slice(0, 22), issues, decoded, removeBuiltIn, afterRemove, removeAgain,
             };
         """) as? [String: Any]
@@ -310,10 +318,11 @@ struct TemplatesTests {
         #expect(imageBytes > 1000)
         let parsed = WritingManuals.parse(content, fallbackName: "x")
         #expect(parsed.name == "我的清单" && parsed.description == "改了说明", "开头和写作手册同一套写法：\(content.prefix(200))")
-        for line in ["tags: 清单, 柔和", "title: 湖边一晚", "theme: glow", "colors:", "  bg: #fff8f0", "  accent: #d9480f", "fonts:", "  zh: lxgw-wenkai", "cover:", "  enabled: true", "  subtitle: 副标题", "  image: \(imageId)", "caption: |", "  第一段", "  #话题", "images:", "  \(imageId): \(imageId).jpg"] {
+        for line in ["tags: 清单, 柔和", "title: 湖边一晚", "theme: glow", "colors:", "  bg: #fff8f0", "  accent: #d9480f", "fonts:", "  zh: lxgw-wenkai", "fontSize: 30", "lineHeight: 1.6", "cover:", "  enabled: true", "  subtitle: 副标题", "  image: \(imageId)", "caption: |", "  第一段", "  #话题", "images:", "  \(imageId): \(imageId).jpg"] {
             #expect(content.contains("\n\(line)\n"), "模板.md 里有「\(line)」：\n\(content)")
         }
         #expect(!content.contains("secondary") && !content.contains("surface"), "没单独调过的辅助、衬底不写")
+        #expect(!content.contains("imageMaxHeight"), "和默认值一样的图片最大高不写")
         #expect(content.hasSuffix("\n\n" + (saved?["markdown"] as? String ?? "?").trimmingCharacters(in: .whitespacesAndNewlines) + "\n"), "正文在后面：\(content.suffix(120))")
 
         #expect(reopened?["listed"] as? [String] == builtIns + ["user_template_我的清单"], "重新打开 App 还在")
@@ -329,6 +338,7 @@ struct TemplatesTests {
         let cover = draft?["cover"] as? [String: Any]
         #expect(cover?["enabled"] as? Bool == true && cover?["subtitle"] as? String == "副标题" && cover?["image"] as? String == imageId, "\(cover ?? [:])")
         #expect(draft?["caption"] as? String == "第一段\n\n#话题")
+        #expect(draft?["type"] as? [Double] == [30, 1.6, 1048], "字号、行距照模板，没写的图片最大高用默认值")
         #expect(draft?["markdown"] as? String == (saved?["markdown"] as? String ?? "?").trimmingCharacters(in: .whitespacesAndNewlines))
         #expect(reopened?["src"] as? String == "data:image/jpeg;base64", "用户模板的图片由壳读成 data URL")
         #expect(reopened?["issues"] as? [String] == [])

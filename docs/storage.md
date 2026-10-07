@@ -171,7 +171,7 @@ description: 通用的小红书图文笔记：给谁看、标题怎么抓人…�
 ```
 模板/
   我的清单/
-    模板.md                 # 开头 front matter（name、description、tags、title、theme、colors、fonts、cover、caption、images），后面是卡片内容
+    模板.md                 # 开头 front matter（name、description、tags、title、theme、colors、fonts、fontSize / lineHeight / imageMaxHeight、cover、caption、images），后面是卡片内容
     img_….jpg               # 图片，文件名就是 images 里的路径（相对这个文件夹）
 ```
 

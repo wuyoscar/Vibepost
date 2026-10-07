@@ -140,7 +140,7 @@ struct GalleryTests {
         #expect(result?["topicChips"] as? [String] == result?["expectedTopics"] as? [String], "\(result?["topicChips"] ?? [])")
         #expect(result?["styleChips"] as? [String] == result?["expectedStyles"] as? [String], "\(result?["styleChips"] ?? [])")
         #expect(result?["byTopic"] as? [String] == ["干货清单"])
-        #expect(result?["byStyle"] as? [String] == ["踩坑经验", "读书笔记", "旅行日记"])
+        #expect(result?["byStyle"] as? [String] == ["踩坑经验", "旅行日记"])
         #expect(result?["byBoth"] as? [String] == ["旅行日记"], "两组一起筛")
         #expect(result?["none"] as? [AnyHashable] == [0, false] as [AnyHashable], "筛不到时说一声")
         #expect(result?["all"] as? Int == 8)
