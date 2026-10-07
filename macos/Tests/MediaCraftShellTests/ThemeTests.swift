@@ -5,8 +5,8 @@ import Testing
 @MainActor
 struct ThemeTests {
     /// 主题注册表（src/themes/themes.js）的顺序：id 与名字（v5 定稿的八个，第 03 张票）
-    static let ids = ["notes", "plain", "journal", "glow", "clay", "editorial", "poster", "ink"]
-    static let names = ["备忘", "纯白", "手帐", "柔光", "陶土", "杂志", "撞色", "纯黑"]
+    static let ids = ["notes", "plain", "journal", "glow", "clay", "editorial", "poster", "ink", "neon"]
+    static let names = ["备忘", "纯白", "手帐", "柔光", "陶土", "杂志", "撞色", "纯黑", "电光"]
     /// 主题 → 卡片结构（每个主题一种，id 相同）
     static let structures = Dictionary(uniqueKeysWithValues: ids.map { ($0, $0) })
     /// 几个主题的配色（背景、文字、强调）
@@ -140,7 +140,7 @@ struct ThemeTests {
         #expect(result?["names"] as? [String] == Self.names)
         let descriptions = result?["descriptions"] as? [String] ?? []
         let labels = result?["labels"] as? [String] ?? []
-        #expect(labels.first == "干净的随手记 · 黄色小签" && labels.last == "黑底白线 · 极简", "\(labels)")
+        #expect(labels.first == "干净的随手记 · 黄色小签" && labels.last == "深蓝底 · 一抹电蓝 · 等宽标签", "\(labels)")
         #expect(descriptions.count == Self.ids.count && zip(descriptions, labels).allSatisfy { $0.hasPrefix($1) }, "描述先说主题的说明：\(descriptions)")
         #expect(result?["pressed"] as? [String] == ["true"] + Array(repeating: "false", count: Self.ids.count - 1), "新环境默认是备忘")
         #expect(result?["disabled"] as? Bool == false, "所有主题都能点")
@@ -190,6 +190,7 @@ struct ThemeTests {
             ("editorial", "editorial", ["#f2f6fa", "#1b2430", "#2f67b1"], ["MC Noto Serif SC", "MC Source Serif 4", "MC IBM Plex Mono"]),
             ("poster", "poster", ["#fffdf5", "#111111", "#ffe047"], ["MC Noto Sans SC", "MC Inter", "MC JetBrains Mono"]),
             ("ink", "ink", ["#0c0c0c", "#e8e8e5", "#e8e8e5"], ["MC Noto Sans SC", "MC Inter", "MC JetBrains Mono"]),
+            ("neon", "neon", ["#0f172a", "#e6edf7", "#4cc9ff"], ["MC Noto Sans SC", "MC Inter", "MC JetBrains Mono"]),
         ]
         #expect(expected.map(\.id) == Self.ids, "表里列全注册表的主题")
         for theme in expected {

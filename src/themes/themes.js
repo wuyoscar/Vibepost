@@ -78,6 +78,14 @@
       colors: { bg: "#0c0c0c", text: "#e8e8e5", accent: "#e8e8e5", secondary: "#e8e8e5", surface: "#222222" },
       fonts: { zh: "noto-sans-sc", en: "inter", code: "jetbrains-mono" },
     },
+    {
+      id: "neon",
+      name: "电光",
+      label: "深蓝底 · 一抹电蓝 · 等宽标签",
+      structure: "neon",
+      colors: { bg: "#0f172a", text: "#e6edf7", accent: "#4cc9ff", secondary: "#e6edf7", surface: "#252c3f" },
+      fonts: { zh: "noto-sans-sc", en: "inter", code: "jetbrains-mono" },
+    },
   ]);
 
   // 没选过主题时新稿子用它；认不出的主题也按它

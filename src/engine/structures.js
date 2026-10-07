@@ -237,6 +237,40 @@
         signature: { avatar: 96, name: { size: 32, weight: 600, font: "body", upper: false, spacing: 0 }, handle: { size: 24 } },
       },
     },
+    // 电光：深色底上的粗黑标题（思源黑体 Black）、等宽的页眉与标签；版心对齐 48px 的网格（structures.css 画在底下），
+    // 页眉条的下线在 120、正文从 168 起。封面标题靠左压底，底图是直角（4px）细框的相框
+    neon: {
+      name: "电光",
+      pages: { inner: { top: 168, right: 72, bottom: 100, left: 72 }, first: { top: 168, right: 72, bottom: 100, left: 72 } },
+      body: { scale: 1 },
+      headings: {
+        h1: { scale: 2, lineHeight: 1.12, weight: 900 },
+        h2: { scale: 1.3, lineHeight: 1.3, weight: 800 },
+        h3: { scale: 1.1, lineHeight: 1.45, weight: 800 },
+      },
+      imageRadius: 4,
+      labelFont: "mono",
+      board: null,
+      cover: {
+        title: { weight: 900, max: 128, min: 68, lineHeight: 1.08, maxLines: 4 },
+        subtitle: { size: 30, weight: 500, lineHeight: 1.6, gap: 28, maxLines: 3, pin: null },
+        align: "left",
+        column: { left: 72, right: 72 },
+        area: { top: 200, bottom: 1000, anchor: "bottom" },
+        image: {
+          mode: "plate",
+          box: { x: 72, y: 168, width: 720, height: 500, radius: 4 },
+          area: { top: 716, bottom: 1040, anchor: "top" },
+          lead: 0,
+          titleMax: 96,
+          subtitleLines: 2,
+        },
+      },
+      end: {
+        inset: 72,
+        signature: { avatar: 88, name: { size: 24, weight: 700, font: "label", upper: true, spacing: 4 }, handle: { size: 22 } },
+      },
+    },
   };
 
   const { deepFreeze } = root.MediaCraftEngine;
