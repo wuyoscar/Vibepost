@@ -12,7 +12,7 @@ const { entry } = context.MediaCraftTemplateFormat;
 // 按文件名排（固定的区域，不跟着这台机器的语言设置变）
 const collator = new Intl.Collator("zh-Hans-CN", { numeric: true });
 const files = readdirSync(new URL("src/templates/", root))
-  .filter((name) => name.endsWith(".md"))
+  .filter((name) => name.endsWith(".md") && name !== "README.md") // README.md 是格式说明，不是模板
   .sort(collator.compare)
   .map((name) => `src/templates/${name}`);
 const entries = files.map((file) => entry(file, readFileSync(new URL(file, root), "utf8")));

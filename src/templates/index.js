@@ -899,29 +899,6 @@
         "",
         "第 1–11 期在合集「一周要闻」里。"
       ]
-    },
-    {
-      "file": "src/templates/README.md",
-      "id": "README",
-      "name": "README",
-      "description": "",
-      "tags": [],
-      "title": "",
-      "theme": "",
-      "colors": {},
-      "fonts": {},
-      "cover": {
-        "enabled": false,
-        "subtitle": "",
-        "image": null
-      },
-      "caption": "",
-      "images": {},
-      "markdown": [
-        "# 自带模板",
-        "",
-        "每个 `.md` 是一套模板：开头 `---` 之间是 front matter（与写作手册同一套解析：一行一个 `键: 值`，`|` 后面缩进的几行是多行的值），后面是卡片内容（Markdown，只用中文记号）。键：`name` 模板名（与文件名一致）、`description` 一句话说明、`tags` 逗号分隔的两个标签（题材一个、风格一个：简洁 / 柔和 / 有态度）、`theme` 主题 id（见 `src/themes/themes.js`）、`colors` 可选（`bg #… , text #… , accent #…`，缺的按主题）、`cover` 可选（`enabled true, subtitle 一行副标题, image 图片编号`；副标题里不要用逗号）、`images` 可选（`编号 相对网页根的路径`，逗号分隔，图片复用 `docs/guide-assets/`，新图放 `docs/template-assets/`）、`caption` 小红书正文（`|` 多行，最后一行 3–5 个 #话题）。正文第一块是 `# 标题`（封面与稿件标题都从它取），每张卡片之间单独一行 `[[分页]]`，关注引导写在 `[[结尾]]` 后面；一张卡片 180–280 字，带图的卡片字要少（整幅图约占大半页，拼图 `[[图片:甲|乙|16x9]]` 矮一些）。改完跑 `node scripts/check-templates.mjs`：它按同样的规则解析，查字数、记号写法、图片与话题。"
-      ]
     }
   ]);
 })(globalThis);
