@@ -160,6 +160,9 @@
       missing: () => callJson("window/missing"),
       // 这个窗口有没有还没存进本机的改动：壳在关闭按钮上显示小圆点（isDocumentEdited）
       edited: (edited) => callJson("window/edited", { edited }),
+      // App 的版本号与能不能检查更新；检查更新（像点了菜单里的「检查更新…」）
+      appInfo: () => callJson("window/app-info"),
+      checkForUpdates: () => callJson("window/check-updates"),
       // 外部 Agent 的这次会话（session）认定了这篇：壳记着，之后它的请求交给开着这篇的窗口
       bindAgent: (session, draftId) => callJson("window/bind-agent", { session, draftId }),
     },

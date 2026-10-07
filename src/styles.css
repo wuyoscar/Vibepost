@@ -4488,6 +4488,18 @@ body[data-layout-mode="article"] .card-only {
   flex: none;
 }
 
+.about-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.about-settings .pill-button {
+  align-self: flex-start;
+}
+
 .ai-settings-popover .section-note {
   overflow-wrap: anywhere;
 }

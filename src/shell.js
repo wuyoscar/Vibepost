@@ -210,8 +210,7 @@
 
   // 胶片上每张正文卡的字数与填满多少：缩略图底边一条细条（长短是填满多少）、右下角字数，偏空、偏挤时换色；悬停时说明。
   // 一张 180–280 字读起来最舒服；末张太短时排版会从前一张回填（src/cards/paginate.js 的末页回填）。
-  const SPARSE_FILL = 0.25;
-  const DENSE_CHARS = 300;
+  const { SPARSE_FILL, DENSE_CHARS } = window.MediaCraftLayoutCheck;
 
   function fillNote(page, index, bodyPages) {
     const label = `第 ${index + 1} 张`;

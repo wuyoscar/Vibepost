@@ -542,6 +542,8 @@ App 可以开几个窗口，每个窗口开着一篇稿子，各改各存（都�
 | `window/claim` | `{ draftId, focus? }` | 这个窗口能不能开这篇：别的窗口占着时 `{ elsewhere: true }`（`focus` 默认为真：把那个窗口调到前面、让它的页面换到那篇），否则先替这个窗口占着，`{ elsewhere: false }` |
 | `window/occupy` | `{ current, drafts, page, sequence }`：这个窗口正开着的那篇（可以是说明书），与别的窗口不能再开的（正开着的自己的稿子、AI 还在跑的）；`page` 是页面启动时自己起的 id，`sequence` 是它第几次报 | `{ ok }`；同时更新 `windows.json`。同一个页面序号旧的丢掉；窗口换了页面（重新载入、页面进程崩了）之后，旧页面迟到的报告也丢掉，新页面报来之前壳照旧替它占着正开着的那篇 |
 | `window/missing` | — | 这个窗口要开的那篇已经不在了：还有别的窗口时关掉它，`{ closed }` |
+| `window/app-info` | — | App 的版本号与能不能检查更新：`{ version, updates }`（AI 设置 › 关于用它显示版本） |
+| `window/check-updates` | — | 像点了「Vibepost › 检查更新…」：交给 App 的更新器（见 [release.md](release.md)）；浏览器、测试里没接更新器时 404 |
 | `window/edited` | `{ edited }` | 这个窗口有没有还没存进本机的改动（存盘状态是 pending / saving / error）：壳设窗口的 `isDocumentEdited`，关闭按钮上显示小圆点；`{ ok }` |
 | `window/bind-agent` | `{ session, draftId }` | 外部 Agent 的这次会话（`mediacraft-mcp` 的会话编号）认定这篇：壳记着，之后它的请求交给开着这篇的窗口（`src/mcp/server.js` 认定、新建、打开之后调用） |
 

@@ -37,9 +37,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         for entry in saved {
             openWindow(WindowRequest(draftId: entry.draftId), frame: entry.frame.flatMap(Self.frame))
         }
-        // 上次留下的下载与暂存清掉；稍等一会儿再自动检查更新（一天最多一次）
+        // 上次留下的下载与暂存清掉；稍等一会儿再自动检查更新（一天最多一次）。页面里（AI 设置 › 关于）也能点「检查更新…」
         updater = Updater.forRunningApp()
         updater.cleanStaging()
+        core.checkForUpdates = { [weak self] in Task { await self?.checkForUpdates(automatic: false) } }
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(8))
             await self?.checkForUpdates(automatic: true)
@@ -131,7 +132,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// 退出：记下开着的窗口（下次照着恢复），每个窗口先把稿子存完（各最多等 3 秒），再结束所有窗口的 AI 进程
     /// （不卡主线程），都退出了再退。
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard !terminating else { return .terminateLater }
+        // 已经在退了（存稿、结束 AI 进程中）：这一次不另起一遍，也不留一个永远不回答的 terminateLater
+        guard !terminating else { return .terminateCancel }
         terminating = true
         core.freezeSession()
         Task {

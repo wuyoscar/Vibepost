@@ -889,7 +889,28 @@
 
   // ===== AI 设置（每个后端的程序在哪） =====
 
+  // 「关于」：版本号与「检查更新…」（只在 App 里有；版本问一次就记着）
+  const about = $("#aboutSettings");
+  let aboutLoaded = false;
+  async function syncAbout() {
+    const windows = root.MediaCraftNative?.windows;
+    if (!windows?.appInfo || aboutLoaded) return;
+    try {
+      const info = await windows.appInfo();
+      $("#aboutVersion").textContent = `Vibepost ${info.version}`;
+      about.hidden = !info.updates;
+      aboutLoaded = true;
+    } catch {
+      about.hidden = true;
+    }
+  }
+  $("#checkUpdatesBtn").addEventListener("click", () => {
+    settings.open = false;
+    root.MediaCraftNative?.windows?.checkForUpdates().catch((error) => showModelError(error.message || String(error)));
+  });
+
   function syncSettings() {
+    void syncAbout();
     for (const [id, { found, input: pathInput, error }] of Object.entries(pathGroups)) {
       const current = statuses[id];
       const label = ai.backends[id].label;

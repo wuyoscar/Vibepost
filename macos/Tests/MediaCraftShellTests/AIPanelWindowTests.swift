@@ -37,6 +37,33 @@ struct AIPanelWindowTests {
         #expect(harness.pageErrors == [])
     }
 
+    @Test("AI 设置 › 关于：写着版本号，「检查更新…」交给 App 的更新器（和菜单里的一样）；没接更新器时不显示")
+    func aboutSectionChecksForUpdates() async throws {
+        let harness = ShellHarness(onboarding: false)
+        harness.shell.core.appVersion = "9.9.9"
+        let checks = CheckCounter()
+        harness.shell.core.checkForUpdates = { checks.increment() }
+        try await harness.load()
+        let result = try await harness.evaluate("""
+            await window.mediacraft.drafts.create();
+            ui.click("AI 助手");
+            ui.expand("AI 设置");
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            const about = document.querySelector("#aboutSettings");
+            const version = document.querySelector("#aboutVersion").textContent;
+            ui.click("检查更新…");
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            return { shown: !about.hidden, version, closed: !document.querySelector("#aiSettings").open };
+        """) as? [String: Any]
+        await harness.tearDown()
+
+        #expect(result?["shown"] as? Bool == true)
+        #expect(result?["version"] as? String == "Vibepost 9.9.9")
+        #expect(result?["closed"] as? Bool == true, "点了就收起设置")
+        #expect(checks.value == 1, "交给 App 的更新器")
+        #expect(harness.pageErrors == [])
+    }
+
     @Test("AI 设置：窗口矮的时候面板不超出窗口下沿，内容多了在面板里面滚动")
     func settingsFitTheWindow() async throws {
         let harness = ShellHarness(onboarding: false)
@@ -61,4 +88,11 @@ struct AIPanelWindowTests {
         #expect(result?["overflow"] as? String == "auto")
         #expect(harness.pageErrors == [])
     }
+}
+
+private final class CheckCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    var value: Int { lock.withLock { count } }
+    func increment() { lock.withLock { count += 1 } }
 }

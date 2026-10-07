@@ -77,6 +77,10 @@ public final class ShellCore {
     public var closeWindow: ((ShellWebView) -> Void)?
     /// 点了网页里的外链时怎么打开（默认交给默认浏览器 / 邮件 App）；测试 harness 换成记下来
     public var openExternal: (URL) -> Void = { NSWorkspace.shared.open($0) }
+    /// 页面里点了「检查更新…」（AI 设置的「关于」）：App（main.swift）接上更新器；nil 时页面不显示这一项
+    public var checkForUpdates: (() -> Void)?
+    /// 「关于」里显示的版本号（App 的 Info.plist；测试 harness 是 dev）
+    public var appVersion: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
     /// 「在 Finder 中显示」一份写作手册（是文件夹时打开那个文件夹）；测试 harness 换成记下来
     public var revealFile: (URL) -> Void = { url in
         var isDirectory: ObjCBool = false
@@ -355,6 +359,7 @@ public final class ShellCore {
     /// - missing：这个窗口要开的那篇已经不在了，还有别的窗口时关掉它
     /// - bind-agent `{ session, draftId }`：外部 Agent 的这次会话认定这篇
     /// - edited `{ edited }`：这个窗口有没有还没存进本机的改动（关闭按钮上的小圆点）
+    /// - app-info：`{ version, updates }`（版本号、能不能检查更新）；check-updates：像点了菜单里的「检查更新…」
     nonisolated func windowAction(_ action: String, _ request: [String: Any], from window: String) async -> NativeBridge.Reply {
         let draftId = (request["draftId"] as? String).flatMap { $0.isEmpty || $0.count > 200 ? nil : $0 }
         switch action {
@@ -386,6 +391,14 @@ public final class ShellCore {
             }
             await MainActor.run { bindAgent(session, to: draftId) }
             return .ok()
+        case "app-info":
+            return await MainActor.run { .ok(["version": appVersion, "updates": checkForUpdates != nil]) }
+        case "check-updates":
+            return await MainActor.run {
+                guard let checkForUpdates else { return .failure(404, "这里不能检查更新") }
+                checkForUpdates()
+                return .ok()
+            }
         case "edited":
             let edited = request["edited"] as? Bool ?? false
             await MainActor.run { pages.first { $0.windowId == window }?.webView.window?.isDocumentEdited = edited }

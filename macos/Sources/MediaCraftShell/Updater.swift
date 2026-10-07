@@ -274,8 +274,9 @@ public final class Updater {
 
     public func check() async throws -> Check {
         guard enabled else { throw UpdateError.developmentBuild }
-        defaults.set(Date(), forKey: Self.lastCheckKey)
+        // 查到了才记下时间：断网没查成的，下次启动照样再试
         let release = try await source.latest()
+        defaults.set(Date(), forKey: Self.lastCheckKey)
         updateLog.notice("最新的 Release 是 \(release.tag, privacy: .public)，现在是 \(self.current.description, privacy: .public)")
         return release.version > current ? .available(release) : .upToDate(current)
     }

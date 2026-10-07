@@ -568,8 +568,12 @@ final class AISessions: @unchecked Sendable {
             let section = Self.manualsSection(manuals, copiedInto: directory.appendingPathComponent(Self.manualsFolder, isDirectory: true))
             agents = agents.isEmpty ? section : agents.replacingOccurrences(of: #"\n+$"#, with: "", options: .regularExpression) + "\n\n" + section
         }
-        if !agents.isEmpty {
-            try Data(agents.utf8).write(to: directory.appendingPathComponent("AGENTS.md"), options: .atomic)
+        // 每轮重写：这一轮没有给（页面没带手册、也没有写作手册）就把上一轮留下的删掉，Agent 不会读到过期的
+        let agentsFile = directory.appendingPathComponent("AGENTS.md")
+        if agents.isEmpty {
+            try? FileManager.default.removeItem(at: agentsFile)
+        } else {
+            try Data(agents.utf8).write(to: agentsFile, options: .atomic)
         }
         return directory
     }
