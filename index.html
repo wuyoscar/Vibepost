@@ -610,6 +610,10 @@
             <header class="ai-session-head">
               <div class="ai-session-title-row">
                 <input id="aiSessionTitle" class="ai-session-title" type="text" autocomplete="off" spellcheck="false" aria-label="会话标题" placeholder="给这篇起个标题" title="就是这篇稿子的标题：在这里改，稿子的标题也跟着改（⌘Z 可以撤销）" />
+                <!-- 新建一篇，在新窗口里打开、直接开着 AI 助手（src/ai/panel.js）；浏览器里在这个窗口新建 -->
+                <button id="aiNewWindowBtn" class="icon-button" type="button" aria-label="新建一篇，在新窗口里和 AI 聊" title="新建一篇稿子，在新窗口里打开 AI 助手">
+                  <svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg>
+                </button>
                 <details id="aiHistory" class="pop-menu ai-history">
                   <summary class="icon-button" aria-label="会话历史" title="会话历史：聊过的稿子">
                     <svg class="icon" aria-hidden="true"><use href="#i-history" /></svg>
@@ -642,7 +646,7 @@
                   <summary class="icon-button" aria-label="AI 设置" title="AI 设置">
                     <svg class="icon" aria-hidden="true"><use href="#i-settings" /></svg>
                   </summary>
-                  <div class="pop-menu-panel ai-settings-popover" role="group" aria-labelledby="aiSettingsTitle">
+                  <div class="pop-menu-panel ai-settings-popover" role="group" aria-labelledby="aiSettingsTitle" data-fit-window>
                     <h2 id="aiSettingsTitle" class="section-label">AI 设置</h2>
                     <p class="section-note">用本机的 Codex 或 Claude Code，沿用它们在终端里的账号与设置（技能、MCP、权限），不用另填密钥。</p>
                     <!-- 每个后端一组：现在用的是哪里的程序、指定路径（src/ai/panel.js 的 pathGroups） -->
@@ -714,6 +718,13 @@
                   <select id="aiModelSelect" aria-label="模型" title="这篇稿子的 AI 用哪个模型，下一轮起生效">
                     <option value="default">默认模型</option>
                     <option value="custom">自定义…</option>
+                  </select>
+                  <svg class="icon ai-picker-chevron" aria-hidden="true"><use href="#i-chevron-down" /></svg>
+                </span>
+                <!-- 推理强度：档位按这篇的后端与模型由 src/ai/panel.js 填，每篇各记，新稿子是「中」 -->
+                <span class="ai-picker ai-effort-picker">
+                  <select id="aiEffortSelect" aria-label="推理强度" title="这篇稿子的 AI 想得多深，下一轮起生效">
+                    <option value="medium">推理：中</option>
                   </select>
                   <svg class="icon ai-picker-chevron" aria-hidden="true"><use href="#i-chevron-down" /></svg>
                 </span>

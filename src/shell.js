@@ -33,6 +33,8 @@
     selectTab(tabs[(moves[event.key] + tabs.length) % tabs.length], { focus: true });
   });
   aiButton.addEventListener("click", () => selectTab(aiButton.getAttribute("aria-pressed") === "true" ? styleTab : aiTab));
+  // AI 助手顶上的「+」开的新窗口（地址带 panel=ai）：一开就是 AI 助手
+  if (new URLSearchParams(location.search).get("panel") === "ai") selectTab(aiTab);
 
   // ===== 顶栏：稿件名、主题按钮 =====
   const themeButton = $("#themeButton");

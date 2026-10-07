@@ -67,6 +67,10 @@
   const modelCustom = $("#aiModelCustom");
   const modelInput = $("#aiModelInput");
   const modelError = $("#aiModelError");
+  const effortSelect = $("#aiEffortSelect");
+  // 推理强度的中文叫法（Codex、Claude Code 用的英文词放在括号里）
+  const EFFORT_NAMES = { none: "不推理", minimal: "最低", low: "低", medium: "中", high: "高", xhigh: "很高", max: "最高", ultra: "极限" };
+  const effortName = (effort) => EFFORT_NAMES[effort] ?? effort;
   const newSessionButton = $("#aiNewSessionBtn");
   const moreMenu = $("#aiMore");
   const sessionTitle = $("#aiSessionTitle");
@@ -494,11 +498,36 @@
       ownOption.textContent = model;
       if (!ownOption.parentElement) modelSelect.insertBefore(ownOption, modelSelect.lastElementChild);
     }
+    void syncEffort();
     if (!rebuilt && modelSelect.value === "custom" && !modelCustom.hidden) return;
     modelSelect.value = model ?? "default";
     modelCustom.hidden = true;
     modelSelect.title = `这篇稿子的 AI 用${model === null ? ` ${backend.label} 设置里的模型` : `「${model}」`}，下一轮起生效`;
   }
+
+  // 推理强度选单跟上这篇：档位来自这篇的后端与模型（ai.effort），选中的是这篇这一轮会用的那档
+  let effortTicket = 0;
+  async function syncEffort() {
+    const mine = ++effortTicket;
+    const usable = draft.id && !draft.readOnly;
+    const info = usable ? await ai.api.effort(draft.id).catch(() => null) : null;
+    if (mine !== effortTicket) return;
+    const efforts = info?.efforts ?? ["medium"];
+    effortSelect.replaceChildren(...efforts.map((effort) => new Option(`推理：${effortName(effort)}`, effort)));
+    effortSelect.value = info?.effort ?? "medium";
+    effortSelect.disabled = !usable;
+    effortSelect.title = `推理强度：${effortName(effortSelect.value)}（${effortSelect.value}）。想得越深越慢，下一轮起生效`;
+  }
+
+  effortSelect.addEventListener("change", () => run(async () => {
+    try {
+      const info = await ai.api.setEffort(effortSelect.value, draft.id);
+      appStatus.textContent = `这篇稿子之后推理强度用「${effortName(info.effort)}」`;
+    } catch (error) {
+      showModelError(error.message || String(error));
+    }
+    await syncEffort();
+  }));
 
   function showModelError(message) {
     modelError.hidden = !message;
@@ -547,6 +576,13 @@
   }));
 
   // ===== 重新开始这篇的对话：问一次再清空，后端解锁 =====
+
+  // 「+」：新建一篇稿子，在新窗口里打开，一开就是 AI 助手（App 里经壳开窗口，地址带 panel=ai）；浏览器里没有窗口，就在这里新建
+  $("#aiNewWindowBtn").addEventListener("click", () => run(async () => {
+    const windows = root.MediaCraftNative?.windows;
+    if (windows) await windows.open({ fresh: true, panel: "ai" });
+    else await mc.drafts.create();
+  }));
 
   newSessionButton.addEventListener("click", () => run(async () => {
     moreMenu.open = false;

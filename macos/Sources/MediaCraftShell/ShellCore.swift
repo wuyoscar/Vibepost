@@ -4,22 +4,30 @@ import WebKit
 
 /// 开一个窗口的要求：打开哪篇稿子，或新建一篇；都不给时照常打开上次那篇。
 /// background：外部 Agent 开的窗口，放到前面但不抢键盘焦点（用户正在别的窗口里打字）
+/// panel：一开就显示检查器的哪一栏（只有 "ai"：AI 助手顶上的「+」开的窗口）
 public struct WindowRequest: Sendable, Equatable {
     public var draftId: String?
     public var fresh: Bool
     public var background: Bool
+    public var panel: String?
 
-    public init(draftId: String? = nil, fresh: Bool = false, background: Bool = false) {
+    public init(draftId: String? = nil, fresh: Bool = false, background: Bool = false, panel: String? = nil) {
         self.draftId = draftId
         self.fresh = fresh
         self.background = background
+        self.panel = panel == "ai" ? panel : nil
     }
 
-    /// 页面地址上的参数（`?draft=<id>`、`?new=1`），页面启动时照它打开；origin 不变（mediacraft://app），稿子存储还是同一份
+    /// 页面地址上的参数（`?draft=<id>`、`?new=1`、`&panel=ai`），页面启动时照它打开；origin 不变（mediacraft://app），稿子存储还是同一份
     var queryItems: [URLQueryItem] {
-        if fresh { return [URLQueryItem(name: "new", value: "1")] }
-        if let draftId { return [URLQueryItem(name: "draft", value: draftId)] }
-        return []
+        var items: [URLQueryItem] = []
+        if fresh {
+            items.append(URLQueryItem(name: "new", value: "1"))
+        } else if let draftId {
+            items.append(URLQueryItem(name: "draft", value: draftId))
+        }
+        if let panel { items.append(URLQueryItem(name: "panel", value: panel)) }
+        return items
     }
 }
 
@@ -326,7 +334,7 @@ public final class ShellCore {
     }
 
     /// 页面经原生桥 `window/<动作>` 要的窗口的事（window 是发来请求的窗口）：
-    /// - open `{ draftId?, fresh? }`：开一个新窗口；那篇在别的窗口里时把那个窗口调到前面，回 `{ elsewhere: true }`
+    /// - open `{ draftId?, fresh?, panel? }`：开一个新窗口（panel 为 "ai" 时一开就是 AI 助手）；那篇在别的窗口里时把那个窗口调到前面，回 `{ elsewhere: true }`
     /// - claim `{ draftId, focus? }`：这个窗口能不能开这篇，`{ elsewhere }`
     /// - occupy `{ current, drafts, page, sequence }`：这个窗口占着的稿子（page 是页面自己起的 id，sequence 是它的第几次报告）
     /// - missing：这个窗口要开的那篇已经不在了，还有别的窗口时关掉它
@@ -336,7 +344,7 @@ public final class ShellCore {
         let draftId = (request["draftId"] as? String).flatMap { $0.isEmpty || $0.count > 200 ? nil : $0 }
         switch action {
         case "open":
-            let wanted = WindowRequest(draftId: draftId, fresh: request["fresh"] as? Bool ?? false)
+            let wanted = WindowRequest(draftId: draftId, fresh: request["fresh"] as? Bool ?? false, panel: request["panel"] as? String)
             return await MainActor.run {
                 if let draftId = wanted.draftId, !wanted.fresh, let other = holder(of: draftId, except: nil) {
                     focus(other, on: draftId)

@@ -4396,6 +4396,12 @@ body[data-layout-mode="article"] .card-only {
   flex: 1;
 }
 
+/* 推理强度：「推理：中」这么短，不和模型抢地方 */
+.ai-effort-picker {
+  flex: none;
+  max-width: 34%;
+}
+
 .ai-picker-lock {
   display: none;
 }
@@ -4471,7 +4477,15 @@ body[data-layout-mode="article"] .card-only {
   flex-direction: column;
   gap: 10px;
   width: 264px;
+  /* 高度跟着窗口走（src/workspace/menus.js 按顶边量出 max-height），放不下就在里面滚动 */
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 14px;
+}
+
+.ai-settings-popover > * {
+  flex: none;
 }
 
 .ai-settings-popover .section-note {

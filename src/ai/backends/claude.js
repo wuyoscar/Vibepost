@@ -169,7 +169,9 @@
     // 这一轮续不续上次的会话：claude 的会话 id 由这边定（UUID），答过一次之后下一轮用 --resume 接着
     session: (ai) => (ai.resumable && ai.sessionId ? { sessionId: ai.sessionId, resume: true } : { sessionId: crypto.randomUUID(), resume: false }),
     // 交给壳、只有 claude 用得上的参数：会话、模型、这篇的会话里放行过的规则（如 Bash(npm test:*)）
-    launch: (turn, { rules }) => ({ sessionId: turn.sessionId, resume: turn.resume, model: turn.chosenModel, allowedTools: rules }),
+    launch: (turn, { rules }) => ({
+      sessionId: turn.sessionId, resume: turn.resume, model: turn.chosenModel, effort: turn.chosenEffort ?? null, allowedTools: rules,
+    }),
     read,
     reply,
     // 用户对一个权限请求的回答写成 claude 的回答；session 时带上放行规则（这一轮生效），并交回规则的写法（之后每轮带上）

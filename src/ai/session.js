@@ -270,6 +270,52 @@
     return structuredClone(await codexModels);
   }
 
+  // ===== 推理强度 =====
+  // 每篇稿子各记各的（ai.effort），没选过是 medium。能选哪几档看这篇的后端与模型：Claude Code 固定 low / medium / high / xhigh / max
+  // （--effort），Codex 问它自己（model/list 里每个模型的 supportedReasoningEfforts）。这篇选的那档这个模型不支持时（换了模型）
+  // 退回 medium，没有 medium 时退回模型自己的默认档。
+
+  const EFFORT_PATTERN = /^[a-z]{1,16}$/;
+  const DEFAULT_EFFORT = "medium";
+  const CLAUDE_EFFORTS = ["low", "medium", "high", "xhigh", "max"];
+
+  // 这篇的后端与模型能选的档位：{ efforts, fallback（模型自己的默认档） }；Codex 的模型列表拿不到时只有 medium
+  async function effortChoices(draftId) {
+    if (backendIdOf(draftId) === "claude") return { efforts: CLAUDE_EFFORTS, fallback: DEFAULT_EFFORT };
+    const list = await models("codex").catch(() => []);
+    const model = chosenModel(draftId);
+    const entry = list.find((item) => item.id === model) ?? list.find((item) => item.isDefault) ?? list[0];
+    const efforts = (entry?.efforts ?? []).filter((effort) => EFFORT_PATTERN.test(effort));
+    return { efforts: efforts.length ? efforts : [DEFAULT_EFFORT], fallback: entry?.defaultEffort ?? DEFAULT_EFFORT };
+  }
+
+  // 这篇这一轮用的档位：自己选过的（这个模型支持时），否则 medium，再否则模型的默认档
+  async function chosenEffort(draftId) {
+    const { efforts, fallback } = await effortChoices(draftId);
+    const saved = drafts.aiSession(draftId)?.effort;
+    const wanted = typeof saved === "string" && EFFORT_PATTERN.test(saved) ? saved : DEFAULT_EFFORT;
+    if (efforts.includes(wanted)) return wanted;
+    if (efforts.includes(DEFAULT_EFFORT)) return DEFAULT_EFFORT;
+    return efforts.includes(fallback) ? fallback : efforts[0];
+  }
+
+  async function effortInfo(draftId) {
+    const id = draftId ?? (await mc().drafts.current()).id;
+    const { efforts } = await effortChoices(id);
+    return { backend: backendIdOf(id), model: chosenModel(id), effort: await chosenEffort(id), efforts: [...efforts] };
+  }
+
+  // 给这篇稿子选推理强度（默认当前这篇），下一轮起生效；只能是这个后端与模型支持的档位
+  async function setEffort(effort, draftId) {
+    if (typeof effort !== "string" || !EFFORT_PATTERN.test(effort)) throw new TypeError(`推理强度不对：「${effort}」`);
+    const draft = await writableDraft(draftId);
+    const { efforts } = await effortChoices(draft.id);
+    if (!efforts.includes(effort)) throw new TypeError(`这个模型的推理强度只能是 ${efforts.join(" / ")}`);
+    await persist(draft.id, { ...stored(draft.id), effort });
+    emit({ type: "model", draftId: draft.id });
+    return effortInfo(draft.id);
+  }
+
   // ===== 生图的设置：只有 OpenAI，哪个模型（空为默认）。这版之前选过 Gemini 的读成 OpenAI 的默认模型 =====
 
   function imageSettings() {
@@ -300,6 +346,7 @@
       resumable: Boolean(ai?.resumable),
       messages: Array.isArray(ai?.messages) ? ai.messages : [],
       ...(ai && "model" in ai ? { model: ai.model } : {}),
+      ...(typeof ai?.effort === "string" ? { effort: ai.effort } : {}),
       ...(ai?.review ? { review: ai.review } : {}),
       ...(Number.isFinite(ai?.lastActive) ? { lastActive: ai.lastActive } : {}),
     };
@@ -951,6 +998,8 @@
       if (!found.available) throw new Error(found.error || `没有找到本机 ${turn.backend.label}`);
       // 后端要自己发这一轮的话与说明时用（Codex 经 stdin 开线程、发 turn/start）
       turn.prompt = prompt;
+      // 这一轮的推理强度（Claude Code 的 --effort，Codex 的 turn/start 的 effort）
+      turn.chosenEffort = await chosenEffort(turn.draftId);
       turn.instructions = systemPrompt(turn.backend);
       await native.send({
         turnId: turn.id,
@@ -1040,6 +1089,9 @@
       backends: async () => Object.values(backends).map(({ id, name, label }) => ({ id, name, label })),
       model: async (draftId) => modelInfo(draftId ?? (await mc().drafts.current()).id),
       setModel,
+      // 推理强度：{ backend, model, effort, efforts }；setEffort(effort, draftId?)
+      effort: effortInfo,
+      setEffort,
       setBackend,
       models,
       imageSettings: async () => imageSettings(),

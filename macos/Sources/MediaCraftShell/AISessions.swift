@@ -362,6 +362,8 @@ final class AISessions: @unchecked Sendable {
         let agentsFile: String
         /// 这篇稿子选的模型（别名如 `opus` 或模型 ID），nil 是跟随 Claude Code 自己的设置（不传 `--model`）
         let model: String?
+        /// 这篇稿子选的推理强度（Claude Code 的 `--effort`；Codex 由页面写进 turn/start），nil 是跟随后端自己的设置
+        let effort: String?
         /// 这篇稿子的会话里点过「本次会话都允许」的权限规则（Claude Code 的写法，如 `Bash(npm test:*)`），每轮都带上
         let allowedTools: [String]
 
@@ -389,6 +391,8 @@ final class AISessions: @unchecked Sendable {
             agentsFile = String((fields["agentsFile"] as? String ?? "").prefix(Self.agentsFileLimit))
             model = fields["model"] as? String
             if let model, !Self.isModel(model) { throw Failure("模型 ID 不对：\(model)") }
+            effort = fields["effort"] as? String
+            if let effort, !Self.isEffort(effort) { throw Failure("推理强度不对：\(effort)") }
             allowedTools = (fields["allowedTools"] as? [String] ?? []).filter(Self.isRule)
         }
 
@@ -398,6 +402,11 @@ final class AISessions: @unchecked Sendable {
         /// 权限规则只能是一个参数：不空、不换行、不以 `-` 开头（免得被当成选项）
         static func isRule(_ rule: String) -> Bool {
             !rule.isEmpty && rule.count <= 500 && !rule.hasPrefix("-") && !rule.contains(where: \.isNewline)
+        }
+
+        /// 推理强度只能是 1–16 个小写字母（low、medium、high、xhigh、max……），免得被当成别的参数
+        static func isEffort(_ effort: String) -> Bool {
+            effort.range(of: #"^[a-z]{1,16}$"#, options: .regularExpression) != nil
         }
 
         /// 模型只能是一个参数：1–100 个字母、数字与 `._:@/[]-`，不以 `-` 开头（和页面的检查一样）

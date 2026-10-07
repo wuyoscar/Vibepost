@@ -1,5 +1,6 @@
 // 下拉菜单（<details class="pop-menu">：段落样式、插入、AI 设置……）的共同行为：
-// 同时只开一个；点菜单以外的地方或按 Esc 收起；弹出层不超出窗口左右边缘（放不下时往里挪）。
+// 同时只开一个；点菜单以外的地方或按 Esc 收起；弹出层不超出窗口左右边缘（放不下时往里挪）；
+// 标了 data-fit-window 的（AI 设置）也不超出窗口下沿：高度跟着窗口走，内容多时在面板里面滚动。
 (function (root) {
   "use strict";
 
@@ -21,11 +22,21 @@
     if (shift) panel.style.left = `${panel.offsetLeft + shift}px`;
   }
 
+  // 弹出层的底边不超出窗口：从它的顶边量到窗口底边（留 EDGE），放不下就限高、在里面滚动
+  function keepAboveBottom(menu) {
+    const panel = menu.querySelector(".pop-menu-panel[data-fit-window]");
+    if (!panel) return;
+    panel.style.maxHeight = "";
+    const top = (panel.offsetParent ?? menu).getBoundingClientRect().top + panel.offsetTop;
+    panel.style.maxHeight = `${Math.max(160, Math.floor(root.innerHeight - top - EDGE))}px`;
+  }
+
   for (const menu of menus()) {
     menu.addEventListener("toggle", () => {
       if (!menu.open) return;
       for (const other of openMenus()) if (other !== menu) other.open = false;
       keepInsideWindow(menu);
+      keepAboveBottom(menu);
     });
   }
 
@@ -45,5 +56,8 @@
     }
   });
 
-  root.addEventListener("resize", () => openMenus().forEach(keepInsideWindow));
+  root.addEventListener("resize", () => openMenus().forEach((menu) => {
+    keepInsideWindow(menu);
+    keepAboveBottom(menu);
+  }));
 })(globalThis);

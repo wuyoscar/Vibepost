@@ -367,7 +367,7 @@ claude -p --input-format stream-json --output-format stream-json --verbose --inc
 | `setPath(path, backend?)` | 在设置里指定 claude（`backend` 默认 `"claude"`）或 codex 的完整路径（`~` 可用）并重新查找；`null` 或 `""` 恢复自动查找 | `AIStatus` |
 | `backends()` | 认得的后端 | `[{ id, name, label }]` |
 | `setBackend(backend, draftId?)` | 给这篇（默认当前这篇）选后端，模型换成那个后端上次选的，同时记成新稿子的默认。这篇已经有对话（或正在跑）时换成别的后端 reject（先「重新开始这篇的对话」）；没有这个后端 `TypeError`，内置说明书 reject | `{ backend, model, used }` |
-| `models(backend?)` | 后端能选的模型：Claude Code 是三个别名；Codex 问它自己（`model/list`，问过一次就记着），不在 App 里时为 `[]` | `[{ id, name, isDefault }]` |
+| `models(backend?)` | 后端能选的模型：Claude Code 是三个别名；Codex 问它自己（`model/list`，问过一次就记着），不在 App 里时为 `[]`；Codex 的每个模型带它能选的推理强度与默认档 | `[{ id, name, isDefault, efforts?, defaultEffort? }]` |
 | `send(prompt, options?)` | 在**当前稿子**的会话里发一句，这一轮说完（或停止、出错）时返回（改了稿子时修改对比已经显示出来）。内置说明书、找不到这篇的后端（或 Codex 没登录）、这篇已经在跑一轮、还有待确认的修改时 reject | `TurnResult` |
 | `polish()` | 一键润色：固定的话（改错别字、理顺句子、不改原意和结构、保留所有自定义标记）发进同一个会话 | `TurnResult` |
 | `preset(name)` | 预设命令（`src/ai/presets.js`，AI 助手里的几个按钮）：固定的话发进同一个会话，会话里显示按钮上的字，用户消息 `kind: "command"`、带 `preset: name`。`"coverTitles"` 封面标题 5 选 1（不改稿子，回复里给 5 个候选的 JSON 数组）、`"hook"` 首图文案（正文最前面一行一级标题）、`"humanize"` 去 AI 味（换成自然的个人口吻，事实与结构不变）、`"repaginate"` 按要点重新分页（Claude 直接改 `draft.md` 里的 `[[分页]]`，不用分页工具）、`"caption"` 写小红书正文（照着卡片内容与标题写 `caption.txt`：纯文本、口语、最后一行 3–5 个 #话题，不改 `draft.md` 与 `title.txt`）；后四个改的稿子照常进修改对比。改卡片内容的提示词都要求保留自定义标记与话题标签。AI 助手里另有快捷命令「加话题标签」（5 个 #话题加到 `caption.txt` 最后，同样进修改对比）。设计方向 `"bolder"` 更醒目、`"quieter"` 更安静、`"distill"` 精简、`"colorize"` 上色、`"typeset"` 调字、`"layout"` 理版式：让 Claude 先用 `get_pages` / `view_page` 看、再用 `restyle_block`、`move_section`、`set_style`、`set_card_css`（与预览里点选一块后的操作同一套）改、改完再看；用户还在经典引擎时提示词里多一句，让 Claude 先提醒切到「HTML 试用」。没有这个名字时 `TypeError` | `TurnResult`；`coverTitles` 另有 `titles: TitleOption[]` |
@@ -375,6 +375,8 @@ claude -p --input-format stream-json --output-format stream-json --verbose --inc
 | `cancel(draftId?)` | 停止这篇（默认当前这篇）正在跑的一轮：先 SIGINT，还不退出再 SIGTERM、SIGKILL；正在生图的一并停止 | `{ cancelled }` |
 | `model(draftId?)` | 这篇（默认当前这篇）用的后端、选的模型与最近一轮实际用的：`model` 是别名（Claude Code 的 `"opus"` / `"sonnet"` / `"haiku"`）、模型 ID 或 `null`（跟随后端自己的设置），`used` 是后端报的模型（还没跑过为 `null`） | `{ backend, model, used }` |
 | `setModel(model, draftId?)` | 给这篇（默认当前这篇）选模型，下一轮起生效，同时记成这个后端没选过的稿子的默认。格式不对 `TypeError`，内置说明书 reject | `{ backend, model, used }` |
+| `effort(draftId?)` | 这篇（默认当前这篇）的推理强度：`efforts` 是这个后端与模型能选的档位（Claude Code 固定 `low` / `medium` / `high` / `xhigh` / `max`；Codex 来自 `model/list`），`effort` 是这一轮会用的那档——每篇各记各的，没选过是 `medium`；选过的这个模型不支持（换了模型）时退回 `medium`，没有 `medium` 时退回模型自己的默认档。Claude Code 带 `--effort`，Codex 写进 `turn/start` 的 `effort` | `{ backend, model, effort, efforts }` |
+| `setEffort(effort, draftId?)` | 给这篇选推理强度，下一轮起生效；只能是 `effort().efforts` 里的一档，不是时 `TypeError`，内置说明书 reject | `{ backend, model, effort, efforts }` |
 | `newSession()` | 重新开始当前这篇的对话（与「更多」里点「重新开始这篇的对话…」并确认相同，见上）。内置说明书 reject；会话记录清空了但工作副本没删掉时 reject 说明原因 | 清空后的 `history()` |
 | `imageSettings()` | 用 Claude Code 时 App 的生图工具用哪个模型：`{ provider: "openai", model, defaultModel, key }`，`key` 是要找的环境变量名（Codex 用它自带的生图，不看这里） | 同左 |
 | `setImageSettings({ provider?, model? })` | 改生图的模型（AI 助手 › 设置里的「生图」），`model` 空为默认；存在本机 `mediacraft.ai.v1`。`provider` 只能是 `"openai"`（或不给），模型 ID 格式不对 `TypeError` | 同 `imageSettings()` |
@@ -534,7 +536,7 @@ App 可以开几个窗口，每个窗口开着一篇稿子，各改各存（都�
 
 | 原生桥 | body | 返回 |
 | --- | --- | --- |
-| `window/open` | `{ draftId?, fresh? }`：打开这篇（`draftId`），或新建一篇（`fresh: true`） | 开好一个新窗口（位置在最前面那个窗口的右下方错开一点），`{ elsewhere: false }`；那篇在别的窗口里开着时不开新窗口，把那个窗口调到前面并换到那篇，`{ elsewhere: true }` |
+| `window/open` | `{ draftId?, fresh?, panel? }`：打开这篇（`draftId`），或新建一篇（`fresh: true`）；`panel: "ai"` 时新窗口一开就是 AI 助手（地址带 `&panel=ai`，AI 助手顶上的「+」用它） | 开好一个新窗口（位置在最前面那个窗口的右下方错开一点），`{ elsewhere: false }`；那篇在别的窗口里开着时不开新窗口，把那个窗口调到前面并换到那篇，`{ elsewhere: true }` |
 | `window/claim` | `{ draftId, focus? }` | 这个窗口能不能开这篇：别的窗口占着时 `{ elsewhere: true }`（`focus` 默认为真：把那个窗口调到前面、让它的页面换到那篇），否则先替这个窗口占着，`{ elsewhere: false }` |
 | `window/occupy` | `{ current, drafts, page, sequence }`：这个窗口正开着的那篇（可以是说明书），与别的窗口不能再开的（正开着的自己的稿子、AI 还在跑的）；`page` 是页面启动时自己起的 id，`sequence` 是它第几次报 | `{ ok }`；同时更新 `windows.json`。同一个页面序号旧的丢掉；窗口换了页面（重新载入、页面进程崩了）之后，旧页面迟到的报告也丢掉，新页面报来之前壳照旧替它占着正开着的那篇 |
 | `window/missing` | — | 这个窗口要开的那篇已经不在了：还有别的窗口时关掉它，`{ closed }` |

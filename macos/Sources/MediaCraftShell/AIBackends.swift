@@ -88,6 +88,7 @@ struct ClaudeBackend: AIBackend {
         ] + request.allowedTools
         if !request.systemPrompt.isEmpty { arguments += ["--append-system-prompt", request.systemPrompt] }
         if let model = request.model { arguments += ["--model", model] }
+        if let effort = request.effort { arguments += ["--effort", effort] }
         arguments += [request.resume ? "--resume" : "--session-id", request.sessionId?.uuidString.lowercased() ?? ""]
         return arguments
     }
@@ -142,8 +143,8 @@ struct CodexBackend: AIBackend {
     }
 
     /// 页面写的：对服务端请求（审批、动态工具）的回答，或开线程、续线程、发这一轮、中断。
-    /// 线程的工作目录、沙箱与审批方式由壳定，页面只能给模型、说明、App 的工具（新线程）、续哪个线程；这一轮只带用户的话（文字），
-    /// 不带覆盖（工作目录、沙箱、审批……）。续线程不要整段历史（里面有每次看页面的图，越聊越大）。
+    /// 线程的工作目录、沙箱与审批方式由壳定，页面只能给模型、说明、App 的工具（新线程）、续哪个线程；这一轮只带用户的话（文字）
+    /// 与推理强度（小写字母的一个词），不带别的覆盖（工作目录、沙箱、审批……）。续线程不要整段历史（里面有每次看页面的图，越聊越大）。
     func outgoing(_ message: [String: Any], directory: URL, context: TurnContext) -> [String: Any]? {
         guard let id = message["id"], !(id is NSNull) else { return nil }
         guard let method = message["method"] as? String else {
@@ -167,6 +168,7 @@ struct CodexBackend: AIBackend {
         case "turn/start":
             let input = (params["input"] as? [[String: Any]] ?? []).filter { $0["type"] as? String == "text" }
             kept = ["threadId": params["threadId"] ?? NSNull(), "input": input]
+            if let effort = params["effort"] as? String, AISessions.TurnRequest.isEffort(effort) { kept["effort"] = effort }
             context["turnRequest"] = "\(id)"
         default:
             kept = params.filter { ["threadId", "turnId"].contains($0.key) }
@@ -235,7 +237,8 @@ struct CodexBackend: AIBackend {
         ["method": "initialized"],
     ]
 
-    /// Codex 能用的模型（model/list）：起一个 app-server，握手、问一次就关上。返回 [{ id, name, isDefault }]
+    /// Codex 能用的模型（model/list）：起一个 app-server，握手、问一次就关上。
+    /// 返回 [{ id, name, isDefault, efforts（这个模型能选的推理强度）, defaultEffort }]
     static func models(executable: URL, environment: [String: String], timeout: Duration = .seconds(20)) async throws -> [[String: Any]] {
         let request: [String: Any] = ["id": "models", "method": "model/list", "params": [:] as [String: Any]]
         let input = try (handshake + [request]).map { try JSONSerialization.data(withJSONObject: $0) + Data("\n".utf8) }
@@ -249,7 +252,14 @@ struct CodexBackend: AIBackend {
         let data = (reply["result"] as? [String: Any])?["data"] as? [[String: Any]] ?? []
         return data.compactMap { model in
             guard let id = model["id"] as? String ?? model["model"] as? String else { return nil }
-            return ["id": id, "name": model["displayName"] as? String ?? id, "isDefault": model["isDefault"] as? Bool ?? false]
+            let efforts = (model["supportedReasoningEfforts"] as? [Any] ?? []).compactMap { option in
+                (option as? String) ?? (option as? [String: Any])?["reasoningEffort"] as? String
+            }.filter(AISessions.TurnRequest.isEffort)
+            let fallback = (model["defaultReasoningEffort"] as? String).flatMap { AISessions.TurnRequest.isEffort($0) ? $0 : nil }
+            return [
+                "id": id, "name": model["displayName"] as? String ?? id, "isDefault": model["isDefault"] as? Bool ?? false,
+                "efforts": efforts, "defaultEffort": fallback ?? NSNull(),
+            ]
         }
     }
 }

@@ -228,7 +228,7 @@
       core.send(turn, {
         id: "turn",
         method: "turn/start",
-        params: { threadId: result.thread.id, input: [{ type: "text", text: turn.prompt }] },
+        params: { threadId: result.thread.id, input: [{ type: "text", text: turn.prompt }], ...(turn.chosenEffort ? { effort: turn.chosenEffort } : {}) },
       });
     } else if (id === "turn") {
       if (error) return failed("开始这一轮");

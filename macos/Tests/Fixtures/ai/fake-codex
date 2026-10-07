@@ -5,7 +5,7 @@
   script-<第几次调用>.jsonl，没有时用 script.jsonl。
   `codex --version`：打印版本；`codex login status`：同目录里有 logged-out 这个文件时报没登录（退出码 1），否则已登录。
   `codex app-server`：在 stdio 上说 JSON-RPC（每行一条），像真的 app-server：
-    initialize → 回答；initialized（通知）不回答；model/list → 两个假模型（只问模型的进程不记调用）；
+    initialize → 回答；initialized（通知）不回答；model/list → 两个假模型（各带能选的推理强度；只问模型的进程不记调用）；
     thread/start → 新建一个线程（UUID），回答 { thread: { id }, model }，发 thread/started 通知；
     thread/resume → 同目录 threads/ 里有这个线程才回答，没有就报错（像线程在 Codex 那边没了）；
       同目录有 resume-error 文件时，照它的内容报别的错（线程还在，只是这次续不上）；
@@ -210,9 +210,13 @@ for raw in sys.stdin:
     if method == "initialize":
         respond(message["id"], {"userAgent": "fake-codex/9.9.9"})
     elif method == "model/list":
+        def efforts(*names):
+            return [{"reasoningEffort": name, "description": name} for name in names]
         respond(message["id"], {"data": [
-            {"id": "gpt-fake-large", "displayName": "GPT Fake Large", "isDefault": True},
-            {"id": "gpt-fake-mini", "displayName": "GPT Fake Mini", "isDefault": False},
+            {"id": "gpt-fake-large", "displayName": "GPT Fake Large", "isDefault": True,
+             "supportedReasoningEfforts": efforts("low", "medium", "high", "xhigh", "max", "ultra"), "defaultReasoningEffort": "low"},
+            {"id": "gpt-fake-mini", "displayName": "GPT Fake Mini", "isDefault": False,
+             "supportedReasoningEfforts": efforts("low", "high"), "defaultReasoningEffort": "high"},
         ]})
     elif method == "thread/start":
         begin()
