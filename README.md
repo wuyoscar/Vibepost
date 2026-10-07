@@ -98,7 +98,7 @@ AI 读到的稿子、网页、文件里，可能藏着「把 ~/.ssh 里的内容
 
 ```sh
 python3 scripts/fetch-fonts.py        # 下载打包字体到 fonts/（按固定版本校验，不进 git）
-macos/build-app.sh                    # 构建 build/Vibepost.app（网页打包进 App）
+macos/build-app.sh                    # 构建 build.noindex/Vibepost.app（网页打包进 App；目录不进 Spotlight）
 macos/build-app.sh --install          # 构建并拷进 /Applications
 macos/build-app.sh debug              # 开发用：App 直接读仓库里的网页，改完 ⌘R 生效
 scripts/make-dmg.sh                   # 打安装用的 DMG 到 dist/（通用二进制；签名与公证的参数见脚本开头）

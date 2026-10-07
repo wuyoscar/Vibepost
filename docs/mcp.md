@@ -26,7 +26,7 @@ claude mcp add mediacraft -- "/Applications/Vibepost.app/Contents/MacOS/mediacra
 }
 ```
 
-开发时用 Debug 构建（`macos/build-app.sh debug`）的话，路径换成 `build/Vibepost.app/Contents/MacOS/mediacraft-mcp`。环境变量 `MEDIACRAFT_MCP_SOCKET` 可以换套接字的位置（测试用）。
+开发时用 Debug 构建（`macos/build-app.sh debug`）的话，路径换成 `build.noindex/Vibepost.app/Contents/MacOS/mediacraft-mcp`。环境变量 `MEDIACRAFT_MCP_SOCKET` 可以换套接字的位置（测试用）。
 
 ## 怎么连
 

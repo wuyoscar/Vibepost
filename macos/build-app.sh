@@ -26,7 +26,8 @@ swift build --package-path "$REPO/macos" -c "$MODE" "${ARCHS[@]}" --product Medi
 swift build --package-path "$REPO/macos" -c "$MODE" "${ARCHS[@]}" --product mediacraft-mcp
 BIN_DIR="$(swift build --package-path "$REPO/macos" -c "$MODE" "${ARCHS[@]}" --show-bin-path)"
 
-APP="$REPO/build/Vibepost.app"
+# 放在 Spotlight 不收录的目录（名字以 .noindex 结尾）：本机只有 /Applications 里那一份出现在启动台与 Spotlight 里
+APP="$REPO/build.noindex/Vibepost.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/MediaCraft" "$APP/Contents/MacOS/Vibepost"

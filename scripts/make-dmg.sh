@@ -37,7 +37,7 @@ if [[ -e "/Volumes/$VOLUME" ]]; then
 fi
 
 "$REPO/macos/build-app.sh" --universal
-APP="$REPO/build/Vibepost.app"
+APP="$REPO/build.noindex/Vibepost.app"
 if [[ -n "$IDENTITY" ]]; then
   codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP"
 fi

@@ -2,6 +2,7 @@
 node_modules/
 macos/.build/
 build/
+build.noindex/
 dist/
 
 # 打包字体：scripts/fetch-fonts.py 下载生成，不进 git
