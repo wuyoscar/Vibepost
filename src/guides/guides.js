@@ -1,4 +1,5 @@
-// 内置说明书：两篇只读的稿子，正文是随网页打包的 Markdown（src/guides/cards.js、article.js 登记进来），
+// 内置说明书：三篇只读的稿子，正文是随网页打包的 Markdown（src/guides/cards.js、styles.js、article.js 登记进来，
+// 稿件栏里按这个次序；styles.js 的「样式与写法」由操作手册登记表 src/engine/manual.js 写出），
 // 演示用的图片与实况视频在 docs/guide-assets/（scripts/make-guide-assets.swift 生成）。
 // 稿件模块把它们列在稿子最前（host.builtIns），不存盘；打开说明书时，界面上改稿子的控件都停用。
 (function (root) {

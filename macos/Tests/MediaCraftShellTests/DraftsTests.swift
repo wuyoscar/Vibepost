@@ -28,7 +28,7 @@ struct DraftsTests {
         let harness = ShellHarness(onboarding: false)
         try await harness.load()
         let result = try await harness.evaluate(Self.helpers + """
-            const known = ["甲稿", "乙稿", "丙稿", "图文卡片说明书", "长文说明书"];
+            const known = ["甲稿", "乙稿", "丙稿", "图文卡片说明书", "样式与写法", "长文说明书"];
             const a = await mc.drafts.create({ markdown: "甲稿" });
             const b = await mc.drafts.create({ markdown: "乙稿" });
             await mc.drafts.create({ markdown: "丙稿" });
@@ -47,12 +47,12 @@ struct DraftsTests {
         """) as? [String: Any]
         await harness.tearDown()
 
-        #expect(result?["edited"] as? [String] == ["甲稿", "丙稿", "乙稿", "图文卡片说明书", "长文说明书"])
-        #expect(result?["opened"] as? [String] == ["甲稿", "丙稿", "乙稿", "图文卡片说明书", "长文说明书"], "只是打开不算修改")
+        #expect(result?["edited"] as? [String] == ["甲稿", "丙稿", "乙稿", "图文卡片说明书", "样式与写法", "长文说明书"])
+        #expect(result?["opened"] as? [String] == ["甲稿", "丙稿", "乙稿", "图文卡片说明书", "样式与写法", "长文说明书"], "只是打开不算修改")
         #expect(result?["current"] as? Bool == true)
         let api = result?["api"] as? [[Any]] ?? []
-        #expect(api.map { $0[0] as? String ?? "" } == ["图文卡片说明书", "长文说明书", "甲稿改了一个字", "丙稿", "乙稿"], "App API 里内置说明书在前，自己的按最近修改")
-        #expect(api.map { $0[2] as? Bool ?? false } == [false, false, false, false, true])
+        #expect(api.map { $0[0] as? String ?? "" } == ["图文卡片说明书", "样式与写法", "长文说明书", "甲稿改了一个字", "丙稿", "乙稿"], "App API 里内置说明书在前，自己的按最近修改")
+        #expect(api.map { $0[2] as? Bool ?? false } == [false, false, false, false, false, true])
         #expect(harness.pageErrors == [])
     }
 
@@ -61,7 +61,7 @@ struct DraftsTests {
         let harness = ShellHarness(onboarding: false)
         try await harness.load()
         let result = try await harness.evaluate(Self.helpers + """
-            const known = ["Spring 书单", "夏天的菜单", "长文：秋天", "图文卡片说明书", "长文说明书"];
+            const known = ["Spring 书单", "夏天的菜单", "长文：秋天", "图文卡片说明书", "样式与写法", "长文说明书"];
             await mc.drafts.create({ title: "Spring 书单", markdown: "春天读的书" });
             await mc.drafts.create({ markdown: "夏天的菜单\\n番茄炒蛋" });
             await mc.drafts.create({ title: "长文：秋天", mode: "article", markdown: "落叶" });
@@ -89,7 +89,7 @@ struct DraftsTests {
         #expect(result?["articles"] as? [String] == ["长文：秋天", "长文说明书"])
         #expect(result?["none"] as? [AnyHashable] == [[String](), "没有找到这篇稿件"] as [AnyHashable])
         #expect(result?["all"] as? [String] == ["夏天的菜单"])
-        #expect(result?["cleared"] as? [String] == ["长文：秋天", "夏天的菜单", "Spring 书单", "图文卡片说明书", "长文说明书"])
+        #expect(result?["cleared"] as? [String] == ["长文：秋天", "夏天的菜单", "Spring 书单", "图文卡片说明书", "样式与写法", "长文说明书"])
         #expect(harness.pageErrors == [])
     }
 
@@ -147,7 +147,7 @@ struct DraftsTests {
         """) as? [String: Any]
         await harness.tearDown()
 
-        #expect(result?["count"] as? Int == 1002, "1000 篇加两本说明书")
+        #expect(result?["count"] as? Int == 1003, "1000 篇加三本说明书")
         #expect((result?["first"] as? String ?? "").hasPrefix("第 1000 篇"), "最近改过的在最上面")
         #expect((result?["last"] as? String ?? "").hasPrefix("长文说明书"))
         #expect((result?["found"] as? [String] ?? []).map { $0.hasPrefix("第 537 篇") } == [true])

@@ -186,7 +186,7 @@ struct MCPTests {
         await Self.finish(harness, client, config)
         try? FileManager.default.removeItem(at: images)
 
-        #expect(guides == ["guide_cards", "guide_article"])
+        #expect(guides == ["guide_cards", "guide_styles", "guide_article"])
         #expect((opened.json as? [String: Any])?["readOnly"] as? Bool == true)
         for result in [update, style, insert] {
             #expect(result.isError && result.text.contains("内置说明书"), "\(result.text)")

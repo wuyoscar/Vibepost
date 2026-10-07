@@ -13,7 +13,7 @@
       spot: ["#newDraftBtn", "#draftsToggleBtn"],
       advanceOn: "#newDraftBtn",
       title: "先新建一篇稿子",
-      body: "稿件栏里有两本只读的说明书，随时能翻回来看。点 +，开一篇自己的稿子。",
+      body: "稿件栏里有三本只读的说明书，随时能翻回来看。点 +，开一篇自己的稿子。",
     },
     {
       spot: ["#markdownEditor"],
