@@ -44,7 +44,7 @@ struct ManualTests {
         #expect(result?["escaped"] as? Bool == false, "手册里没有转义的竖线（Agent 照抄会写坏记号）")
     }
 
-    @Test("「样式」「插入」「/」菜单与卡片上的「换样式」都照操作手册列：同一个名字、同一句说明")
+    @Test("「样式」「插入」「/」菜单与卡片上的「换样式」都照操作手册列：同一个名字、同一句说明；「插入」与「/」菜单最后一组是片段")
     func menusFollowTheManual() async throws {
         let harness = ShellHarness(onboarding: false)
         try await harness.load()
@@ -73,12 +73,14 @@ struct ManualTests {
             const paragraph = await stageMenu(0);
             const list = await stageMenu(1);
             const summary = (name) => manual.style(name).summary;
+            // 「插入」与「/」菜单最后一组是片段（登记表 src/engine/snippets.js，SnippetTests）
+            const snippets = window.MediaCraftSnippets.list;
             return {
               styleMenu: JSON.stringify(styleMenu) === JSON.stringify(manual.styles.filter((style) => style.family === "text").concat(manual.styles.filter((style) => style.family === "list")).map((style) => [style.name, style.summary])),
               insertMenu: insertMenu.map(([name]) => name),
-              insertTitles: insertMenu.every(([name, title]) => title.startsWith(manual.inserts.find((item) => item.name === name)?.summary ?? summary(name))),
+              insertTitles: insertMenu.every(([name, title]) => title.startsWith(manual.inserts.find((item) => item.name === name)?.summary ?? manual.style(name)?.summary ?? window.MediaCraftSnippets.get(name).summary)),
               slash,
-              expectedSlash: [...manual.inserts.map((item) => item.name), ...components.map((style) => style.name)],
+              expectedSlash: [...manual.inserts.map((item) => item.name), ...components.map((style) => style.name), ...snippets.map((snippet) => snippet.name)],
               paragraph: paragraph.map(([name]) => name), paragraphTitles: paragraph.every(([name, title]) => title === summary(name)),
               list: list.map(([name]) => name), textFamily: family("text"), listFamily: [...family("list"), "正文"],
               kicker: [manual.style("kicker").name, manual.style("小标签").id, manual.style("kicker").summary],
@@ -87,7 +89,10 @@ struct ManualTests {
         await harness.tearDown()
 
         #expect(result?["styleMenu"] as? Bool == true, "「样式」：段落类、列表类，每项带一句说明")
-        #expect(result?["insertMenu"] as? [String] == ["分割线", "分页", "结尾页", "代码块", "小标签", "提示", "页尾", "等宽", "标签列表", "步骤"])
+        #expect(result?["insertMenu"] as? [String] == [
+            "分割线", "分页", "结尾页", "代码块", "小标签", "提示", "页尾", "等宽", "标签列表", "步骤",
+            "三步教程", "对比", "金句页", "论文卡", "时间线", "FAQ", "清单", "前后对比", "数据卡", "结尾引导",
+        ])
         #expect(result?["insertTitles"] as? Bool == true, "「插入」每项悬停有说明")
         #expect(result?["slash"] as? [String] == result?["expectedSlash"] as? [String])
         #expect(result?["paragraph"] as? [String] == result?["textFamily"] as? [String])

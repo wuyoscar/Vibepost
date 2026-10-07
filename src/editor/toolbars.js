@@ -46,9 +46,11 @@
     return item;
   }
 
-  // 「插入」：分割线、分页、结尾页、代码块与全部组件（图片、实况两项连着文件选择框，写在页面里）
+  // 「插入」：分割线、分页、结尾页、代码块，一条线下面是全部组件，再一条线下面是「片段」一组（写好的示范段落，
+  // src/engine/snippets.js，名字下面一句说明）；图片、实况两项连着文件选择框，写在页面里
   function fillInsertMenu(container) {
     const { inserts, styles } = manual();
+    const rule = () => Object.assign(document.createElement("hr"), { className: "menu-rule" });
     const others = inserts.filter((item) => INSERT_ICONS[item.id]).map((item) => {
       const button = menuItem({ name: item.name, icon: INSERT_ICONS[item.id], shortcut: item.shortcut, title: item.summary });
       button.dataset.insert = item.id;
@@ -59,7 +61,13 @@
       button.dataset.insert = `component-${style.id}`;
       return button;
     });
-    container.replaceChildren(...others, Object.assign(document.createElement("hr"), { className: "menu-rule" }), ...components);
+    const snippets = window.MediaCraftSnippets.list.map((snippet) => {
+      const button = menuItem({ name: snippet.name, glyph: snippet.glyph, hint: snippet.summary, title: `${snippet.summary}（用在${snippet.when}）` });
+      button.dataset.insert = `snippet-${snippet.id}`;
+      return button;
+    });
+    const heading = Object.assign(document.createElement("p"), { className: "menu-heading", textContent: "片段" });
+    container.replaceChildren(...others, rule(), ...components, rule(), heading, ...snippets);
   }
 
   // 「样式」：段落类、列表类两组，每项带一句说明；最后是组件的对齐

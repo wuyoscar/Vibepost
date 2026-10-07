@@ -1440,6 +1440,19 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   padding: 4px 10px;
 }
 
+/* 「插入」菜单：最后一组片段每项带一句说明，整个菜单长了就在里面滚 */
+.insert-menu-panel {
+  max-height: min(calc(100vh - 120px), 760px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.insert-menu-panel .menu-item:has(.menu-hint) {
+  height: auto;
+  min-height: 38px;
+  padding: 4px 10px;
+}
+
 .style-menu-aligns {
   display: flex;
   gap: 4px;

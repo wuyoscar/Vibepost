@@ -122,6 +122,7 @@ const editor = window.MediaCraftEditor.create({
   onDropFiles: (transfer, at) => void media.importDropped(Array.from(transfer.files), at),
   pickImages: () => $("#imageFileInput").click(),
   pickLivePhoto: () => $("#videoFileInput").click(),
+  notify,
 });
 // 浮动条的字色、高亮色块跟着这篇的配色（不是色轮正在预览的）；稿子有改动（换主题、套配色、调色块、换稿子）时重画
 const toolbars = MediaCraftEditor.bindToolbars(editor, {

@@ -2,6 +2,7 @@
 // 从这里取的：解析器认哪些记号（src/engine/markdown.js）、卡片渲染与块操作（src/cards/html.js、blocks.js）、编辑器左上角的「样式」
 // 与「插入」、「/」菜单、卡片上的「换样式」、AI 的说明书与工具说明、工作副本里的 AGENTS.md、外部 Agent 的握手说明与 get_manual、
 // docs/manual.md（scripts/build-manual.mjs 生成，测试比对）、内置说明书的「样式与写法」。改这里，那些都跟着变。
+// 片段（写好的示范段落）另有一张登记表 src/engine/snippets.js，手册末尾的「片段」一节从它取。
 // 只有数据和把它写成文字的函数，不碰 DOM；Node 里也能载入（生成 docs/manual.md）。
 (function (root) {
   "use strict";
@@ -247,6 +248,9 @@
       "",
       ...LESSONS.map((lesson) => `- ${lesson}`),
       "",
+      // 片段（src/engine/snippets.js，在这个文件之后载入）：每个片段的名字、什么时候用、写法
+      root.MediaCraftSnippets.document(),
+      "",
     ];
     return lines.join("\n");
   }
@@ -258,6 +262,7 @@
       "- 块样式（列表类）：" + STYLES.filter((item) => item.family === "list").map((item) => `${item.name} ${item.component ? `:::${item.name}` : item.syntax}`).join("；") + "。",
       "- 组件：单独一行 :::名字（对齐写在后面，如 :::提示 居中）到单独一行 :::，开头和收尾两行都要留着。",
       "- 记号：" + MARKERS.map((item) => `${item.syntax.replace(/　/g, " 或 ")} ${item.name}`).join("；") + "。",
+      "- 片段（写好的示范段落，写法见 AGENTS.md 的「片段」一节）：" + root.MediaCraftSnippets.list.map((item) => item.name).join("、") + "。",
       ...LESSONS.map((lesson) => `- ${lesson}`),
     ].join("\n");
   }
