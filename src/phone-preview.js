@@ -126,7 +126,8 @@
 
   async function sync() {
     const seq = ++syncSeq;
-    const [canvases, draft, profile] = await Promise.all([mc.render.canvases(), mc.drafts.current(), mc.profile.get()]);
+    // 笔记页里翻的每张图按手机的尺寸直接从 PNG 缩，不要整页画布
+    const [canvases, draft, profile] = await Promise.all([mc.render.thumbnails({ width: SLIDE_WIDTH, height: SLIDE_HEIGHT }), mc.drafts.current(), mc.profile.get()]);
     if (seq !== syncSeq || !open) return;
     authorName.textContent = profile.name.trim() || "还没填署名";
     if (view === "note") {

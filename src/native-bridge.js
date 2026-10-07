@@ -81,6 +81,9 @@
 
   // HTML 卡片出图（src/cards/，壳里的 CardRasterizer）。request：{ pages: [每页的 HTML], style, media: { 编号: data URL },
   //   width, height, scale }；得到 { pages: [PNG Blob], totalMs, times: [每页毫秒] }。
+  // 出图：request = { pages: [{ html, chrome?: { head, foot }, full? }]（也认每页只是 HTML 的旧写法）, style, media, mediaIds, width, height, scale }。
+  // 回 { pages: [{ png（full 时）, strips: [{ x, y, width, height, png }] }], generation, totalMs, times }；
+  // 宿主页缺图时 reject 的错误带 missing（编号）与 generation，调用方补发一次
   async function rasterCards(request) {
     const response = await fetch("/__native/cards/raster", {
       method: "POST",
@@ -88,10 +91,21 @@
       body: await new Blob([JSON.stringify(request)]).arrayBuffer(),
     });
     if (!response.ok || response.headers.get("Content-Type") !== "application/octet-stream") {
-      throw new Error((await replyOf(response)).error || "卡片没能出图");
+      const reply = await replyOf(response);
+      const error = new Error(reply.error || "卡片没能出图");
+      if (Array.isArray(reply.missing)) error.missing = reply.missing;
+      if (typeof reply.generation === "string") error.generation = reply.generation;
+      throw error;
     }
     const { header, parts } = unframed(await response.arrayBuffer());
-    return { pages: parts.map((part) => new Blob([part], { type: "image/png" })), totalMs: header.totalMs, times: header.files.map((file) => file.ms) };
+    const png = (part) => new Blob([part], { type: "image/png" });
+    let at = 0;
+    const pages = (header.pages ?? header.files.map(() => ({ full: true, strips: [] }))).map((page) => ({
+      png: page.full === false ? null : png(parts[at++]),
+      strips: (page.strips ?? []).map((rect) => ({ ...rect, png: png(parts[at++]) })),
+      ms: page.ms,
+    }));
+    return { pages, generation: header.generation ?? null, totalMs: header.totalMs, times: pages.map((page) => page.ms) };
   }
 
   // 网页铺进透明标题栏时（壳开了毛玻璃）才有：告诉壳哪里可以拖动窗口、界面是深色还是浅色。

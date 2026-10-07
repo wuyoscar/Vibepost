@@ -55,11 +55,11 @@
     const cardsModule = root.MediaCraftCards;
     const profile = settings.profile && { ...settings.profile, avatar: await avatarOf(settings.profile) };
     const result = await cardsModule.layout({ ...settings, profile, ...(structureId ? { structureId } : {}) });
-    const { pageCount, canvases, pages, views, draw } = await cardsModule.paint(result, { paint });
+    const { pageCount, canvases, pages, views, draw, thumbnails } = await cardsModule.paint(result, { paint });
     canvases.forEach((canvas, index) => layouts.set(canvas, pages[index]));
     views.forEach((view, index) => layouts.set(view, pages[index]));
     if (!lazy) await draw();
-    return { pageCount, canvases, views, draw };
+    return { pageCount, canvases, views, draw, thumbnails };
   }
 
   // 长文的外观跟随这篇的主题：配色（含单篇微调）、字体、字号与行距都和卡片一致。

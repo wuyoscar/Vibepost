@@ -46,8 +46,8 @@ struct CardRasterTests {
               for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
               return btoa(binary);
             };
-            const images = await Promise.all(pages.map(encode));
-            const bitmap = await createImageBitmap(pages[0]);
+            const images = await Promise.all(pages.map((page) => encode(page.png)));
+            const bitmap = await createImageBitmap(pages[0].png);
             return { images, totalMs, times, width: bitmap.width, height: bitmap.height };
         """, arguments: ["page": Self.referencePage]) as? [String: Any]
         await harness.tearDown()
@@ -74,12 +74,21 @@ extension CardRasterTests {
           for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
           return btoa(binary);
         };
+        // rasterize 给的是正文 PNG + 真实页码的条：合成一张 PNG
+        window.compositePng = async (page) => {
+          const { WIDTH, HEIGHT, SCALE, paintPage } = window.MediaCraftCards;
+          const canvas = Object.assign(document.createElement("canvas"), { width: WIDTH * SCALE, height: HEIGHT * SCALE });
+          await paintPage(canvas.getContext("2d"), page);
+          return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+        };
         window.cardsOf = async (settings) => {
           const started = performance.now();
           const result = await window.MediaCraftCards.layout(settings);
           const layoutMs = performance.now() - started;
-          const pngs = await window.MediaCraftCards.rasterize(result);
-          return { pages: result.pages.map((page) => ({ kind: page.kind, sources: page.sources })), images: await Promise.all(pngs.map(encode)), layoutMs };
+          const rendered = await window.MediaCraftCards.rasterize(result);
+          const images = [];
+          for (const page of rendered) images.push(await encode(await compositePng(page)));
+          return { pages: result.pages.map((page) => ({ kind: page.kind, sources: page.sources })), images, layoutMs };
         };
     """
 }
@@ -141,7 +150,7 @@ extension CardRasterTests {
                 host.remove();
                 return { over, structure };
               });
-              out[theme] = { images: await Promise.all(pngs.map(encode)), count: result.pages.length, overflow };
+              out[theme] = { images: await Promise.all(pngs.map(async (page) => encode(await compositePng(page)))), count: result.pages.length, overflow };
             }
             return out;
         """) as? [String: [String: Any]]
@@ -213,7 +222,7 @@ extension CardRasterTests {
                 const page = painted.pages[0];
                 const titles = page.items.filter((item) => item.blockType === "title");
                 out[`${theme}-${image ? "image" : "plain"}`] = {
-                  image: await encode(png), role: page.role, hits: page.imageHits.filter((hit) => hit.cover).length,
+                  image: await encode(await compositePng(png)), role: page.role, hits: page.imageHits.filter((hit) => hit.cover).length,
                   inside: titles.length > 0 && titles.every((item) => item.x >= page.bounds.left - 1 && item.x + item.width <= page.bounds.right + 1),
                 };
               }

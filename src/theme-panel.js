@@ -216,11 +216,12 @@
     stop();
     group.setAttribute("aria-busy", "true");
     const draft = await readDraft();
-    const canvases = draft.mode === "cards" ? await mc.render.canvases() : [];
+    // 当前主题的首图：直接要一张小图，不要整页画布
+    const [first] = draft.mode === "cards" ? await mc.render.thumbnails({ width: THUMB_WIDTH, height: THUMB_HEIGHT, indexes: [0] }) : [];
     if (seq !== refreshSeq) return;
     snapshot = { ...draft, pageCount };
     for (const { button } of tiles.values()) button.disabled = draft.readOnly;
-    if (draft.mode === "cards") store(cacheKey(draft.theme, draft), { pageCount, image: canvases[0] ? shrink(canvases[0]) : null });
+    if (draft.mode === "cards") store(cacheKey(draft.theme, draft), { pageCount, image: first ?? null });
     paintTiles();
     schedule();
   }
@@ -233,7 +234,7 @@
     // 选中的底色跟着换上的主题滑过去
     window.MediaCraftMotion.track(group, '[aria-pressed="true"]');
 
-    mc.on("rendered", ({ pageCount }) => void refresh(pageCount).catch(() => undefined));
+    mc.on("rendered", ({ pageCount }) => void refresh(pageCount).catch((error) => console.warn("主题面板的首图没出来", error)));
     // 这篇的主题一换（点格子、App API、切稿子）就标出来，不用等出图
     new MutationObserver(() => markCurrent(document.documentElement.dataset.cardTheme))
       .observe(document.documentElement, { attributes: true, attributeFilter: ["data-card-theme"] });

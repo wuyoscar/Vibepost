@@ -61,8 +61,8 @@
       if (problems.length) host.notify(problems.join("；"));
       if (!images.length) return null;
       const ids = images.map(() => importer.newImageId());
-      images.forEach(({ name, src }, index) => {
-        store.add(ids[index], { name, src, sourcePath: name, layout: { ...importer.DEFAULT_LAYOUT }, crop: null });
+      images.forEach(({ name, src, width, height }, index) => {
+        store.add(ids[index], { name, src, sourcePath: name, layout: { ...importer.DEFAULT_LAYOUT }, crop: null, ...(width && height ? { width, height } : {}) });
       });
       insertTags(ids.map((id) => placement.imageTag([id])), at);
       if (!problems.length) host.notify(`已插入 ${ids.length} 张图片`);
@@ -75,9 +75,9 @@
       const { images, problems } = await importer.readImages([file]);
       if (problems.length) host.notify(problems.join("；"));
       if (!images.length) return null;
-      const [{ name, src }] = images;
+      const [{ name, src, width, height }] = images;
       const id = importer.newImageId();
-      store.add(id, { name, src, sourcePath: name, layout: { ...importer.DEFAULT_LAYOUT }, crop: null });
+      store.add(id, { name, src, sourcePath: name, layout: { ...importer.DEFAULT_LAYOUT }, crop: null, ...(width && height ? { width, height } : {}) });
       refresh();
       return id;
     }

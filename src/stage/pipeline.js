@@ -32,6 +32,7 @@
   function create(host) {
     let cardCanvases = []; // 最近一次画完的卡片画布（长文模式为空）
     let drawCards = () => Promise.resolve(); // 让这些画布有像素（HTML 卡片要出图时才出）
+    let thumbCards = async () => []; // 这一套的缩略图（从 PNG 直接缩，不经整页画布）
     let ticket = 0; // 出图的序号：只有最新一次能放上舞台
     let latest = Promise.resolve();
 
@@ -43,10 +44,12 @@
       if (article) {
         cardCanvases = [];
         drawCards = () => Promise.resolve();
+        thumbCards = async () => [];
         host.preview.showArticle(result);
       } else {
         cardCanvases = result.canvases;
         drawCards = result.draw;
+        thumbCards = result.thumbnails;
         host.preview.showCards(cardCanvases, result.views);
       }
       host.drawn({ mode: settings.mode, pageCount: cardCanvases.length });
@@ -77,12 +80,17 @@
       latest: () => latest,
       // 最近一次的画布，页面结果用 MediaCraftRender.pageOf 取；HTML 卡片这时可能还没有像素
       cards: () => cardCanvases,
-      // 画到最新、画布都有像素之后的画布（导出、发送、缩略图、看一页用）
+      // 画到最新、画布都有像素之后的画布（导出、发送、看一页用；缩略图别用这个，用 thumbnails）
       async pixels() {
         await latest;
         const canvases = cardCanvases;
         await drawCards();
         return canvases;
+      },
+      // 画到最新之后每页一张小图（胶片、主题面板、手机预览用）：{ width, height, indexes? }
+      async thumbnails(options) {
+        await latest;
+        return thumbCards(options);
       },
     };
   }

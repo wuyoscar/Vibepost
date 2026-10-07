@@ -197,14 +197,15 @@
     async function refresh() {
       if (!view) return;
       const seq = ++refreshSeq;
-      const [list, me, canvases] = await Promise.all([mc.drafts.list(), mc.profile.get(), mc.render.canvases()]);
+      // 这一篇的首图：直接要一张小图，不要整页画布
+      const [list, me, [first]] = await Promise.all([mc.drafts.list(), mc.profile.get(), mc.render.thumbnails({ width: THUMB_WIDTH, height: THUMB_HEIGHT, indexes: [0] })]);
       const profileKey = hash(JSON.stringify([me.name, me.handle, fingerprint(me.avatar), me.avatarCrop]));
       const recent = list.filter((item) => !item.builtIn && !item.current && item.mode === "cards").slice(0, RECENT);
       const keys = await Promise.all(recent.map((item) => keyOf(item, profileKey)));
       const mine = list.find((item) => item.current);
       if (seq !== refreshSeq || !view || !mine) return;
       profile = { name: me.name, handle: me.handle };
-      current = { id: mine.id, title: mine.title, image: canvases[0] ? shrink(canvases[0]) : null };
+      current = { id: mine.id, title: mine.title, image: first ?? null };
       others = recent.map((item, index) => ({ id: item.id, title: item.title, key: keys[index] }));
       paint();
       schedule();

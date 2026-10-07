@@ -342,6 +342,14 @@
         await pipeline.now();
         return cards();
       },
+      // 页内专用：画到最新之后每页一张 width × height 的小图（胶片、主题面板、手机预览用），从 PNG 直接缩，不经整页画布
+      async thumbnails(options = {}) {
+        const width = Math.trunc(Number(options.width)), height = Math.trunc(Number(options.height));
+        if (!(width >= 16 && width <= 1728 && height >= 16 && height <= 2304)) throw new RangeError("thumbnails：width 16–1728、height 16–2304");
+        if (options.indexes !== undefined && !Array.isArray(options.indexes)) throw new TypeError("thumbnails：indexes 要是数组");
+        await pipeline.latest().catch(() => undefined);
+        return pipeline.thumbnails({ width, height, ...(options.indexes ? { indexes: options.indexes } : {}) });
+      },
       // 页内专用：最近一次画完的预览画布（2 倍图），不触发出图。
       async canvases() {
         await pipeline.latest().catch(() => undefined);

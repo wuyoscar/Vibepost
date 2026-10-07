@@ -104,7 +104,7 @@
         "imageHits" : [
 
         ],
-        "sha256" : "d7c38b8782ec80db1c5562183f450d60d764b5dba285012939b737c8c57169d7"
+        "sha256" : "63b2b3466878457adfc2320c48a17c5d4ecf2b3470a4fa6a4f624ff93109dc6a"
       },
       {
         "bounds" : [
@@ -124,7 +124,7 @@
         "imageHits" : [
           "single.png 219,739 426x319 base 688 max 688 resize 688 src 230-263"
         ],
-        "sha256" : "812680978e63a04b9999eea434d3701a778f80058c67a76e9dab44a2cb3a5dc7"
+        "sha256" : "b76a2cecddded19a47d42b61e735f02a539c817765db89f5bcb7f38c259adaae"
       }
     ],
     "structure" : "fresh"
@@ -151,7 +151,7 @@
         "imageHits" : [
 
         ],
-        "sha256" : "4aa176c340a00154216174fdb10e46f08fbd202d38af78357588a34cbdba00c4"
+        "sha256" : "8f7914e1b694be02e65b121b1c3bc3afaaab01b73efda1b13a365ab8f8daefa5"
       },
       {
         "bounds" : [
@@ -169,7 +169,7 @@
         "imageHits" : [
           "single.png 144,376 576x432 base 720 max 720 resize 720 src 230-263"
         ],
-        "sha256" : "7b579fe58ca405eb877c5831a492534281213f5ccbca60e89487f188ff3a5844"
+        "sha256" : "ef90ca69134110451348b1bd37bc9d03a21873037cd9409cb0c8da8c407159bc"
       }
     ],
     "structure" : "glow"
@@ -331,7 +331,7 @@
         "imageHits" : [
 
         ],
-        "sha256" : "5e402e53fc6a7815ffd9a9f748ffd63ce1f4ac4fb3dcf3dec34a39f9f638d5b4"
+        "sha256" : "51095361b398854fb3a8473740a91f59eeeeef9e1a448f304383b3b9b7f5134b"
       },
       {
         "bounds" : [

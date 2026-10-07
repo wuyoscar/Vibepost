@@ -1,7 +1,7 @@
 // HTML 卡片（ADR 0006）的入口：稿子 → 分好页的 HTML → 舞台上可操作的卡片 DOM / 壳里截的 PNG。
 //   await MediaCraftCards.layout(settings)   → { pages: [{ kind, html, sources }], theme, style }
 //   MediaCraftCards.mount(result, index)      → 一张卡片的元素（Shadow DOM，864 × 1152 逻辑像素）
-//   await MediaCraftCards.rasterize(result)   → 每页一个 PNG Blob（壳里原生截图；浏览器里退回 html2canvas）
+//   await MediaCraftCards.rasterize(result)   → 每页 { png（正文 PNG Blob）, strips（真实页码的页眉页脚条）}（壳里原生截图；浏览器里退回 html2canvas）
 // settings 与 src/stage/render.js 的相同：{ title, markdown, theme, images, profile: { name, handle, avatar }, … }。
 (function (root) {
   "use strict";
@@ -20,6 +20,14 @@
   // 出图缓存按字节也封顶：每页 PNG 2–4 MB，只按条数留 160 条会吃掉几百 MB
   const RASTER_CACHE_BYTES = 160 * 1024 * 1024;
   const RASTER_BATCH = 40; // 一次交给壳出这么多页（壳一次最多收 200 页） // 出过的页按整页 HTML 留着 PNG：打字时只重出变了的页
+  // 缩略图（胶片、主题面板、手机预览）按出图键留着小图：一张 120×160 不到 80 KB，几百张也没多少
+  const THUMB_CACHE_SIZE = 400;
+  const SAMPLES = 48; // 图片指纹抽样的段数
+  // 量过尺寸的图片按指纹记着：每次排版都重新载入几 MB 的 data URL 量一遍太贵（记录里有 width / height 的不用量）
+  const SIZE_CACHE_SIZE = 500;
+
+  // 出图的计数（测试与排查用：改一个字之后该只重出变了的页、图片不该再过桥、不该新建整页画布）
+  const stats = { rasterized: 0, cacheHits: 0, strips: 0, bridgedImageBytes: 0, fullPaints: 0, thumbs: 0, thumbHits: 0 };
 
   const px = (value) => `${Math.round(value * 100) / 100}px`;
 
@@ -237,15 +245,24 @@
     };
   }
 
-  // 图片的原始尺寸：记录里没有时量一次（分页要按比例留高度）
+  // 图片的原始尺寸：记录里没有时量一次（分页要按比例留高度），量过的按指纹记着，同一张图不再重新载入
+  const sizeCache = new Map();
   async function withSizes(settings) {
     const images = { ...(settings.images ?? {}) };
     await Promise.all(Object.entries(images).map(async ([id, record]) => {
       if (!record?.src || (record.width && record.height)) return;
-      const image = new Image();
-      image.src = record.src;
-      await loaded(image);
-      images[id] = { ...record, width: image.naturalWidth || 1, height: image.naturalHeight || 1 };
+      const key = fingerprint(record.src);
+      let size = sizeCache.get(key);
+      if (!size) {
+        const image = new Image();
+        image.src = record.src;
+        await loaded(image);
+        size = { width: image.naturalWidth || 1, height: image.naturalHeight || 1 };
+        sizeCache.delete(key);
+        sizeCache.set(key, size);
+        while (sizeCache.size > SIZE_CACHE_SIZE) sizeCache.delete(sizeCache.keys().next().value);
+      }
+      images[id] = { ...record, ...size };
     }));
     return { ...settings, images };
   }
@@ -296,12 +313,15 @@
   const mediaIds = (page) => [...new Set([...page.matchAll(/data-media="([^"]+)"/g)].map((match) => match[1]))];
   const mediaSrc = (result, id) => (id === "__avatar" ? result.context.profile.avatar : result.context.images[id]?.src);
 
-  // 出过的页：整页 HTML、样式与用到的图片都一样就是同一张图。
+  // ---------- 出图缓存 ----------
+  // 正文 PNG 按「占位页码」的整页 HTML 截：页眉页脚里的页码写成固定的占位（第一页仍是第一页，其余都当第二页，共 88 页），
+  // 这样加减一页只有真变了的页要重出，不会因为「n / 总页数」全部失效。真实页码的页眉页脚另外截成小条（chrome）贴上去。
   // 图片在键里只放指纹（长度 + 均匀抽样的几段字符），不放整条 data URL：一张图几 MB，拼进键里每代都留一份，
   // 一篇十来张图的稿子审阅几轮就是几百 MB（2026-10-08 的卡顿）
-  const rasterCache = new Map();
+  const rasterCache = new Map(); // 键 → 正文 PNG Blob
   let rasterBytes = 0;
-  const SAMPLES = 48;
+  const stripCache = new Map(); // 键 → 这页页眉页脚的条 [{ x, y, width, height, png }]
+  const STRIP_CACHE_SIZE = 600;
   function fingerprint(src) {
     const text = String(src ?? "");
     if (!text.startsWith("data:") || text.length < 2048) return text;
@@ -310,7 +330,25 @@
     for (let i = 0; i < SAMPLES; i += 1) sample += text.substr(i * stride, 16);
     return `${text.length}:${sample}:${text.slice(-32)}`;
   }
+  const placeholderPage = (result, index) => ({ ...result.pages[index], index: index === 0 ? 0 : 1, total: 88 });
+  // 截正文 PNG 用的整页 HTML：占位页码，并去掉源码偏移（data-s 每段字的、data-src / data-content-src 每块的，只给舞台点选用）——
+  // 改一个字后面所有块的偏移都变，留着会让后面每一页的出图键都变、全部重出
+  const SOURCE_ATTRS = / data-(?:s|src|content-src)="[^"]*"/g;
+  const rasterHtml = (result, index) => pageHtml(placeholderPage(result, index), result.context).replace(SOURCE_ATTRS, "");
+  // 真实页码的页眉页脚；和占位的一样（没有页码的页，比如封面）时为 null
+  function chromeOf(result, index) {
+    const chrome = root.MediaCraftCardChrome.of(result.context.look);
+    const real = { ...result.pages[index], index, total: result.pages.length };
+    const placeholder = placeholderPage(result, index);
+    const head = chrome.head(real, result.context);
+    const foot = chrome.foot(real, result.context);
+    if (head === chrome.head(placeholder, result.context) && foot === chrome.foot(placeholder, result.context)) return null;
+    return { head, foot };
+  }
   const cacheKey = (result, page) => `${result.style.length}|${page}|${mediaIds(page).map((id) => fingerprint(mediaSrc(result, id))).join("|")}`;
+  // 条的键要带这一页的 <article …> 开头标签：配色、字体、版心都是它上面的变量（同结构、同署名、同页码的两个主题只差这个）
+  const openingTag = (html) => html.slice(0, html.indexOf(">") + 1);
+  const stripKey = (result, html, chrome) => `${result.style.length}|${openingTag(html)}|${chrome.head}|${chrome.foot}|${fingerprint(result.context.profile.avatar)}`;
   function remember(key, png) {
     const previous = rasterCache.get(key);
     if (previous) {
@@ -325,40 +363,131 @@
       rasterCache.delete(oldest);
     }
   }
+  function rememberStrips(key, strips) {
+    stripCache.delete(key);
+    stripCache.set(key, strips);
+    while (stripCache.size > STRIP_CACHE_SIZE) stripCache.delete(stripCache.keys().next().value);
+  }
 
-  // 每页一个 PNG Blob（2 倍图）。indexes：只出这几页（默认全部）
+  // 每页一份 { png（正文 PNG Blob）, strips（页眉页脚的条）}。indexes：只出这几页（默认全部）。
+  // 正文 PNG、条分别按键缓存：打字只重出变了的页；页数变了只重截各页的条。
+  // 正在出的页（胶片、主题面板、手机预览常同时要同一批）记在 inflight 里，后来的等它，不再发一次
+  const inflight = new Map();
   async function rasterize(result, indexes = result.pages.map((_, index) => index)) {
-    const pages = indexes.map((index) => fullHtml(result, index));
-    const keys = pages.map((page) => cacheKey(result, page));
-    // 先取出缓存里有的（页数比缓存多时，新出的页会把它们挤掉）
-    const found = keys.map((key) => rasterCache.get(key) ?? null);
-    const missing = found.map((png, at) => (png ? null : at)).filter((at) => at !== null);
-    if (missing.length) {
-      const pngs = root.MediaCraftNative?.rasterCards
-        ? await rasterizeNatively(result, missing.map((at) => pages[at]))
-        : await Promise.all(missing.map((at) => rasterizeInBrowser(result, indexes[at])));
-      missing.forEach((at, order) => {
-        found[at] = pngs[order];
-        remember(keys[at], pngs[order]);
-      });
+    const jobs = indexes.map((index) => {
+      const html = rasterHtml(result, index);
+      const chrome = chromeOf(result, index);
+      const key = cacheKey(result, html);
+      const strip = chrome ? stripKey(result, html, chrome) : null;
+      return { index, html, chrome, key, stripKey: strip, id: `${key}|${strip ?? ""}` };
+    });
+    const found = jobs.map((job) => ({ png: rasterCache.get(job.key) ?? null, strips: job.stripKey ? stripCache.get(job.stripKey) ?? null : [] }));
+    const missing = jobs.map((job, at) => (found[at].png && found[at].strips ? null : at)).filter((at) => at !== null);
+    stats.cacheHits += jobs.length - missing.length;
+    const waits = [];
+    const fresh = [];
+    for (const at of missing) {
+      const pending = inflight.get(jobs[at].id);
+      if (pending) waits.push(pending.then((page) => { found[at] = { ...page }; }));
+      else fresh.push(at);
     }
+    stats.rasterized += fresh.filter((at) => !found[at].png).length;
+    stats.strips += fresh.filter((at) => !found[at].strips).length;
+    if (fresh.length) {
+      const deferred = fresh.map((at) => {
+        let resolve, reject;
+        const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+        promise.catch(() => undefined);
+        inflight.set(jobs[at].id, promise);
+        return { at, resolve, reject };
+      });
+      try {
+        if (root.MediaCraftNative?.rasterCards) {
+          const rendered = await rasterizeNatively(result, fresh.map((at) => ({ html: jobs[at].html, chrome: found[at].strips ? null : jobs[at].chrome, full: !found[at].png })));
+          fresh.forEach((at, order) => {
+            const page = rendered[order];
+            if (page.png) {
+              found[at].png = page.png;
+              remember(jobs[at].key, page.png);
+            }
+            if (!found[at].strips) {
+              found[at].strips = page.strips;
+              rememberStrips(jobs[at].stripKey, page.strips);
+            }
+          });
+        } else {
+          // 浏览器里没有壳：html2canvas 按真实页码整页画（没有条；页数变了这页会重画）
+          for (const at of fresh) {
+            found[at].png = await rasterizeInBrowser(result, indexes[at]);
+            found[at].strips = [];
+            remember(jobs[at].key, found[at].png);
+          }
+        }
+        for (const { at, resolve } of deferred) resolve(found[at]);
+      } catch (error) {
+        for (const { reject } of deferred) reject(error);
+        throw error;
+      } finally {
+        for (const { at } of deferred) inflight.delete(jobs[at].id);
+      }
+    }
+    await Promise.all(waits);
     return found;
   }
 
-  // 图片换成 data URL 交给壳（壳里的宿主页读不到页面内存里的 Blob）
+  // 图片只过一次桥：宿主页按编号留着，这里记着哪些发过（宿主页重建后 generation 变，重新发）；宿主页缺哪张就回 409，补发一次
+  const hostMedia = { generation: null, sent: new Set() };
   async function rasterizeNatively(result, pages) {
-    const media = {};
-    await Promise.all([...new Set(pages.flatMap(mediaIds))].map(async (id) => {
-      const src = mediaSrc(result, id);
-      if (src) media[id] = await dataUrl(src);
-    }));
-    const pngs = [];
+    const ids = [...new Set(pages.flatMap((page) => mediaIds(page.html)))].filter((id) => mediaSrc(result, id));
+    const payload = async (wanted) => {
+      const media = {};
+      await Promise.all(wanted.map(async (id) => {
+        media[id] = await dataUrl(mediaSrc(result, id));
+      }));
+      for (const src of Object.values(media)) stats.bridgedImageBytes += src.length;
+      return media;
+    };
+    const out = [];
     for (let start = 0; start < pages.length; start += RASTER_BATCH) {
       const batch = pages.slice(start, start + RASTER_BATCH);
-      const reply = await root.MediaCraftNative.rasterCards({ pages: batch, style: result.style, media, width: WIDTH, height: HEIGHT, scale: SCALE });
-      pngs.push(...reply.pages);
+      const batchIds = [...new Set(batch.flatMap((page) => mediaIds(page.html)))].filter((id) => ids.includes(id));
+      let wanted = batchIds.filter((id) => !hostMedia.generation || !hostMedia.sent.has(id));
+      let reply;
+      for (let attempt = 0; ; attempt += 1) {
+        const request = { pages: batch, style: result.style, media: await payload(wanted), mediaIds: batchIds, width: WIDTH, height: HEIGHT, scale: SCALE };
+        try {
+          reply = await root.MediaCraftNative.rasterCards(request);
+          break;
+        } catch (error) {
+          if (!Array.isArray(error.missing) || attempt) throw error;
+          // 宿主页说缺图（重建过或挤掉了）：按它说的补发一次
+          if (error.generation && error.generation !== hostMedia.generation) {
+            hostMedia.generation = error.generation;
+            hostMedia.sent.clear();
+          }
+          wanted = error.missing.filter((id) => ids.includes(id));
+        }
+      }
+      if (reply.generation !== hostMedia.generation) {
+        hostMedia.generation = reply.generation;
+        hostMedia.sent.clear();
+      }
+      for (const id of batchIds) hostMedia.sent.add(id);
+      out.push(...reply.pages);
     }
-    return pngs;
+    return out;
+  }
+
+  // 把一页画进 2 倍图的画布：正文 PNG 铺满，页眉页脚的条按卡片坐标 × 倍数贴上
+  async function paintPage(context, page) {
+    const bitmap = await createImageBitmap(page.png);
+    context.drawImage(bitmap, 0, 0, WIDTH * SCALE, HEIGHT * SCALE);
+    bitmap.close();
+    for (const strip of page.strips ?? []) {
+      const piece = await createImageBitmap(strip.png);
+      context.drawImage(piece, strip.x * SCALE, strip.y * SCALE, strip.width * SCALE, strip.height * SCALE);
+      piece.close();
+    }
   }
 
   // 浏览器开发模式没有壳：用 html2canvas 画（只为开发时看效果，像素以壳为准）
@@ -421,22 +550,75 @@
     let drawing = null;
     const draw = () => {
       // 一页一页画，页与页之间让出主线程（一次画几十张 2 倍图会卡住界面）
-      drawing ??= rasterize(result, canvases.map((_, index) => index)).then(async (pngs) => {
-        for (const [index, png] of pngs.entries()) {
-          const bitmap = await createImageBitmap(png);
-          canvases[index].getContext("2d").drawImage(bitmap, 0, 0, canvases[index].width, canvases[index].height);
-          bitmap.close();
+      drawing ??= rasterize(result, canvases.map((_, index) => index)).then(async (pages) => {
+        for (const [index, page] of pages.entries()) {
+          stats.fullPaints += 1;
+          await paintPage(canvases[index].getContext("2d"), page);
           await root.MediaCraftCardPaginate.yieldToPage();
         }
       });
       return drawing;
     };
-    return { pageCount: result.pages.length, canvases, pages, views: hosts.slice(0, count), draw };
+    return { pageCount: result.pages.length, canvases, pages, views: hosts.slice(0, count), draw, thumbnails: (options) => thumbnails(result, options) };
+  }
+
+  // 缩略图：每页一张 width × height 的小画布，从 PNG 解码后直接画小（整张位图用完就 close，不留 16 MB 的整页画布；
+  // 胶片、主题面板、手机预览每次出图都要全部页，整页画布留着太贵）。小图按出图键 + 尺寸缓存，改一个字只重做变了的页。
+  // 给出去的是拷贝（调用方可能把它放进界面）。indexes：只要这几页
+  const thumbCache = new Map();
+  async function thumbnails(result, { width, height, indexes = result.pages.map((_, index) => index) } = {}) {
+    const pages = await rasterize(result, indexes);
+    const keys = indexes.map((index) => {
+      const html = rasterHtml(result, index);
+      const chrome = chromeOf(result, index);
+      return `${cacheKey(result, html)}|${chrome ? stripKey(result, html, chrome) : ""}|${width}x${height}`;
+    });
+    const canvases = [];
+    for (const [order, page] of pages.entries()) {
+      let small = thumbCache.get(keys[order]);
+      if (small) {
+        stats.thumbHits += 1;
+      } else {
+        stats.thumbs += 1;
+        small = await shrinkPage(page, width, height);
+        thumbCache.delete(keys[order]);
+        thumbCache.set(keys[order], small);
+        while (thumbCache.size > THUMB_CACHE_SIZE) thumbCache.delete(thumbCache.keys().next().value);
+      }
+      const copy = Object.assign(document.createElement("canvas"), { width, height });
+      copy.getContext("2d").drawImage(small, 0, 0);
+      canvases.push(copy);
+      if (order) await root.MediaCraftCardPaginate.yieldToPage();
+    }
+    return canvases;
+  }
+
+  // PNG → 小画布：整张解码后先 1:1 画进一张复用的中转整页画布，再从画布缩（WebKit 从位图缩与从画布缩的重采样不同；
+  // 从画布缩和导出、手机预览原来的路一致，像素一样）。中转画布只有一张，所以一次只缩一张（胶片、主题面板、手机预览常同时来，
+  // 交错着清、画会互相抹掉）；整张位图随手关掉
+  let scratch = null;
+  let shrinking = Promise.resolve();
+  function shrinkPage(page, width, height) {
+    const run = shrinking.then(async () => {
+      scratch ??= Object.assign(document.createElement("canvas"), { width: WIDTH * SCALE, height: HEIGHT * SCALE });
+      const full = scratch.getContext("2d");
+      full.clearRect(0, 0, scratch.width, scratch.height);
+      await paintPage(full, page);
+      const canvas = Object.assign(document.createElement("canvas"), { width, height });
+      const context = canvas.getContext("2d");
+      context.imageSmoothingQuality = "high";
+      context.drawImage(scratch, 0, 0, width, height);
+      return canvas;
+    });
+    shrinking = run.catch(() => undefined);
+    return run;
   }
 
   root.MediaCraftCards = {
-    WIDTH, HEIGHT, SCALE, layout, mount, rasterize, paint,
+    WIDTH, HEIGHT, SCALE, layout, mount, rasterize, paint, thumbnails, paintPage,
     cleanCss,
     CARD_CSS_LIMIT,
+    stats,
+    resetStats: () => { for (const key of Object.keys(stats)) stats[key] = 0; },
   };
 })(globalThis);

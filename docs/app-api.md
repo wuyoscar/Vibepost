@@ -119,7 +119,8 @@
 | --- | --- | --- |
 | `pages()` | 等预览画到最新（界面里还有没到点的出图就马上画，否则不重复出图）；长文模式没有分页，返回 `[]` | `PageSummary[]` |
 | `refresh()` | 重新排版出一次图（比如字体加载完之后） | `PageSummary[]` |
-| `canvases()` 〔页内〕 | 最近一次画完的预览画布，与 `pages()` 同序；不触发重新排版。HTML 卡片（ADR 0006）的画布要出图后才有像素，这里等出图完成再返回 | `HTMLCanvasElement[]` |
+| `canvases()` 〔页内〕 | 最近一次画完的预览画布，与 `pages()` 同序；不触发重新排版。HTML 卡片（ADR 0006）的画布要出图后才有像素，这里等出图完成再返回（每页一张 2 倍图画布 ≈ 16 MB：导出、看一页才用，缩略图用下面的 `thumbnails`） | `HTMLCanvasElement[]` |
+| `thumbnails({ width, height, indexes? })` 〔页内〕 | 画到最新之后每页一张 `width × height` 的小画布（胶片、主题面板、手机预览用），从出图的 PNG 直接缩，不经整页画布；按出图键缓存，改一个字只重做变了的页。`indexes` 只要这几页 | `HTMLCanvasElement[]` |
 | `offscreen({ structure? })` 〔页内〕 | 按当前稿子另出一套图文卡片，不管当前模式；`structure` 可指定卡片结构（`tweet` / `swiss` / `book` / `knowledge` / `memo` / `nightReading` / `cyber` / `waste`，没登记的 reject）；`views` 是每页的卡片元素（没挂到页面上） | `{ pages: PageSummary[], canvases, views }` |
 | `plainText(markdown?)` | 页脚「复制卡片文字」（长文里是「复制全文」）得到的纯文本：去掉行内标记、图片与分页符，列表留编号、表格留成竖线表、链接写成 `[文字](网址)`，原文隔着空行的块之间空一行（规则见 `src/engine/plain-text.js`）；长文发送到 iPhone 的剪贴板也按它（图文卡片发的是 `caption`）。不给参数时用当前卡片内容 | `string` |
 | `articleHtml(markdown?)` | 长文的语义 HTML（不带排版样式；图片是 `<figure><img src alt></figure>`，实况的 `figure` 带 `data-live`，分页符与找不到的图不出现） | `string` |

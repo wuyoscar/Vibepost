@@ -180,11 +180,11 @@
   // 先按舞台上的页数摆好缩略图的按钮，再等画布有像素了画上去（HTML 卡片要出图后才有）
   async function renderFilmstrip() {
     placeThumbs(document.querySelectorAll("#stageCards .stage-card").length);
-    const canvases = await mc.render.canvases();
-    placeThumbs(canvases.length);
-    canvases.forEach((source, index) => {
+    // 小图直接从 PNG 缩，不要整页画布（十几页就是几百 MB）
+    const thumbs = await mc.render.thumbnails({ width: 120, height: 160 });
+    placeThumbs(thumbs.length);
+    thumbs.forEach((source, index) => {
       const context = filmstrip.children[index].firstElementChild.getContext("2d");
-      context.imageSmoothingQuality = "high";
       context.drawImage(source, 0, 0, 120, 160);
     });
   }
@@ -284,7 +284,11 @@
       return;
     }
     showPage(current);
-    await renderFilmstrip();
+    try {
+      await renderFilmstrip();
+    } catch (error) {
+      console.warn("胶片没画出来", error); // 出图出错时舞台照常，缩略图下次出图再补
+    }
     syncStageNav();
     schedulePageMap();
   });

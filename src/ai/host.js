@@ -17,8 +17,10 @@
     // 版本里的图片只有信息，画面从现在的图片或本机媒体库里取（版本用着的不会被删）；实况的原视频放回内存
     async function imagesWithData(images) {
       await root.MediaCraftDrafts.flush();
-      const stored = await root.MediaCraftDrafts.store.readMedia(host.draftId());
       const current = host.images();
+      // 现在的图片里没有的（版本里有、后来删掉的）才去本机媒体库读：别把这篇全部图片都读成 data URL 再大多丢掉
+      const missing = Object.keys(images).filter((id) => !current[id]?.src);
+      const stored = missing.length ? await root.MediaCraftDrafts.store.readMedia(host.draftId()) : { images: {} };
       const restored = Object.fromEntries(Object.entries(images).map(([id, info]) => [
         id,
         { ...info, src: current[id]?.src ?? stored.images[id] ?? info.src ?? "" },

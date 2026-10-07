@@ -19,13 +19,15 @@
     });
   }
 
-  // 浏览器解不开的图（比如损坏的文件）不插进稿子
+  // 浏览器解不开的图（比如损坏的文件）不插进稿子；解得开的顺手记下尺寸（排版按比例留高度，不用再载入一遍量）
   async function decodable(blob) {
     try {
-      (await createImageBitmap(blob)).close();
-      return true;
+      const bitmap = await createImageBitmap(blob);
+      const size = { width: bitmap.width, height: bitmap.height };
+      bitmap.close();
+      return size;
     } catch {
-      return false;
+      return null;
     }
   }
 
@@ -37,7 +39,7 @@
     return Promise.all(pages.map(async (page, index) => ({ name: `${stem}-第${index + 1}页.png`, src: await readAsDataUrl(page) })));
   }
 
-  // files → { images: [{ name, src }], problems: [说明] }，images 按文件名排好、PDF 按页序展开
+  // files → { images: [{ name, src, width?, height? }], problems: [说明] }，images 按文件名排好、PDF 按页序展开
   async function readImages(files) {
     const sorted = Array.from(files).sort((a, b) => collator.compare(a.name || "", b.name || ""));
     const images = [];
@@ -46,8 +48,11 @@
       try {
         if (isPdf(file)) images.push(...await pdfPages(file));
         else if (!isImage(file)) problems.push(`「${file.name}」不是图片或 PDF`);
-        else if (!await decodable(file)) problems.push(`「${file.name}」打不开`);
-        else images.push({ name: file.name || "图片.png", src: await readAsDataUrl(file) });
+        else {
+          const size = await decodable(file);
+          if (!size) problems.push(`「${file.name}」打不开`);
+          else images.push({ name: file.name || "图片.png", src: await readAsDataUrl(file), ...size });
+        }
       } catch (error) {
         problems.push(error.message);
       }

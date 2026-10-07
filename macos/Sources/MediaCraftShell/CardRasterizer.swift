@@ -22,9 +22,22 @@ struct RasterError: LocalizedError {
 /// - `pdf`：`createPDF` 得到矢量页，再用 CoreGraphics 按目标像素画（与屏幕无关）。
 @MainActor
 final class CardRasterizer: NSObject {
+    /// 一页：整页 HTML（页眉页脚里是占位页码），可选真实页码的页眉页脚（`chrome`：换上之后只截那两个区域），
+    /// `full == false` 表示客户端已有这页的整页 PNG、只要页眉页脚的条
+    struct PageRequest: Decodable {
+        struct Chrome: Decodable {
+            let head: String?
+            let foot: String?
+        }
+
+        let html: String
+        let chrome: Chrome?
+        let full: Bool?
+    }
+
     struct Request: Decodable {
-        /// 每页 `<article class="mc-page">…</article>` 的外层 HTML（已经净化过）
-        let pages: [String]
+        /// 每页的请求；也认旧写法（每页只是 `<article class="mc-page">…</article>` 的外层 HTML）
+        let pages: [PageRequest]
         /// 这一套卡片的样式：主题令牌 + 稿子的自定义样式（已经净化、限定在卡片里）
         let style: String
         /// 卡片的 CSS 尺寸与出图倍数：PNG 是 `width × scale` 乘 `height × scale`
@@ -32,8 +45,28 @@ final class CardRasterizer: NSObject {
         let height: Double
         let scale: Double
         let method: String?
-        /// 图片编号 → data URL；页面里写 `src="media:编号"`
+        /// 图片编号 → data URL：只带宿主页还没有的；页面里写 `data-media="编号"`
         let media: [String: String]?
+        /// 这一批用到的全部图片编号：宿主页缺哪张就回 409 让客户端补发
+        let mediaIds: [String]?
+
+        private enum CodingKeys: String, CodingKey { case pages, style, width, height, scale, method, media, mediaIds }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            if let htmls = try? container.decode([String].self, forKey: .pages) {
+                pages = htmls.map { PageRequest(html: $0, chrome: nil, full: nil) }
+            } else {
+                pages = try container.decode([PageRequest].self, forKey: .pages)
+            }
+            style = try container.decode(String.self, forKey: .style)
+            width = try container.decode(Double.self, forKey: .width)
+            height = try container.decode(Double.self, forKey: .height)
+            scale = try container.decode(Double.self, forKey: .scale)
+            method = try container.decodeIfPresent(String.self, forKey: .method)
+            media = try container.decodeIfPresent([String: String].self, forKey: .media)
+            mediaIds = try container.decodeIfPresent([String].self, forKey: .mediaIds)
+        }
 
         func validate() throws {
             guard !pages.isEmpty, pages.count <= 200 else { throw Failure.badRequest("页数") }
@@ -47,19 +80,38 @@ final class CardRasterizer: NSObject {
         case badRequest(String)
         case hostNotReady
         case snapshotFailed(page: Int)
+        /// 宿主页缺这几张图（重建过、或被挤掉了）：客户端补发一次
+        case missingMedia([String], generation: String)
 
         var errorDescription: String? {
             switch self {
             case .badRequest(let what): "出图请求不对：\(what)"
             case .hostNotReady: "出图页面没有载入"
             case .snapshotFailed(let page): "第 \(page) 页没能出图"
+            case .missingMedia(let ids, _): "出图的页面缺 \(ids.count) 张图"
             }
         }
     }
 
-    struct Page {
+    /// 页眉或页脚按真实页码重截的一条：卡片坐标（CSS 像素）与 PNG
+    struct Strip {
+        let x: Double
+        let y: Double
+        let width: Double
+        let height: Double
         let png: Data
+    }
+
+    struct Page {
+        /// 整页 PNG；客户端说已有时为 nil
+        let png: Data?
+        let strips: [Strip]
         let milliseconds: Double
+    }
+
+    struct Rendered {
+        let pages: [Page]
+        let generation: String
     }
 
     private let root: URL
@@ -78,31 +130,54 @@ final class CardRasterizer: NSObject {
         self.root = root
     }
 
-    /// 桥请求：body 是 `Request` 的 JSON；回复是 `FramedBody`，头部 `{ ok, totalMs, files: [{ size, ms }] }`，后面依次是各页 PNG。
+    /// 桥请求：body 是 `Request` 的 JSON；回复是 `FramedBody`，头部
+    /// `{ ok, totalMs, generation, files: [{ size, ms }], pages: [{ ms, full, strips: [{ x, y, width, height }] }] }`，
+    /// 后面的二进制段按页依次是：整页 PNG（full 时）、这页的各条。宿主页缺图时回 409 `{ ok: false, error, missing, generation }`。
     func handle(body: Data) async -> NativeBridge.Reply {
         do {
             let request = try JSONDecoder().decode(Request.self, from: body)
             try request.validate()
             let started = ContinuousClock.now
-            let pages = try await render(request)
+            let rendered = try await render(request)
+            var files: [[String: Any]] = []
+            var parts: [Data] = []
+            let pages: [[String: Any]] = rendered.pages.map { page in
+                if let png = page.png {
+                    files.append(["size": png.count, "ms": page.milliseconds])
+                    parts.append(png)
+                }
+                for strip in page.strips {
+                    files.append(["size": strip.png.count, "ms": 0])
+                    parts.append(strip.png)
+                }
+                return [
+                    "ms": page.milliseconds, "full": page.png != nil,
+                    "strips": page.strips.map { ["x": $0.x, "y": $0.y, "width": $0.width, "height": $0.height] },
+                ]
+            }
             let header: [String: Any] = [
                 "ok": true,
                 "totalMs": Self.milliseconds(since: started),
-                "files": pages.map { ["size": $0.png.count, "ms": $0.milliseconds] },
+                "generation": rendered.generation,
+                "files": files,
+                "pages": pages,
             ]
             let json = try JSONSerialization.data(withJSONObject: header)
-            return .binary(FramedBody.join(header: json, parts: pages.map(\.png)))
+            return .binary(FramedBody.join(header: json, parts: parts))
         } catch let error as DecodingError {
             return .failure(400, "出图请求读不出来：\(error)")
+        } catch Failure.missingMedia(let ids, let generation) {
+            let body = (try? JSONSerialization.data(withJSONObject: ["ok": false, "error": "出图的页面缺 \(ids.count) 张图", "missing": ids, "generation": generation])) ?? Data()
+            return NativeBridge.Reply(status: 409, body: body)
         } catch {
             return .failure(500, error.localizedDescription)
         }
     }
 
     /// 排队执行，一套一套来。
-    func render(_ request: Request) async throws -> [Page] {
+    func render(_ request: Request) async throws -> Rendered {
         let previous = queue
-        let work = Task { () -> Result<[Page], Error> in
+        let work = Task { () -> Result<Rendered, Error> in
             await previous?.value
             do { return .success(try await self.renderNow(request)) } catch { return .failure(error) }
         }
@@ -115,30 +190,60 @@ final class CardRasterizer: NSObject {
     static let setupTimeout: Duration = .seconds(60)
     static let pageTimeout: Duration = .seconds(60)
 
-    private func renderNow(_ request: Request) async throws -> [Page] {
+    private func renderNow(_ request: Request) async throws -> Rendered {
         let webView = try await bounded(Self.loadTimeout, "载入出图的宿主页") { try await self.host(width: request.width, height: request.height) }
-        _ = try await bounded(Self.setupTimeout, "布置样式与图片") {
+        let setup = try await bounded(Self.setupTimeout, "布置样式与图片") {
             try await webView.callAsyncJavaScript(
-                "return await window.mcRaster.setup(style, media, width, height)",
-                arguments: ["style": request.style, "media": request.media ?? [:], "width": request.width, "height": request.height],
+                "return await window.mcRaster.setup(style, media, mediaIds, width, height)",
+                arguments: [
+                    "style": request.style, "media": request.media ?? [:], "mediaIds": request.mediaIds ?? [],
+                    "width": request.width, "height": request.height,
+                ],
                 contentWorld: .page
             )
-        }
+        } as? [String: Any] ?? [:]
+        let generation = setup["generation"] as? String ?? ""
+        if let missing = setup["missing"] as? [String], !missing.isEmpty { throw Failure.missingMedia(missing, generation: generation) }
         var pages: [Page] = []
-        for (index, html) in request.pages.enumerated() {
+        for (index, page) in request.pages.enumerated() {
             let started = ContinuousClock.now
-            let png = try await bounded(Self.pageTimeout, "出第 \(index + 1) 页") {
+            let rendered: Page = try await bounded(Self.pageTimeout, "出第 \(index + 1) 页") {
                 _ = try await webView.callAsyncJavaScript(
-                    "return await window.mcRaster.show(html)", arguments: ["html": html], contentWorld: .page
+                    "return await window.mcRaster.show(html)", arguments: ["html": page.html], contentWorld: .page
                 )
-                if request.method == "pdf" {
-                    return try await self.pdf(webView, request: request, page: index + 1)
+                var png: Data?
+                if page.full != false {
+                    png = request.method == "pdf"
+                        ? try await self.pdf(webView, request: request, page: index + 1)
+                        : try await self.snapshot(webView, request: request, page: index + 1)
                 }
-                return try await self.snapshot(webView, request: request, page: index + 1)
+                var strips: [Strip] = []
+                if let chrome = page.chrome {
+                    let rects = try await webView.callAsyncJavaScript(
+                        "return await window.mcRaster.chrome(head, foot)",
+                        arguments: ["head": chrome.head ?? "", "foot": chrome.foot ?? ""], contentWorld: .page
+                    ) as? [[String: Any]] ?? []
+                    // PDF 路径没有区域截图：换上真实页码后整页再出一次，裁出各条
+                    let whole = request.method == "pdf" && !rects.isEmpty ? try await self.pdf(webView, request: request, page: index + 1) : nil
+                    for rect in rects {
+                        guard let x = rect["x"] as? Double, let y = rect["y"] as? Double,
+                              let width = rect["width"] as? Double, let height = rect["height"] as? Double, width > 0, height > 0
+                        else { continue }
+                        let box = CGRect(x: x, y: y, width: width, height: height)
+                        let data: Data
+                        if let whole {
+                            data = try Self.crop(whole, rect: box, scale: request.scale, page: index + 1)
+                        } else {
+                            data = try await self.snapshot(webView, request: request, rect: box, page: index + 1)
+                        }
+                        strips.append(Strip(x: x, y: y, width: width, height: height, png: data))
+                    }
+                }
+                return Page(png: png, strips: strips, milliseconds: Self.milliseconds(since: started))
             }
-            pages.append(Page(png: png, milliseconds: Self.milliseconds(since: started)))
+            pages.append(rendered)
         }
-        return pages
+        return Rendered(pages: pages, generation: generation)
     }
 
     /// 一步出图最多等多久：到点了就当宿主页卡住，重建它（下次请求重新载入），这次报错
@@ -208,16 +313,29 @@ final class CardRasterizer: NSObject {
     // MARK: 出图
 
     private func snapshot(_ webView: WKWebView, request: Request, page: Int) async throws -> Data {
+        try await snapshot(webView, request: request, rect: CGRect(x: 0, y: 0, width: request.width, height: request.height), page: page)
+    }
+
+    /// 截卡片上的一块（整页或页眉页脚的条）：rect 是卡片坐标（CSS 像素），PNG 是 rect × scale 的准确像素
+    private func snapshot(_ webView: WKWebView, request: Request, rect: CGRect, page: Int) async throws -> Data {
         let config = WKSnapshotConfiguration()
-        config.rect = CGRect(x: 0, y: 0, width: request.width, height: request.height)
+        config.rect = rect
         config.afterScreenUpdates = true
         // snapshotWidth 以点计；给到目标像素宽，WebKit 按 deviceScaleFactor 光栅化后再缩放，下面统一重采样到准确像素。
-        config.snapshotWidth = NSNumber(value: request.width * request.scale / max(1, backingScale))
+        config.snapshotWidth = NSNumber(value: rect.width * request.scale / max(1, backingScale))
         let image = try await webView.takeSnapshot(configuration: config)
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             throw Failure.snapshotFailed(page: page)
         }
-        return try Self.png(cgImage, width: Int((request.width * request.scale).rounded()), height: Int((request.height * request.scale).rounded()), page: page)
+        return try Self.png(cgImage, width: Int((rect.width * request.scale).rounded()), height: Int((rect.height * request.scale).rounded()), page: page)
+    }
+
+    /// 从整页 PNG 里裁一块（PDF 路径的页眉页脚条）
+    static func crop(_ png: Data, rect: CGRect, scale: Double, page: Int) throws -> Data {
+        guard let source = CGImageSourceCreateWithData(png as CFData, nil), let image = CGImageSourceCreateImageAtIndex(source, 0, nil),
+              let cropped = image.cropping(to: CGRect(x: (rect.minX * scale).rounded(), y: (rect.minY * scale).rounded(), width: (rect.width * scale).rounded(), height: (rect.height * scale).rounded()))
+        else { throw Failure.snapshotFailed(page: page) }
+        return try Self.png(cropped, width: Int((rect.width * scale).rounded()), height: Int((rect.height * scale).rounded()), page: page)
     }
 
     private func pdf(_ webView: WKWebView, request: Request, page: Int) async throws -> Data {
