@@ -208,9 +208,10 @@
     }
   }
 
-  // ===== 右键菜单：在新窗口打开、删除 =====
+  // ===== 右键菜单：在新窗口打开、存为模板（自己的稿子；对话框在 src/templates/gallery.js）、删除 =====
   const menu = $("#draftMenu");
   const menuWindow = menu.querySelector('[data-draft-action="window"]');
+  const menuTemplate = menu.querySelector('[data-draft-action="template"]');
   const menuDelete = menu.querySelector('[data-draft-action="delete"]');
   const MENU_EDGE = 8;
   let menuFor = null;
@@ -221,8 +222,10 @@
     menuFor = summary;
     menuReturn = document.activeElement;
     menuWindow.hidden = !windows;
+    // 模板只在 App 里能存（浏览器里没有模板文件夹）
+    menuTemplate.hidden = summary.builtIn || !root.MediaCraftNative?.templates;
     menuDelete.hidden = summary.builtIn;
-    if (menuWindow.hidden && menuDelete.hidden) return;
+    if (menuWindow.hidden && menuTemplate.hidden && menuDelete.hidden) return;
     menu.hidden = false;
     // 开在点按的地方，放不下时往窗口里挪；键盘打开（没有坐标）时开在这一行下面
     const anchor = event.clientX || event.clientY ? { x: event.clientX, y: event.clientY } : (() => {
@@ -245,6 +248,12 @@
     const summary = menuFor;
     hideMenu();
     if (summary) void openInWindow(summary);
+  });
+  // 存为模板的对话框归模板画廊（src/templates/gallery.js）：这里只说是哪一篇
+  menuTemplate.addEventListener("click", () => {
+    const summary = menuFor;
+    hideMenu();
+    if (summary) document.dispatchEvent(new CustomEvent("mediacraft:save-template", { detail: { draftId: summary.id, title: summary.title } }));
   });
   menuDelete.addEventListener("click", () => {
     const summary = menuFor;

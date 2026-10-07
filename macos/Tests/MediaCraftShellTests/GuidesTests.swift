@@ -44,10 +44,10 @@ struct GuidesTests {
         let reopened = try await harness.evaluate(Self.helpers + "return tour() !== null;") as? Bool
         await harness.tearDown()
 
-        #expect(result?["titles"] as? [String] == ["先新建一篇稿子", "像写文档一样写", "发到 iPhone，或让 AI 帮忙"])
+        #expect(result?["titles"] as? [String] == ["新建，或从模板开始", "像写文档一样写", "发到 iPhone，或让 AI 帮忙"])
         #expect(result?["focused"] as? Bool == true, "打开时焦点在「下一步」，回车就能往下走")
         #expect(result?["firstHasBack"] as? Bool == false, "第一步没有「上一步」")
-        #expect(result?["back"] as? String == "先新建一篇稿子")
+        #expect(result?["back"] as? String == "新建，或从模板开始")
         #expect(result?["finish"] as? Bool == true, "最后一步的按钮是「开始使用」")
         #expect(result?["closed"] as? Bool == true)
         #expect(reopened == false, "看完了，重新打开不再弹")
@@ -62,7 +62,7 @@ struct GuidesTests {
             ui.click("稿件列表");
             await until(() => ui.find("新建稿件"));
             ui.click("新建稿件");
-            await until(async () => tourTitle() !== "先新建一篇稿子" && (await mc.drafts.list()).some((draft) => !draft.builtIn));
+            await until(async () => tourTitle() !== "新建，或从模板开始" && (await mc.drafts.list()).some((draft) => !draft.builtIn));
             const afterNew = { title: tourTitle(), drafts: (await mc.drafts.list()).filter((draft) => !draft.builtIn).length };
             ui.find("下一步", { within: tour() }).focus();
             press("Escape");

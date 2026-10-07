@@ -16,6 +16,9 @@
 //   caption       小红书正文：`caption: |` 后面缩进的几行，换行照原样
 //   images        缩进的 `编号: 路径` 几行：自带模板相对网页根（docs/guide-assets/…、docs/template-assets/…），
 //                 用户模板相对它自己的文件夹；正文里写 [[图片:编号]]
+// colors / fonts / cover / images 这四张表也能写成一行（src/templates/README.md 与 scripts/check-templates.mjs 的写法）：
+// `cover: enabled true, subtitle 一行副标题, image valley`——半角逗号分开各项，每项第一个空白前是子键（所以副标题里不能有半角逗号）。
+// 读进来一样，写回（compose）一律用缩进的几行。
 // 色值直接写 #rrggbb（不是 YAML 的注释）；值里有「: 」、以 # 以外的特殊符号开头时加双引号。
 (function (root) {
   "use strict";
@@ -106,7 +109,15 @@
   }
 
   const text = (value) => (typeof value === "string" ? value : "");
-  const map = (value) => (value && typeof value === "object" ? value : {});
+  // 一行写法「子键 值, 子键 值」→ { 子键: 值 }：半角逗号分开各项，每项第一个空白前是子键（没有值的项值为空）
+  function inlineMap(value) {
+    return Object.fromEntries(String(value).split(",").map((item) => item.trim()).filter(Boolean).map((item) => {
+      const space = item.search(/\s/);
+      return space < 0 ? [item, ""] : [item.slice(0, space), item.slice(space + 1).trim()];
+    }));
+  }
+  // 一张表：缩进的几行（split 已经读成对象）或一行写法；都没有为空表
+  const map = (value) => (value && typeof value === "object" ? value : typeof value === "string" && value.trim() ? inlineMap(value) : {});
   const truthy = (value) => ["true", "yes", "on", "1", "是", "开"].includes(String(value ?? "").trim().toLowerCase());
 
   // 标签：逗号（半角、全角、顿号）分开，去重

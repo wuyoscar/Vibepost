@@ -10,10 +10,11 @@
   // advanceOn：点了这个控件就进入下一步。
   const STEPS = [
     {
-      spot: ["#newDraftBtn", "#draftsToggleBtn"],
-      advanceOn: "#newDraftBtn",
-      title: "先新建一篇稿子",
-      body: "稿件栏里有三本只读的说明书，随时能翻回来看。点 +，开一篇自己的稿子。",
+      // 稿件抽屉头上的两个按钮一起圈住（抽屉收着时圈「稿件列表」）；点哪个都进入下一步
+      spot: ["#templateGalleryBtn, #newDraftBtn", "#draftsToggleBtn"],
+      advanceOn: "#newDraftBtn, #templateGalleryBtn",
+      title: "新建，或从模板开始",
+      body: "稿件栏里有三本只读的说明书，随时能翻回来看。点 + 开一篇空白稿子，或点旁边的「从模板新建」挑一套写好的改。",
     },
     {
       spot: ["#markdownEditor"],
@@ -23,7 +24,7 @@
     {
       spot: ["#themeButton", "#themeOptions"],
       title: "挑一个主题",
-      body: "8 个主题，一次换掉界面、卡片结构和配色。缩略图画的是你自己的第一页，还标着会排成几页。",
+      body: "主题面板里一键换，卡片结构和配色一起换。缩略图画的是你自己的第一页，还标着会排成几页。",
     },
     {
       spot: ["#aiButton, #exportActions"],
