@@ -143,6 +143,7 @@
       contentBounds: { left, top, right, bottom },
       fill: page.fill === null ? null : Math.round(page.fill * 100) / 100,
       chars: page.chars,
+      overflow: Boolean(page.overflow),
       items: page.items.map(pageItem),
       imageHits: page.imageHits.map(({ imageId, live, x, y, width, height, baseWidth, maxWidth, resizeMaxWidth, source, cover }) => ({
         imageId, live, x, y, width, height, baseWidth, maxWidth, resizeMaxWidth, source, cover: Boolean(cover),
@@ -268,7 +269,13 @@
   function renderApi(app) {
     const { editor, pipeline } = app;
     const engine = root.MediaCraftEngine;
-    const cards = () => (app.draft.mode === "article" ? [] : pipeline.cards().map(pageSummary));
+    // 每页带上排版自检的问题（src/stage/layout-check.js）
+    const cards = () => {
+      if (app.draft.mode === "article") return [];
+      const pages = pipeline.cards().map(pageSummary);
+      const issues = root.MediaCraftLayoutCheck.issues(pages);
+      return pages.map((page, index) => ({ ...page, issues: issues[index] }));
+    };
     return {
       // 等预览画到最新并返回每页摘要；长文模式没有分页，返回 []。
       async pages() {

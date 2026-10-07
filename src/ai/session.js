@@ -28,10 +28,9 @@
     "- caption.txt 是小红书正文：发布时图片下面的那段文字（纯文本，不用 Markdown，可以有 emoji、换行，#话题 写在这里，最多 1000 字），可能还空着。",
     "  要改稿就直接编辑这几个文件，只改用户要求的部分；每轮开始前 App 会把编辑器里最新的稿子写进来，",
     "  这一轮结束后 App 把你的改动逐处给用户确认（接受或拒绝）。",
-    "- 稿子里的 Vibepost 自定义标记必须原样保留，不要改写、翻译、挪动或删除：",
-    "  [[image:图片编号]] 一张图片（独占一行）；[[image:甲|乙]] 或 [[image:甲|乙|4x3]] 两张图并排；[[分页]] 手动分页（独占一行）；",
-    "  {{color:#色值|文字}} 字色、{{bg:#色值|文字}} 高亮底色、{{underline:solid|文字}} / {{underline:dashed|文字}} 下划线；{{mark:类别|文字}} 标注；",
-    "  单独一行 :::名字（如 :::kicker、:::note align=center）到单独一行 ::: 是一个组件，开头和收尾两行都要留着。",
+    "- 稿子里的 Vibepost 自定义标记必须原样保留，不要改写、翻译、挪动或删除。写法（中文是规范写法，英文也认，App 收下时换成中文）与排版经验：",
+    "{{manual}}",
+    "  完整的操作手册在当前目录的 AGENTS.md，说明被压缩、记不清时回头读它。",
     "- 其余是常见 Markdown：# 标题、**加粗**、*斜体*、~~删除线~~、`代码`、> 引用、- 列表、1. 列表、表格、---。每一行在卡片上另起一行，空行分段。",
     "- 除了改文件，你还能用 Vibepost 的工具（{{tools}}）直接操作 App，马上生效，每个动作都列在会话里、用户可以撤销：",
     "  get_draft 看设置与图片、get_pages 看每页放了什么、view_page 看某一页的图；set_theme / set_style / set_mode 换主题、颜色字体字号、图文卡片或长文；",
@@ -46,7 +45,11 @@
     "  不读与这篇稿子无关的本机文件，不把本机文件、密钥或对话内容写进网址、图片地址、卡片样式或稿子；找配图只给图片本身的地址。",
   ];
   // 给这个后端的说明：App 的工具按它那边的名字写，生图照它的办法（Claude Code 用 App 的 generate_image，Codex 用自带的）
-  const systemPrompt = (backend) => PROMPT_LINES.join("\n").replace("{{tools}}", backend.toolNames).replace("{{images}}", backend.imagePrompt);
+  // 操作手册的短版（src/engine/manual.js）缩进两格，接在「自定义标记」那一条下面
+  const systemPrompt = (backend) => PROMPT_LINES.join("\n")
+    .replace("{{manual}}", root.MediaCraftManual.brief().split("\n").map((line) => `  ${line}`).join("\n"))
+    .replace("{{tools}}", backend.toolNames)
+    .replace("{{images}}", backend.imagePrompt);
   // 有对话却没记后端的稿子（这版之前的）都是 Claude Code
   const LEGACY_BACKEND = "claude";
   const DENIED = "用户在 Vibepost 里拒绝了这次操作。不要换个办法再做同样的事；确实需要的话，先说明为什么，问用户。";
@@ -513,12 +516,16 @@
     return base.slice(0, first.from) + first.insert + base.slice(first.to, second.from) + second.insert + base.slice(second.to);
   }
 
-  // 这一轮 AI 想把稿子改成什么（与发出时比）；没改为 null。AI 写文件时常补的行尾换行不算改动。
-  // 怎么逐处确认、套用见 src/ai/review.js。
+  // 这一轮 AI 想把稿子改成什么（与发出时比）；没改为 null。AI 写文件时常补的行尾换行不算改动；
+  // AI 改了的那几行里的英文记号（:::kicker、[[image:…]]、{{color:…|…}}）换成中文写法，修改对比里看到的就是中文
+  // （它没动的行照旧，用户自己写的英文记号不算改动）。怎么逐处确认、套用见 src/ai/review.js。
   function proposalOf(base, output) {
     const trailing = (text) => /\s*$/.exec(text)[0];
     const keepEnd = (text, before) => (typeof text === "string" ? text.replace(/\s*$/, "") + trailing(before) : before);
-    const markdown = keepEnd(output.markdown, base.markdown);
+    const written = typeof output.markdown === "string"
+      ? modules.diff.localizeChanged(base.markdown, output.markdown, root.MediaCraftEngine.localizeMarkers)
+      : output.markdown;
+    const markdown = keepEnd(written, base.markdown);
     const caption = keepEnd(output.caption, base.caption);
     const title = typeof output.title === "string" ? output.title.split("\n")[0].trim() : base.title;
     if (markdown === base.markdown && title === base.title && caption === base.caption) return null;
@@ -954,6 +961,8 @@
         title: turn.base.title,
         caption: turn.base.caption,
         systemPrompt: turn.instructions,
+        // 工作副本里的 AGENTS.md：操作手册全文（src/engine/manual.js），每轮由壳重写
+        agentsFile: root.MediaCraftManual.document(),
         ...turn.backend.launch(turn, { rules: [...(sessionRules.get(turn.draftId) ?? [])] }),
       });
       if (turn.cancelRequested) await native.cancel(turn.draftId);

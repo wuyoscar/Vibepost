@@ -161,12 +161,17 @@ struct LivePreviewEditorTests {
         """, arguments: ["corpus": Self.corpus])
         try await harness.load()
         let reloaded = try await harness.evaluate("return (await window.mediacraft.drafts.current()).markdown") as? String
+        // 再打开时英文记号换成了中文写法（旧稿升级），别的一字不差
+        let localized = try await harness.evaluate(
+            "return window.MediaCraftEngine.localizeMarkers(corpus.join('\\n'))", arguments: ["corpus": Self.corpus]
+        ) as? String
         await harness.tearDown()
 
         #expect(result?["failures"] as? String == "[]")
         #expect(result?["pressedOn"] as? Int == Self.corpus.count, "源码模式下按钮是按下的")
         #expect(result?["keys"] as? String == "Meta+/")
-        #expect(reloaded == Self.corpus.joined(separator: "\n"), "存盘再打开也一字不差（含 \\r）")
+        #expect(reloaded == localized, "存盘再打开也一字不差（含 \\r），只有英文记号换成了中文")
+        #expect(localized != Self.corpus.joined(separator: "\n"), "语料里有英文记号")
         #expect(harness.pageErrors == [])
     }
 
@@ -203,7 +208,7 @@ struct LivePreviewEditorTests {
             ui.click("关闭裁剪");
             // 光标在图片行首：→ 一步跨过整个标记；退格把整个标记删掉
             const current = await markdown();
-            const tag = `[[image:${red}]]`;
+            const tag = `[[图片:${red}]]`;
             await mc.editor.select(current.indexOf(tag));
             press("ArrowRight");
             const afterArrow = (await mc.editor.selection()).start - current.indexOf(tag);
@@ -296,9 +301,9 @@ struct LivePreviewEditorTests {
         #expect(result?["steps"] as? [String] == [
             "看看**这段文字**吧", "看看这段文字吧",
             "看看*这段文字*吧", "看看这段文字吧",
-            "看看{{underline:solid|这段文字}}吧", "看看这段文字吧",
-            "看看{{color:\(color)|这段文字}}吧", "看看这段文字吧",
-            "看看{{bg:\(highlight)|这段文字}}吧", "看看这段文字吧",
+            "看看{{下划线:实线|这段文字}}吧", "看看这段文字吧",
+            "看看{{字色:\(color)|这段文字}}吧", "看看这段文字吧",
+            "看看{{高亮:\(highlight)|这段文字}}吧", "看看这段文字吧",
             "看看[这段文字]()吧",
         ])
         #expect(result?["rewrites"] as? [String] == ["文字"], "改写把选中的文字交出去")
@@ -359,14 +364,14 @@ struct LivePreviewEditorTests {
         """) as? [String: Any]
         await harness.tearDown()
 
-        #expect(result?["all"] as? [String] == ["图片或 PDF", "实况视频", "分割线", "分页", "结尾页", "代码块", "小标签", "提示框", "页尾小字", "等宽块", "标签列表", "步骤"])
+        #expect(result?["all"] as? [String] == ["图片或 PDF", "实况视频", "分割线", "分页", "结尾页", "代码块", "小标签", "提示", "页尾", "等宽", "标签列表", "步骤"])
         #expect(result?["filtered"] as? [String] == ["分页"], "拼音缩写 fy 筛出「分页」")
         #expect(result?["pageBreak"] as? String == "第一段\n[[分页]]\n")
         #expect(result?["selected"] as? [String] == ["实况视频"], "↓ 选中下一项")
         #expect(result?["escaped"] as? [Any] as? NSArray == ["标题行\n/", false] as NSArray, "Esc 收起菜单，留下打的 /")
-        #expect(result?["quote"] as? String == "标题行\n:::kicker\n引用的话\n:::\n", "点菜单项插入")
+        #expect(result?["quote"] as? String == "标题行\n:::小标签\n引用的话\n:::\n", "点菜单项插入（中文写法）")
         #expect(result?["midLine"] as? Bool == false)
-        #expect(result?["component"] as? String == "前文\n:::kicker\n核心动作\n:::\n", "组件：插入开头与收尾两行，光标在中间")
+        #expect(result?["component"] as? String == "前文\n:::小标签\n核心动作\n:::\n", "组件：插入开头与收尾两行，光标在中间")
         #expect(harness.pageErrors == [])
     }
 

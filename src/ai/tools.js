@@ -341,6 +341,7 @@
       const next = doc.blocks[(blocks.at(-1) ?? -1) + 1];
       const role = page.role === "end" ? " · 结尾页（[[结尾]] 之后）" : "";
       lines.push("", `第 ${number + 1} 页${role} · 正文区用了 ${Math.round(((used - top) / (bottom - top)) * 100)}%`);
+      for (const issue of page.issues ?? []) lines.push(`  ⚠ ${issue.text}`);
       for (const index of blocks) {
         const from = number > 0 && onPage[number - 1].includes(index) ? "（接上页）" : "";
         const to = number < pages.length - 1 && onPage[number + 1].includes(index) ? "（转下页）" : "";
@@ -496,11 +497,12 @@
   // ===== 换样式（HTML 卡片的组件，与舞台上点选一块后的「换样式」同一套，src/cards/blocks.js）=====
 
   // 与预览里点选一块后「换样式」同一套（src/cards/blocks.js 的 setStyle）；text 是正文
-  const BLOCK_STYLES = ["text", "h1", "h2", "h3", "quote", "ul", "ol", "kicker", "note", "footnote", "mono", "rows", "steps"];
-  const STYLE_LABELS = {
-    text: "正文", h1: "大标题", h2: "小标题", h3: "三级标题", quote: "引用", ul: "无序列表", ol: "有序列表",
-    kicker: "小标签", note: "提示", footnote: "页尾", mono: "等宽", rows: "标签列表", steps: "步骤",
-  };
+  // 块样式（操作手册 src/engine/manual.js）：给 id（正文是 text，也认 p）或中文名都行
+  const manual = root.MediaCraftManual;
+  const BLOCK_STYLES = [...manual.styles.map((style) => (style.id === "p" ? "text" : style.id)), ...manual.styles.map((style) => style.name)];
+  const styleId = (value) => (value === "text" ? "p" : manual.style(value)?.id ?? null);
+  const styleList = (family) => manual.styles.filter((style) => style.family === family)
+    .map((style) => `${style.id === "p" ? "text" : style.id} ${style.name}${style.component ? "（组件）" : ""}`).join(" / ");
 
   // 用一段原文找顶层的一块（组件整个算一块）
   function topBlockOf(markdown, anchor) {
@@ -514,7 +516,7 @@
 
   function restyleBlock(args, context, draft) {
     const cards = root.MediaCraftCardBlocks;
-    if (args.style !== undefined && !BLOCK_STYLES.includes(args.style)) throw new TypeError(`style 只能是 ${BLOCK_STYLES.join(" / ")}`);
+    if (args.style !== undefined && !styleId(args.style)) throw new TypeError(`style 只能是 ${BLOCK_STYLES.join(" / ")}`);
     if (args.align !== undefined && !ALIGNS.includes(args.align)) throw new TypeError(`align 只能是 ${ALIGNS.join(" / ")}`);
     if (args.headingLevel !== undefined && ![1, 2, 3].includes(args.headingLevel)) throw new TypeError("headingLevel 只能是 1、2、3");
     if (args.style === undefined && args.align === undefined && args.headingLevel === undefined) throw new TypeError("style、align、headingLevel 至少给一个");
@@ -523,8 +525,8 @@
       const current = () => topBlockOf(next, args.block);
       if (args.style !== undefined) {
         const block = current();
-        if (args.style === "text" && block.type === "paragraph") throw new Error("这一块已经是正文了");
-        next = cards.setStyle(next, block.source, args.style === "text" ? "p" : args.style) ?? next;
+        if (styleId(args.style) === "p" && block.type === "paragraph") throw new Error("这一块已经是正文了");
+        next = cards.setStyle(next, block.source, styleId(args.style)) ?? next;
       }
       if (args.headingLevel !== undefined) {
         const block = current();
@@ -540,9 +542,9 @@
       return next;
     };
     const parts = [
-      args.style !== undefined ? STYLE_LABELS[args.style] : null,
+      args.style !== undefined ? manual.style(styleId(args.style)).name : null,
       args.headingLevel !== undefined ? `${args.headingLevel} 级标题` : null,
-      args.align !== undefined ? { left: "靠左", center: "居中", right: "靠右" }[args.align] : null,
+      args.align !== undefined ? manual.alignName(args.align) : null,
     ].filter(Boolean);
     return editStructure(context, draft, `「${clip(args.block, 16)}」换成${parts.join("、")}`, op);
   }
@@ -559,7 +561,7 @@
     const info = await imageInfo(args.image);
     const op = (markdown) => {
       if (referencedImages(parseMarkdown(markdown)).has(info.id)) throw new Error("这张图已经在正文里了，要换位置用 move_image");
-      return insertLines(markdown.split("\n"), placeOf(markdown, args).at, [`[[image:${info.id}]]`]).join("\n");
+      return insertLines(markdown.split("\n"), placeOf(markdown, args).at, [root.MediaCraftManual.imageTag([info.id])]).join("\n");
     };
     return editStructure(context, draft, `插入图片${imageName(info)}：${where(placeOf(draft.markdown, args))}`, op);
   }
@@ -752,7 +754,8 @@
     {
       name: "get_pages",
       label: "查看分页",
-      description: "按编辑器里当前的稿子出图，列出每页放了哪些块、正文区用了多少、是分页符换页还是放不下自动换页。分页、挪段落、调图片之后用它检查。",
+      description: "按编辑器里当前的稿子出图，列出每页放了哪些块、正文区用了多少、是分页符换页还是放不下自动换页，以及这一页的问题（⚠ 只有标题、太空、偏挤、溢出）。"
+        + "分页、挪段落、调图片、换样式之后用它检查，有 ⚠ 的页处理好再交差。",
       app: "你在 draft.md 里的文字修改要这一轮结束后才进编辑器，这里看不到。",
       external: "要看每页的图用 render_pages。",
       shared: true,
@@ -847,9 +850,10 @@
       name: "restyle_block",
       shared: true,
       label: "换样式",
-      description: "给一块换样式（和用户在卡片上点选一块后点「换样式」一样）：style 是 text 正文 / h1 大标题 / h2 小标题 / h3 三级标题 / quote 引用 / "
-        + "kicker 小标签 / note 提示 / footnote 页尾 / mono 等宽（段落类），或 ul 无序列表 / ol 有序列表 / rows 标签列表（每项开头写 [类别]）/ steps 步骤（列表类）；"
-        + "align（left / center / right）只对组件有用；headingLevel（1–3）等同于 style h1–h3。组件的写法是单独一行 :::名字 … 单独一行 :::。",
+      description: `给一块换样式（和用户在卡片上点选一块后点「换样式」、编辑器左上角的「样式」一样）：style 给 id 或中文名，段落类 ${styleList("text")}，`
+        + `列表类 ${styleList("list")}（标签列表每项开头写 [类别]）；align（left 靠左 / center 居中 / right 靠右）只对组件有用；`
+        + "headingLevel（1–3）等同于 style h1–h3。写进稿子的是中文写法：单独一行「:::小标签」…单独一行「:::」，对齐写成「:::提示 居中」。"
+        + `什么时候用哪种看操作手册：${manual.lessons[0]}${manual.lessons[1]}`,
       inputSchema: {
         type: "object",
         properties: {

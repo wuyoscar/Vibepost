@@ -170,7 +170,8 @@ final class ExternalAgents: @unchecked Sendable {
         guard let request = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
               let id = request["id"], let method = request["method"] as? String, let session = request["session"] as? String
         else { return ["error": "请求的格式不对"] }
-        guard ["tools/list", "tools/call"].contains(method) else { return ["id": id, "error": "Vibepost 不支持 \(method)"] }
+        // manual/get：握手时 MCP 服务要操作手册（页面从 src/engine/manual.js 写出）
+        guard ["tools/list", "tools/call", "manual/get"].contains(method) else { return ["id": id, "error": "Vibepost 不支持 \(method)"] }
         let params = request["params"] as? [String: Any] ?? [:]
         var message: [String: Any] = ["session": session, "method": method, "params": params]
         var exportRequest: String?

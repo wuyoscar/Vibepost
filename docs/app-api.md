@@ -127,6 +127,9 @@
   contentBounds: { left, top, right, bottom },  // 正文区（封面是标题所在的区域）
   fill,                 // 正文区用了多少（0–1，两位小数）；封面为 null
   chars,                // 这页上的字数（各行文字与表格格子，空白不计，按 UTF-16 算，同小红书）
+  overflow,             // 有一块放不下又拆不开，超出了正文区
+  issues: [{ id, text }],  // 排版自检（src/stage/layout-check.js）：headingOnly 只有标题、sparse 正文不到正文区四分之一
+                        // （封面、结尾页、最后一页不算）、dense 超过 300 字、overflow 溢出；text 是说给人和 Agent 的原因与建议
   items: PageItem[],    // 按绘制顺序
   imageHits: [{ imageId, live, x, y, width, height, baseWidth, maxWidth, resizeMaxWidth, source, cover }],
   dropTargets: [{ kind: "text-line" | "block", imageId, y, height, source }],  // 预览里拖放图片的落点
@@ -493,7 +496,7 @@ Claude 用它们直接操作 App（工具全名 `mcp__mediacraft__<名字>`）�
 | `ai/status` | `{ refresh, backend }`（`backend` 没给时是 `"claude"`） | `AIStatus` |
 | `ai/settings` | `{ backend, path }`（`null` 恢复自动查找；旧的 `{ claudePath }` 也认） | `AIStatus` |
 | `ai/models` | `{ backend }` | Codex：起一次 `codex app-server`，握手后问 `model/list` 就关上，`{ models: [{ id, name, isDefault }] }`；别的后端 `{ models: [] }` |
-| `ai/send` | `{ turnId, draftId, backend, prompt, markdown, title, caption, systemPrompt, … }`，后面是这个后端要的：Claude Code 是 `sessionId, resume, model, allowedTools`（`model`：这篇选的模型，`null` 不传 `--model`，格式不对时 `ok: false`；`allowedTools`：这篇的会话里「本次会话都允许」过的规则），Codex 不要别的（线程由页面经 stdin 开） | 进程启动后立即返回 `{ ok }`；找不到这个后端、缺了它要的字段、这篇已在跑时 `ok: false` 带原因 |
+| `ai/send` | `{ turnId, draftId, backend, prompt, markdown, title, caption, systemPrompt, agentsFile, … }`（`agentsFile`：写进工作副本 `AGENTS.md` 的操作手册全文，每轮重写），后面是这个后端要的：Claude Code 是 `sessionId, resume, model, allowedTools`（`model`：这篇选的模型，`null` 不传 `--model`，格式不对时 `ok: false`；`allowedTools`：这篇的会话里「本次会话都允许」过的规则），Codex 不要别的（线程由页面经 stdin 开） | 进程启动后立即返回 `{ ok }`；找不到这个后端、缺了它要的字段、这篇已在跑时 `ok: false` 带原因 |
 | `ai/cancel` | `{ draftId }` | `{ cancelled }` |
 | `ai/respond` | `{ draftId, turnId, message }`：`message` 是一整行（Claude Code 是 `control_response`；Codex 是对服务端请求的回答，或 `thread/start`、`thread/resume`、`turn/start`、`turn/interrupt`，壳按上面「Codex」里说的填好工作目录、沙箱与审批、去掉别的字段），不是这个后端认得的样子时不写、`ok: false` | 写进那一轮的 stdin，真写进去了才回 `{ delivered: true }`；这一轮已经结束、stdin 已关时 `{ delivered: false }`；写失败时 `ok: false` 带原因 |
 | `ai/work-file` | `{ draftId, turnId, markdown? }` | 这一轮进行中读工作副本的 `draft.md`；带 `markdown` 时先写进去。返回 `{ markdown }`；这一轮已经结束时 `ok: false` |

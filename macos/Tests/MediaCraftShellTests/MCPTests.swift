@@ -8,6 +8,7 @@ import Testing
 @MainActor
 struct MCPTests {
     static let tools = [
+        "get_manual",
         "list_drafts", "get_draft", "create_draft", "open_draft", "update_draft",
         "set_theme", "set_style", "set_mode", "list_palettes", "apply_palette",
         "insert_page_break", "remove_page_break", "move_section", "restyle_block", "set_card_css",
@@ -224,7 +225,7 @@ struct MCPTests {
         try? FileManager.default.removeItem(at: folder)
 
         #expect(!inserted.isError && ids.count == 2)
-        #expect(shape == "第一段\n[[image:湖.png]]\n[[image:山.png]]\n\n第二段", "每张一行，紧跟在那一块后面：\(String(reflecting: shape))")
+        #expect(shape == "第一段\n[[图片:湖.png]]\n[[图片:山.png]]\n\n第二段", "每张一行，紧跟在那一块后面：\(String(reflecting: shape))")
         #expect(relative.isError && relative.text.contains("绝对路径"))
         #expect(absent.isError && absent.text.contains("找不到图片文件"))
         #expect(notImage.isError && notImage.text.contains("不是能打开的图片"))

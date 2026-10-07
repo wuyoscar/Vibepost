@@ -207,16 +207,20 @@
 
   // 名字（中英文都认）→ 渲染。不认识的名字也不报错：渲染成 class="mc-c 名字" 的容器，
   // 这一篇的自定义样式（或 AI 写的样式）可以给它定样子——这是留给自由度的口子。
-  const COMPONENTS = [
-    { id: "kicker", names: ["kicker", "小标签"], render: (node, context) => wrap("p", "mc-kicker", node, flatLines(node, context)) },
-    { id: "mono", names: ["mono", "等宽"], render: (node, context) => wrap("div", "mc-mono", node, children(node, context)) },
-    { id: "rows", names: ["rows", "标签列表"], render: rows },
-    { id: "note", names: ["note", "提示"], render: (node, context) => wrap("div", "mc-note", node, children(node, context)) },
-    { id: "footnote", names: ["footnote", "页尾"], render: (node, context) => wrap("p", "mc-footnote", node, flatLines(node, context)) },
-    { id: "steps", names: ["steps", "步骤"], render: steps },
-  ];
-  const BY_NAME = new Map(COMPONENTS.flatMap((component) => component.names.map((name) => [name, component])));
-  const componentOf = (name) => BY_NAME.get(name) ?? null;
+  // 内置组件的画法（按 id）；名字（中文、英文）、说明与写法在操作手册 src/engine/manual.js
+  const manual = root.MediaCraftManual;
+  const RENDER = {
+    kicker: (node, context) => wrap("p", "mc-kicker", node, flatLines(node, context)),
+    mono: (node, context) => wrap("div", "mc-mono", node, children(node, context)),
+    rows: (node, context) => rows(node, context),
+    note: (node, context) => wrap("div", "mc-note", node, children(node, context)),
+    footnote: (node, context) => wrap("p", "mc-footnote", node, flatLines(node, context)),
+    steps: (node, context) => steps(node, context),
+  };
+  const componentOf = (name) => {
+    const entry = manual.component(name);
+    return entry && RENDER[entry.id] ? { id: entry.id, render: RENDER[entry.id] } : null;
+  };
 
   const children = (node, context) => mergeHeadings(node.blocks).map((child) => block(child, context)).join("");
 
@@ -225,11 +229,11 @@
     return node.blocks.flatMap((child) => child.lines ?? (child.runs ? [child] : child.items ?? [])).map((line) => inline(line.runs, context)).join("<br>");
   }
 
-  const ALIGNS = new Set(["left", "center", "right"]);
-
+  // 对齐写成「:::提示 居中」或 align=center（操作手册的 alignOf）
   function wrap(tag, className, node, inner) {
     const variant = node.attrs.variant ? ` data-variant="${escape(node.attrs.variant)}"` : "";
-    const align = ALIGNS.has(node.attrs.align) ? ` data-align="${node.attrs.align}"` : "";
+    const aligned = manual.alignOf(node.attrs);
+    const align = aligned ? ` data-align="${aligned}"` : "";
     return `<${tag} class="${className}"${variant}${align}${src(node.source)}>${inner}</${tag}>`;
   }
 
@@ -272,5 +276,5 @@
     }));
   }
 
-  root.MediaCraftCardHtml = { blocks, escape, picture, components: COMPONENTS.map(({ id, names }) => ({ id, names })) };
+  root.MediaCraftCardHtml = { blocks, escape, picture };
 })(globalThis);

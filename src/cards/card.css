@@ -472,14 +472,19 @@
   background: var(--mc-surface);
 }
 
-/* 页尾小字：贴在页脚上方，上面一条细线 */
+/* 页尾小字：是这一页正文区最后一块时贴在页脚上方（后面只跟着结尾页署名这类页面框架也算）；写在中间就是原地的一行小字，
+   不再把它和后面的内容一起推到页底。不用 !important：这一篇的卡片样式能改它 */
 .mc-footnote {
-  margin-top: auto !important;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--mc-rule);
   color: var(--mc-muted);
   font-size: 17px;
   line-height: 1.6;
+}
+
+.mc-body > .mc-footnote:last-child,
+.mc-body > .mc-footnote:has(+ [data-chrome]:last-child) {
+  margin-top: auto;
 }
 
 /* ---------- 页眉 ---------- */

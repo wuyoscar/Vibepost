@@ -41,11 +41,14 @@
     return reply(json(await draftView(draft)));
   }
 
+  // Agent 写来的卡片内容：英文记号换成中文写法（App 收下的都是中文写法，用户在编辑器里看到的也是）
+  const localized = (markdown) => root.MediaCraftEngine.localizeMarkers(String(markdown));
+
   async function createDraft(args, context) {
     const init = {};
     if (args.title !== undefined) init.title = String(args.title);
     if (args.caption !== undefined) init.caption = String(args.caption);
-    if (args.markdown !== undefined) init.markdown = String(args.markdown);
+    if (args.markdown !== undefined) init.markdown = localized(args.markdown);
     if (args.mode !== undefined) {
       if (!["cards", "article"].includes(args.mode)) throw new TypeError("mode 只能是 cards（图文卡片）或 article（长文）");
       init.mode = args.mode;
@@ -78,7 +81,7 @@
       parts.push(`小红书正文改写（${patch.caption.length} 字）`);
     }
     if (args.markdown !== undefined) {
-      patch.markdown = String(args.markdown);
+      patch.markdown = localized(args.markdown);
       parts.push(`卡片内容改写（${patch.markdown.length} 字）`);
     }
     if (!parts.length) throw new TypeError("title、caption 与 markdown 至少给一个");
@@ -206,6 +209,14 @@
 
   const TOOLS = [
     {
+      name: "get_manual",
+      free: true,
+      description: "Vibepost 的操作手册全文（Markdown）：块样式、组件（:::小标签、:::提示……）、记号（[[图片:编号]]、[[分页]]、{{字色:#色值|文字}}……）的写法、"
+        + "什么时候用哪种、排版经验。改稿、排版之前读一遍；只讲 App 认得的写法，写什么内容看写作手册。",
+      inputSchema: { type: "object", properties: {} },
+      run: async () => reply(root.MediaCraftManual.document()),
+    },
+    {
       name: "list_drafts",
       free: true,
       description: "列出 Vibepost 里的全部稿子：id、标题（没填时是正文第一行）、模式、是不是内置说明书（builtIn，只读）、是不是正在编辑的那篇（current）、最近修改时间。",
@@ -221,7 +232,7 @@
     {
       name: "create_draft",
       free: true,
-      description: "新建一篇稿子并在 App 里打开它，之后的工具都改这篇。可以同时给标题、卡片内容 markdown、小红书正文 caption、模式与主题（id 或中文名，不给时沿用用户上次选的）。正文里的自定义标记：[[分页]] 手动分页、{{color:#色值|文字}} 字色、{{bg:#色值|文字}} 高亮；图片用 import_images 插。",
+      description: "新建一篇稿子并在 App 里打开它，之后的工具都改这篇。可以同时给标题、卡片内容 markdown、小红书正文 caption、模式与主题（id 或中文名，不给时沿用用户上次选的）。写法看操作手册（工具 get_manual）：中文是规范写法（:::小标签、{{字色:#色值|文字}}、[[分页]]），英文写法也认、App 收下时换成中文；图片用 import_images 插。",
       inputSchema: {
         type: "object",
         properties: {

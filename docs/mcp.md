@@ -35,6 +35,7 @@ Claude Code ──stdio（JSON-RPC）── mediacraft-mcp ──Unix 域套接�
 ```
 
 - `mediacraft-mcp` 由 Agent 启动，自己回答握手（`initialize` / `server/discover`）与 `ping`；`tools/list`、`tools/call` 经 `~/Library/Application Support/MediaCraft/mcp.sock` 交给正在运行的 App，一次一个，按收到的顺序。
+- **握手说明**（`instructions`）：一段通用说明（App 是什么、一般流程），App 开着、打开了「允许外部 Agent 连接」时后面再接上**操作手册全文**（向 App 要 `manual/get`，页面从 `src/engine/manual.js` 写出，和 [docs/manual.md](manual.md) 一样）。连不上时只有通用说明，提示用 `get_manual` 读手册——不为了握手把 App 打开，最多等 5 秒。
 - **App 没开**时它先打开 App（`open -b com.wuyoscar.mediacraft`），最多等 20 秒套接字出现；打不开、等不到都在工具结果里说明原因。App 中途退出或重新打开过，下一次调用自动重连。一次调用最多等 10 分钟（导出很多实况也够），过了就断开、说明可能没做完。
 - 每个 `mediacraft-mcp` 进程（一次 Agent 会话）有自己的会话编号，每个请求都带上：App 按它记这次会话在改哪篇稿子，重连、页面重新载入都还记得。
 - 同时开着两个 Vibepost（比如 Debug 构建与装好的）时，后开的不抢先开的套接字（它不接外部 Agent，设置里也不显示开关），退出时也不删别人的。
@@ -60,11 +61,12 @@ Claude Code ──stdio（JSON-RPC）── mediacraft-mcp ──Unix 域套接�
 
 | 工具 | 做什么 |
 | --- | --- |
+| `get_manual` | 操作手册全文（Markdown）：块样式、组件、记号的写法，什么时候用哪种，排版经验（与 docs/manual.md 一样） |
 | `list_drafts` | 全部稿子：id、标题、模式、是不是内置说明书、是不是正在编辑的那篇、最近修改时间 |
 | `get_draft` | 认定的那篇（还没新建、打开过时是正在编辑的那篇）：id、只读、标题、小红书正文 `caption`、卡片内容 Markdown、模式、主题、颜色、字体、字号行距、分页个数、图片，以及可选的主题、字体与取值范围 |
-| `create_draft` | 新建并在新窗口里打开（标题、卡片内容、小红书正文、模式、主题可一起给） |
+| `create_draft` | 新建并在新窗口里打开（标题、卡片内容、小红书正文、模式、主题可一起给；卡片内容里的英文记号收下时换成中文写法） |
 | `open_draft` | 打开一篇（之后的工具改这篇）：开着它的窗口，或一个新窗口 |
-| `update_draft` | 改标题、小红书正文和 / 或整篇卡片内容（一步可撤销） |
+| `update_draft` | 改标题、小红书正文和 / 或整篇卡片内容（一步可撤销；英文记号收下时换成中文写法） |
 | `set_theme` ★ | 换主题（id 或中文名） |
 | `set_style` ★ | 颜色、字体、字号、行距、图片最大高，只改给了的项 |
 | `set_mode` ★ | 图文卡片 `cards` / 长文 `article` |
@@ -76,7 +78,7 @@ Claude Code ──stdio（JSON-RPC）── mediacraft-mcp ──Unix 域套接�
 | `restyle_block` ★ | 给一块换样式：组件（小标签、提示、页尾、等宽、标签列表、步骤）、对齐、标题级别 |
 | `import_images` | 按本机绝对路径插图，插在某一块之前或之后（都不给插在末尾），每张一行 |
 | `insert_image` ★ / `move_image` ★ / `resize_image` ★ / `crop_image` ★ | 把素材里的图插回正文 / 挪图 / 大小与对齐 / 裁剪 |
-| `get_pages` ★ | 每页放了哪些块、正文区用了多少、怎么换的页 |
+| `get_pages` ★ | 每页放了哪些块、正文区用了多少、怎么换的页，以及这一页的问题（⚠ 只有标题、太空、偏挤、溢出） |
 | `render_pages` | 同上，并附每页卡片的 PNG（MCP 的 image 内容，默认 540 像素宽，一次最多 9 页） |
 | `export` | 导出 `zip` / `png`（第几页）/ `long`（长文长图）到指定文件夹，返回写下的路径 |
 | `send_to_iphone` | 按页序交给隔空投送（人选设备），小红书正文进剪贴板（空着时不动） |

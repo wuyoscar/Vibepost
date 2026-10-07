@@ -213,5 +213,17 @@
       ]));
   }
 
-  (root.MediaCraftAI ||= {}).diff = { review, apply, parts };
+  // AI 写回来的稿子：只把它改了的那几行换成 localize 之后的样子（英文记号换成中文写法），没动的行照旧——
+  // 用户自己写的英文记号不会因为这一轮 AI 而变成一处「修改」。整篇先一起 localize（代码块里的照样不动），再按行取
+  function localizeChanged(base, proposal, localize) {
+    const before = linesOf(base);
+    const after = linesOf(proposal);
+    const localized = linesOf(localize(proposal));
+    if (localized.length !== after.length) return proposal;
+    const changed = new Set();
+    for (const change of changes(before, after)) for (let line = change.bFrom; line < change.bTo; line += 1) changed.add(line);
+    return after.map((line, index) => (changed.has(index) ? localized[index] : line)).join("").slice(0, -1);
+  }
+
+  (root.MediaCraftAI ||= {}).diff = { review, apply, parts, localizeChanged };
 })(window);

@@ -150,7 +150,7 @@ struct AIImageTests {
         #expect(second?["placeholder"] as? String == "gpt-image-2")
         #expect(second?["candidates"] as? [Int] == [2, 2])
         #expect(second?["media"] as? Int == 1, "点了一张才插进稿子")
-        #expect((second?["markdown"] as? String ?? "").contains("[[image:"))
+        #expect((second?["markdown"] as? String ?? "").contains("[[图片:"), "插进稿子的是中文写法")
         #expect(second?["leaked"] as? Bool == false && !stdin.contains(FakeImageAPI.key) && !argv.contains(FakeImageAPI.key), "密钥只进请求头")
         #expect(harness.pageErrors == [])
     }

@@ -119,20 +119,26 @@ struct PublishAssistantTests {
             }
             const topics = Array.from({ length: 12 }, (_, index) => `#话题${index + 1}`).join(" ");
             await mc.drafts.update({ caption: `去了好多地方\\n${topics}`, markdown: "#卡片上的话题不算 " + Array.from({ length: 19 }, (_, index) => `第 ${index + 1} 页`).join("\\n\\n[[分页]]\\n\\n") });
-            await until(() => badge().textContent === "检查 · 3");
+            // 每页只有一行字：除了三条数量上限，前 18 页各有一条「太空」的排版提示（最后一页不算）
+            await until(() => badge().textContent === "检查 · 21");
             ui.click("检查");
-            const limits = rows();
+            const limits = rows().filter((row) => row[0] === "数量上限");
+            const layout = rows().filter((row) => row[0] === "排版");
             ui.click("跳到正文栏里的「话题 12 个」");
             const caption = document.querySelector("#captionInput");
             const extraTopic = await until(() => document.activeElement === caption && caption.value.slice(caption.selectionStart, caption.selectionEnd));
             await mc.drafts.update({ mode: "article" });
             await until(() => badge().textContent === "检查");
-            return { widths, limits, extraTopic, empty: checkPanel().textContent.includes("没有要改的地方") };
+            return { widths, limits, layout: [layout.length, layout[0], layout.at(-1)], extraTopic, empty: checkPanel().textContent.includes("没有要改的地方") };
         """) as? [String: Any]
         await harness.tearDown()
 
         #expect(result?["widths"] as? [[AnyHashable]] == [["10/20", false], ["3/20", false], ["20/20", false], ["21/20", true]] as [[AnyHashable]])
         #expect(result?["limits"] as? [[String]] == [["数量上限", "警告", "标题 21/20"], ["数量上限", "警告", "话题 12 个"], ["数量上限", "警告", "19 张图片"]])
+        let layout = result?["layout"] as? [Any]
+        #expect(layout?.first as? Int == 18, "一条一页太空的排版提示：最后一页不算")
+        #expect(layout?[1] as? [String] == ["排版", "提示", "第 1 页太空"])
+        #expect(layout?[2] as? [String] == ["排版", "提示", "第 18 页太空"])
         #expect(result?["extraTopic"] as? String == "#话题11", "跳到正文栏里第一个发不出去的话题")
         #expect(result?["empty"] as? Bool == true, "长文不查标题、话题与图片数")
         #expect(harness.pageErrors == [])

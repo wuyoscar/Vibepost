@@ -171,6 +171,15 @@
 
         <section class="editor-pane" aria-label="编辑器">
           <div class="format-bar toolbar" role="toolbar" aria-label="文字样式" data-guide-lock>
+            <!-- 样式（src/editor/toolbars.js）：光标所在那块是什么、换成别的；和卡片上点选一块后的「换样式」是同一个操作、同一份列表 -->
+            <details id="styleMenu" class="pop-menu style-menu">
+              <summary class="menu-button" aria-label="样式" title="光标所在那块的样式：正文、标题、引用、组件……">
+                <span class="style-menu-current" data-style-current>正文</span>
+                <svg class="icon icon-small" aria-hidden="true"><use href="#i-chevron-down" /></svg>
+              </summary>
+              <div class="pop-menu-panel menu style-menu-panel" data-style-items></div>
+            </details>
+            <span class="bar-separator" aria-hidden="true"></span>
             <button type="button" class="format-button" data-mark="bold" aria-label="加粗" aria-keyshortcuts="Meta+B" title="加粗 ⌘B"><b>B</b></button>
             <button type="button" class="format-button format-italic" data-mark="italic" aria-label="斜体" aria-keyshortcuts="Meta+I" title="斜体 ⌘I"><i>I</i></button>
             <button type="button" class="format-button" data-mark="underline" aria-label="下划线" aria-keyshortcuts="Meta+U" title="下划线 ⌘U"><u>U</u></button>
@@ -190,18 +199,8 @@
                   <span class="menu-glyph" aria-hidden="true"><svg class="icon icon-small"><use href="#i-live" /></svg></span>实况视频
                   <input id="videoFileInput" class="visually-hidden" type="file" accept="video/mp4,video/quicktime,.mp4,.m4v,.mov" multiple />
                 </label>
-                <button type="button" class="menu-item" data-insert="divider" aria-label="分割线">
-                  <span class="menu-glyph" aria-hidden="true"><svg class="icon icon-small"><use href="#i-divider" /></svg></span>分割线
-                </button>
-                <button type="button" class="menu-item" data-insert="pageBreak" aria-label="分页" aria-keyshortcuts="Meta+Enter" title="后面的内容从下一张卡片开始">
-                  <span class="menu-glyph" aria-hidden="true"><svg class="icon icon-small"><use href="#i-page-break" /></svg></span>分页<kbd>⌘↩</kbd>
-                </button>
-                <button type="button" class="menu-item" data-insert="endPage" aria-label="结尾页" title="后面的内容排成结尾页：居中、留白，最后是署名">
-                  <span class="menu-glyph" aria-hidden="true"><svg class="icon icon-small"><use href="#i-end-page" /></svg></span>结尾页
-                </button>
-                <button type="button" class="menu-item" data-insert="code" aria-label="代码块">
-                  <span class="menu-glyph" aria-hidden="true"><svg class="icon icon-small"><use href="#i-code" /></svg></span>代码块
-                </button>
+                <!-- 其余各项（分割线、分页、结尾页、代码块与组件）由 src/editor/toolbars.js 照操作手册（src/engine/manual.js）生成 -->
+                <div class="menu-section" data-insert-items></div>
               </div>
             </details>
             <button type="button" class="source-toggle" data-source-toggle aria-label="源码" aria-pressed="false" aria-keyshortcuts="Meta+/" title="显示 Markdown 源码 ⌘/">&lt;/&gt; 源码</button>
@@ -1132,6 +1131,7 @@
     <script src="src/engine/freeze.js"></script>
     <script src="src/engine/colors.js"></script>
     <script src="src/engine/media.js"></script>
+    <script src="src/engine/manual.js"></script>
     <script src="src/engine/markdown.js"></script>
     <script src="src/engine/plain-text.js"></script>
     <script src="src/engine/structures.js"></script>
@@ -1200,6 +1200,7 @@
     <script src="src/stage/render.js"></script>
     <script src="src/stage/preview.js"></script>
     <script src="src/stage/pipeline.js"></script>
+    <script src="src/stage/layout-check.js"></script>
     <script src="src/stage/blocks.js"></script>
     <script src="src/stage/annotations.js"></script>
     <script src="src/api/media.js"></script>

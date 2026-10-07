@@ -358,6 +358,8 @@ final class AISessions: @unchecked Sendable {
         /// 小红书正文（发布时图片下面的那段），写进 `caption.txt`
         let caption: String
         let systemPrompt: String
+        /// 工作副本里的 `AGENTS.md`：页面给的操作手册全文（每轮重写，Agent 改了也不留）；空着时不写
+        let agentsFile: String
         /// 这篇稿子选的模型（别名如 `opus` 或模型 ID），nil 是跟随 Claude Code 自己的设置（不传 `--model`）
         let model: String?
         /// 这篇稿子的会话里点过「本次会话都允许」的权限规则（Claude Code 的写法，如 `Bash(npm test:*)`），每轮都带上
@@ -384,10 +386,14 @@ final class AISessions: @unchecked Sendable {
             title = fields["title"] as? String ?? ""
             caption = fields["caption"] as? String ?? ""
             systemPrompt = fields["systemPrompt"] as? String ?? ""
+            agentsFile = String((fields["agentsFile"] as? String ?? "").prefix(Self.agentsFileLimit))
             model = fields["model"] as? String
             if let model, !Self.isModel(model) { throw Failure("模型 ID 不对：\(model)") }
             allowedTools = (fields["allowedTools"] as? [String] ?? []).filter(Self.isRule)
         }
+
+        /// AGENTS.md 最多这么多字（操作手册不到一万字，留足余量）
+        static let agentsFileLimit = 200_000
 
         /// 权限规则只能是一个参数：不空、不换行、不以 `-` 开头（免得被当成选项）
         static func isRule(_ rule: String) -> Bool {
@@ -536,13 +542,17 @@ final class AISessions: @unchecked Sendable {
         startReading(turn, output: output.fileHandleForReading, errors: errors.fileHandleForReading, readers: readers)
     }
 
-    /// 工作副本：这篇稿子的常驻目录（`--resume` 要在同一个目录里），每轮开始时写进最新的卡片内容、标题与小红书正文。
+    /// 工作副本：这篇稿子的常驻目录（`--resume` 要在同一个目录里），每轮开始时写进最新的卡片内容、标题与小红书正文，
+    /// 以及 `AGENTS.md`（操作手册；Codex 自己会读它，Claude Code 的说明书里指向它）。
     private func prepareWorkCopy(for request: TurnRequest) throws -> URL {
         let directory = configuration.root.appendingPathComponent(request.draftId, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try Data(request.markdown.utf8).write(to: directory.appendingPathComponent("draft.md"), options: .atomic)
         try Data(request.title.utf8).write(to: directory.appendingPathComponent("title.txt"), options: .atomic)
         try Data(request.caption.utf8).write(to: directory.appendingPathComponent("caption.txt"), options: .atomic)
+        if !request.agentsFile.isEmpty {
+            try Data(request.agentsFile.utf8).write(to: directory.appendingPathComponent("AGENTS.md"), options: .atomic)
+        }
         return directory
     }
 

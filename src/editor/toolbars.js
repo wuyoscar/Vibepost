@@ -1,5 +1,7 @@
 // 编辑区的两条工具：
-// - 精简格式条：段落样式、B / I / U / S、列表、引用、插入、源码开关；按钮状态跟着光标所在的格式走。
+// - 格式条：「样式」（光标所在那块是什么、换成别的）、B / I / U / S、插入、源码开关；按钮状态跟着光标走。
+//   「样式」与「插入」的条目照操作手册（src/engine/manual.js）生成；换样式和卡片上点选一块后的「换样式」是同一个操作
+//   （src/cards/blocks.js 的 setStyle），只是这里作用于光标所在的那几块。
 // - 选中文字时的浮动条：B / I / U、字色、高亮、链接、改写；字色、高亮的色块由应用按这篇的配色给出。
 (() => {
   const { syntax } = window.MediaCraftEditor;
@@ -12,8 +14,127 @@
     if (menu) menu.open = false;
   }
 
-  // 格式条只管写字：加粗等行内格式、插入、源码。段落的样式（标题、列表、引用、组件）在预览里点选那一块改（src/stage/blocks.js），
-  // 不在这里另开一个入口
+  const manual = () => window.MediaCraftManual;
+  const cardBlocks = () => window.MediaCraftCardBlocks;
+  // 「插入」里非组件的几项用图标（组件用操作手册里的字形）
+  const INSERT_ICONS = { divider: "i-divider", pageBreak: "i-page-break", endPage: "i-end-page", code: "i-code" };
+  const ALIGN_ICONS = { left: "i-align-left", center: "i-align-center", right: "i-align-right" };
+
+  function glyphOf({ glyph, icon }) {
+    const span = document.createElement("span");
+    span.className = "menu-glyph";
+    span.setAttribute("aria-hidden", "true");
+    if (icon) span.innerHTML = `<svg class="icon icon-small"><use href="#${icon}" /></svg>`;
+    else span.textContent = glyph ?? "";
+    return span;
+  }
+
+  // 菜单里的一项：字形、名字（hint 给了就在名字下面写一句说明）、快捷键
+  function menuItem({ name, hint, glyph, icon, shortcut, title, role = "menuitem" }) {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "menu-item";
+    item.setAttribute("role", role);
+    item.setAttribute("aria-label", name);
+    if (title) item.title = title;
+    const label = document.createElement("span");
+    label.className = "menu-item-label";
+    label.append(name);
+    if (hint) label.append(Object.assign(document.createElement("small"), { className: "menu-hint", textContent: hint }));
+    item.append(glyphOf({ glyph, icon }), label);
+    if (shortcut) item.append(Object.assign(document.createElement("kbd"), { textContent: shortcut }));
+    return item;
+  }
+
+  // 「插入」：分割线、分页、结尾页、代码块与全部组件（图片、实况两项连着文件选择框，写在页面里）
+  function fillInsertMenu(container) {
+    const { inserts, styles } = manual();
+    const others = inserts.filter((item) => INSERT_ICONS[item.id]).map((item) => {
+      const button = menuItem({ name: item.name, icon: INSERT_ICONS[item.id], shortcut: item.shortcut, title: item.summary });
+      button.dataset.insert = item.id;
+      return button;
+    });
+    const components = styles.filter((style) => style.component).map((style) => {
+      const button = menuItem({ name: style.name, glyph: style.glyph, title: `${style.summary}（${style.when}）` });
+      button.dataset.insert = `component-${style.id}`;
+      return button;
+    });
+    container.replaceChildren(...others, Object.assign(document.createElement("hr"), { className: "menu-rule" }), ...components);
+  }
+
+  // 「样式」：段落类、列表类两组，每项带一句说明；最后是组件的对齐
+  function fillStyleMenu(panel) {
+    const { styles, aligns } = manual();
+    const heading = (text) => Object.assign(document.createElement("p"), { className: "menu-heading", textContent: text });
+    const group = (family) => styles.filter((style) => style.family === family).map((style) => {
+      const title = [style.summary, style.when && `用在${style.when}`, style.avoid].filter(Boolean).join("；");
+      const item = menuItem({ name: style.name, hint: style.summary, glyph: style.glyph, title, role: "menuitemradio" });
+      item.dataset.style = style.id;
+      return item;
+    });
+    const alignRow = document.createElement("div");
+    alignRow.className = "style-menu-aligns";
+    alignRow.setAttribute("role", "group");
+    alignRow.setAttribute("aria-label", "组件的对齐");
+    alignRow.append(...aligns.map((align) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "format-button";
+      button.dataset.align = align.id;
+      button.setAttribute("aria-label", align.name);
+      button.title = `组件${align.name}`;
+      button.innerHTML = `<svg class="icon icon-small" aria-hidden="true"><use href="#${ALIGN_ICONS[align.id]}" /></svg>`;
+      return button;
+    }));
+    panel.replaceChildren(heading("段落"), ...group("text"), heading("列表"), ...group("list"), heading("对齐（组件）"), alignRow);
+  }
+
+  function bindStyleMenu(editor, menu) {
+    const panel = menu.querySelector("[data-style-items]");
+    const current = menu.querySelector("[data-style-current]");
+    fillStyleMenu(panel);
+    const range = () => {
+      const { start, end } = editor.selection();
+      return [start, end];
+    };
+    panel.addEventListener("click", (event) => {
+      const control = event.target.closest("[data-style], [data-align]");
+      if (!control || control.disabled) return;
+      const text = editor.getText();
+      const next = control.dataset.style
+        ? cardBlocks().restyleRange(text, range(), control.dataset.style)
+        : cardBlocks().alignRange(text, range(), control.dataset.align);
+      menu.open = false;
+      if (next !== null) editor.edit({ text: next });
+      editor.focus();
+    });
+    // 光标所在的那几块：正文没变时不重新解析
+    let parsedDoc = null;
+    let blocks = [];
+    return function sync() {
+      const { state } = editor.view;
+      if (state.doc !== parsedDoc) {
+        parsedDoc = state.doc;
+        blocks = cardBlocks().list(state.doc.toString());
+      }
+      const { from, to } = state.selection.main;
+      const found = blocks.filter((block) => cardBlocks().styleOf(block) && block.source[0] <= Math.max(from, to - 1) && from < Math.max(block.source[1], block.source[0] + 1));
+      const style = cardBlocks().styleOf(found[0]);
+      current.textContent = style ? manual().style(style).name : "样式";
+      for (const item of panel.querySelectorAll("[data-style]")) {
+        item.disabled = !found.length;
+        item.setAttribute("aria-checked", String(item.dataset.style === style));
+      }
+      const component = found.find((block) => block.type === "container" && manual().component(block.name));
+      const align = component ? manual().alignOf(component.attrs) ?? "left" : null;
+      for (const button of panel.querySelectorAll("[data-align]")) {
+        button.disabled = !component;
+        button.setAttribute("aria-pressed", String(button.dataset.align === align));
+      }
+    };
+  }
+
+  // 格式条：「样式」、加粗等行内格式、插入、源码
   function bindFormatBar(editor, bar) {
     const sourceToggle = bar.querySelector("[data-source-toggle]");
     const run = (control, action) => control.addEventListener("click", () => {
@@ -21,6 +142,8 @@
       closeMenu(control);
       editor.focus();
     });
+    fillInsertMenu(bar.querySelector("[data-insert-items]"));
+    const syncStyle = bindStyleMenu(editor, bar.querySelector("#styleMenu"));
     bar.querySelectorAll("[data-mark]").forEach((button) => run(button, () => editor.command("toggleInline", button.dataset.mark)));
     bar.querySelectorAll("[data-insert]").forEach((button) => run(button, () => editor.insert(button.dataset.insert)));
     run(sourceToggle, () => editor.setSourceMode(!editor.sourceMode()));
@@ -31,6 +154,7 @@
       const formats = syntax.formatsAt(state, from, to);
       bar.querySelectorAll("[data-mark]").forEach((button) => button.setAttribute("aria-pressed", String(Boolean(formats[button.dataset.mark]))));
       sourceToggle.setAttribute("aria-pressed", String(editor.sourceMode()));
+      syncStyle();
     };
   }
 

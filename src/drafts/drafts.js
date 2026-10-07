@@ -87,20 +87,30 @@
   }
 
   // 存储里读出来的记录：用的是定稿之前的旧主题时换成接替它的新主题，没调过的配色换成新主题的
-  // （src/themes/themes.js 的 migrate；每轮 AI 之前存的版本一样换）。启动时换过的一次写回去。
-  function upgrade(record) {
+  // （src/themes/themes.js 的 migrate）；卡片内容里的英文记号换成中文写法（src/engine/markdown.js 的 localizeMarkers）。
+  // 每轮 AI 之前存的版本一样换；都不算修改（不改修改时间）。启动时换过的一次写回去。
+  function migrate(fields) {
     const themes = root.MediaCraftThemes;
-    if (!record || !themes) return record;
+    const changes = { ...(themes?.migrate(fields) ?? {}) };
+    if (typeof fields.markdown === "string") {
+      const markdown = root.MediaCraftEngine.localizeMarkers(fields.markdown);
+      if (markdown !== fields.markdown) changes.markdown = markdown;
+    }
+    return Object.keys(changes).length ? changes : null;
+  }
+
+  function upgrade(record) {
+    if (!record) return record;
     let versionsChanged = false;
     const versions = Array.isArray(record.versions)
       ? record.versions.map((version) => {
-        const changes = version?.draft && themes.migrate(version.draft);
+        const changes = version?.draft && migrate(version.draft);
         if (!changes) return version;
         versionsChanged = true;
         return { ...version, draft: { ...version.draft, ...changes } };
       })
       : null;
-    const changes = themes.migrate(record);
+    const changes = migrate(record);
     if (!changes && !versionsChanged) return record;
     return { ...record, ...changes, ...(versionsChanged ? { versions } : {}) };
   }

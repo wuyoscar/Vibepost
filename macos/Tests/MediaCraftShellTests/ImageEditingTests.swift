@@ -100,7 +100,7 @@ struct ImageEditingTests {
         """) as? String
         await harness.tearDown()
 
-        #expect(result == "第一行\n[[image:后.png]]\n[[image:前.png]]\n第二行\n[[image:空行.png]]\n第三行")
+        #expect(result == "第一行\n[[图片:后.png]]\n[[图片:前.png]]\n第二行\n[[图片:空行.png]]\n第三行")
         #expect(harness.pageErrors == [])
     }
 
@@ -126,7 +126,7 @@ struct ImageEditingTests {
         """) as? String
         await harness.tearDown()
 
-        #expect(result == "第一段\n\n[[image:上.png]]\n第二段\n[[image:图1.png]]\n[[image:图2.png]]\n[[image:图10.png]]\n\n第三段")
+        #expect(result == "第一段\n\n[[图片:上.png]]\n第二段\n[[图片:图1.png]]\n[[图片:图2.png]]\n[[图片:图10.png]]\n\n第三段")
         #expect(harness.pageErrors == [])
     }
 
@@ -163,7 +163,7 @@ struct ImageEditingTests {
         #expect((result?["alone"] as? String ?? "").contains("MediaCraft App"), "浏览器里导入 PDF 说明要在 App 里做")
         #expect(result?["mixed"] as? [String] == ["封面.png"])
         #expect((result?["status"] as? String ?? "").contains("PDF"))
-        #expect(result?["shape"] as? String == "开头\n[[image:封面.png]]\n[[image:讲义-第1页.png]]\n[[image:讲义-第2页.png]]\n[[image:讲义-第3页.png]]\n")
+        #expect(result?["shape"] as? String == "开头\n[[图片:封面.png]]\n[[图片:讲义-第1页.png]]\n[[图片:讲义-第2页.png]]\n[[图片:讲义-第3页.png]]\n")
         #expect(harness.pageErrors == [])
     }
 
@@ -239,7 +239,7 @@ struct ImageEditingTests {
         let result = try await harness.evaluate(Self.helpers + """
             await mc.drafts.create({ markdown: "开头" });
             const [red, blue] = await mc.media.import([await pngFile("红.png", 60, 60, ["#e03131"]), await pngFile("蓝.png", 60, 60, ["#1971c2"])]);
-            await mc.drafts.update({ markdown: `开头\\n[[image:${red}|${blue}]]\\n结尾` });
+            await mc.drafts.update({ markdown: `开头\\n[[图片:${red}|${blue}]]\\n结尾` });
             await settle(200);
             const body = document.querySelector('[role="textbox"][aria-label="正文"]');
             const openPair = async (names) => {
@@ -287,17 +287,17 @@ struct ImageEditingTests {
         await harness.tearDown()
 
         let fourThree = result?["fourThree"] as? [String: Any]
-        #expect(fourThree?["text"] as? String == "开头\n[[image:红.png|蓝.png|4x3]]\n结尾")
+        #expect(fourThree?["text"] as? String == "开头\n[[图片:红.png|蓝.png|4x3]]\n结尾")
         #expect(fourThree?["ratio"] as? Double == 1.33, "卡片上整组 4:3")
         #expect(result?["pressed"] as? String == "true", "再打开时是 4:3")
         #expect(result?["dragged"] as? String == "1:1", "下边往下拖到头吸附到 1:1")
-        #expect(result?["cancelled"] as? String == "开头\n[[image:红.png|蓝.png|4x3]]\n结尾", "取消什么都不改")
+        #expect(result?["cancelled"] as? String == "开头\n[[图片:红.png|蓝.png|4x3]]\n结尾", "取消什么都不改")
         let swapped = result?["swapped"] as? [String: Any]
-        #expect(swapped?["text"] as? String == "开头\n[[image:蓝.png|红.png|1x1]]\n结尾")
+        #expect(swapped?["text"] as? String == "开头\n[[图片:蓝.png|红.png|1x1]]\n结尾")
         #expect(swapped?["ratio"] as? Double == 1)
-        #expect(result?["split"] as? String == "开头\n[[image:蓝.png]]\n[[image:红.png]]\n结尾")
-        #expect(result?["undoSplit"] as? String == "开头\n[[image:蓝.png|红.png|1x1]]\n结尾")
-        #expect(result?["undoSwap"] as? String == "开头\n[[image:红.png|蓝.png|4x3]]\n结尾")
+        #expect(result?["split"] as? String == "开头\n[[图片:蓝.png]]\n[[图片:红.png]]\n结尾")
+        #expect(result?["undoSplit"] as? String == "开头\n[[图片:蓝.png|红.png|1x1]]\n结尾")
+        #expect(result?["undoSwap"] as? String == "开头\n[[图片:红.png|蓝.png|4x3]]\n结尾")
         #expect(harness.pageErrors == [])
     }
 
@@ -334,12 +334,12 @@ struct ImageEditingTests {
         """) as? [String: Any]
         await harness.tearDown()
 
-        #expect(result?["moved"] as? String == "[[image:乙.png]]\n第一段\n\n第二段\n[[image:甲.png]]\n")
+        #expect(result?["moved"] as? String == "[[图片:乙.png]]\n第一段\n\n第二段\n[[图片:甲.png]]\n")
         let paired = result?["paired"] as? [String: Any]
-        #expect(paired?["text"] as? String == "[[image:甲.png|乙.png]]\n第一段\n\n第二段\n", "甲的那一行删掉，和乙拼在乙的位置")
+        #expect(paired?["text"] as? String == "[[图片:甲.png|乙.png]]\n第一段\n\n第二段\n", "甲的那一行删掉，和乙拼在乙的位置")
         #expect(paired?["selected"] as? String == "true", "拼好后选中这组")
-        #expect(result?["undoPair"] as? String == "[[image:乙.png]]\n第一段\n\n第二段\n[[image:甲.png]]\n")
-        #expect(result?["undoMove"] as? String == "第一段\n\n第二段\n[[image:甲.png]]\n[[image:乙.png]]\n")
+        #expect(result?["undoPair"] as? String == "[[图片:乙.png]]\n第一段\n\n第二段\n[[图片:甲.png]]\n")
+        #expect(result?["undoMove"] as? String == "第一段\n\n第二段\n[[图片:甲.png]]\n[[图片:乙.png]]\n")
         #expect(harness.pageErrors == [])
     }
 

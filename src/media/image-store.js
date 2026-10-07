@@ -5,7 +5,8 @@
 (() => {
   "use strict";
 
-  const IMAGE_TAG = /\[\[image:([\w|-]+)\]\]/g;
+  // [[图片:…]]（英文 [[image:…]] 照样认，冒号也认全角的）
+  const IMAGE_TAG = new RegExp(`\\[\\[(?:${window.MediaCraftManual.markerWords.image.join("|")})[:：]([\\w|-]+)\\]\\]`, "g");
 
   // 正文里出现的图片 id（拼图里的两张都算）
   const idsIn = (content) => new Set([...String(content || "").matchAll(IMAGE_TAG)].flatMap((match) => match[1].split("|")));

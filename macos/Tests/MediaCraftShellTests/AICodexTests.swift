@@ -463,7 +463,7 @@ struct AICodexTests {
         #expect((result?["captions"] as? [Any?])?.first as? String == "窗边的橘猫，水彩", "说明是它改写后的提示词")
         let lines = result?["lines"] as? [[String]] ?? []
         #expect(lines.contains { $0.first == "tool" && ($0.last ?? "").contains("生成图片没成功") && ($0.last ?? "").contains("额度") }, "\(lines)")
-        #expect(result?["media"] as? Int == 1 && (result?["markdown"] as? String ?? "").contains("[[image:"), "点了一张才插进稿子")
+        #expect(result?["media"] as? Int == 1 && (result?["markdown"] as? String ?? "").contains("[[图片:"), "点了一张才插进稿子")
         #expect(result?["rawHasImage"] as? Bool == false, "原图的数据不推给页面")
         #expect(FileManager.default.fileExists(atPath: saved.path) && (try? Data(contentsOf: saved)) == savedData, "它目录里的原图不动")
         let start = try #require(codex.params(0, "thread/start"))

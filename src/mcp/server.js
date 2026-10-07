@@ -14,8 +14,9 @@
   const shared = root.MediaCraftAITools.shared;
   const LOG_LIMIT = 50;
 
-  // 工具在清单里的顺序：稿子、样式、结构、图片、出图与导出
+  // 工具在清单里的顺序：手册、稿子、样式、结构、图片、出图与导出
   const ORDER = [
+    "get_manual",
     "list_drafts", "get_draft", "create_draft", "open_draft", "update_draft",
     "set_theme", "set_style", "set_mode", "list_palettes", "apply_palette",
     "insert_page_break", "remove_page_break", "move_section", "restyle_block", "set_card_css",
@@ -124,6 +125,8 @@
       return { tools: TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) };
     }
     if (request.method === "tools/call") return callTool(request);
+    // 握手时 MCP 服务要的操作手册（接在握手说明后面，src/engine/manual.js）
+    if (request.method === "manual/get") return { text: root.MediaCraftManual.document() };
     throw new Error(`不支持 ${request.method}`);
   }
 

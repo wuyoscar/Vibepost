@@ -61,18 +61,22 @@
     return null;
   }
 
-  const span = (name) => ({
-    opener: lastOf(new RegExp(`\\{\\{${name}:[^|{}]+\\|`, "g")),
-    closer: firstOf(/\}\}/g),
-    splits: contains(new RegExp(`\\{\\{${name}:`, "g")),
-  });
+  // {{字色:…| 这类开头：中文、英文写法都认（操作手册 src/engine/manual.js 的词表），冒号也认全角的
+  const span = (id) => {
+    const word = `(?:${window.MediaCraftManual.markerWords[id].join("|")})[:：]`;
+    return {
+      opener: lastOf(new RegExp(`\\{\\{${word}[^|{}]+\\|`, "g")),
+      closer: firstOf(/\}\}/g),
+      splits: contains(new RegExp(`\\{\\{${word}`, "g")),
+    };
+  };
 
   const FORMATS = {
     bold: { open: "**", close: "**", ...stars(2) },
     italic: { open: "*", close: "*", ...stars(1) },
     strike: { open: "~~", close: "~~", opener: lastOf(/~~/g), closer: firstOf(/~~/g), splits: contains(/~~/g) },
     code: { open: "`", close: "`", opener: lastOf(/`+/g), closer: firstOf(/`+/g), splits: contains(/`/g) },
-    underline: { open: "{{underline:solid|", close: "}}", ...span("underline") },
+    underline: { open: window.MediaCraftManual.spanOpener("underline", "solid"), close: "}}", ...span("underline") },
     color: span("color"),
     bg: span("bg"),
     link: { opener: lastOf(/\[/g), closer: linkCloser, splits: contains(/\[|\]\(/g) },
@@ -252,7 +256,7 @@
       return removal ? edit(view, removal) : false;
     }
     if (state.selection.main.empty) return false;
-    const opener = `{{${kind}:${value}|`;
+    const opener = window.MediaCraftManual.spanOpener(kind, value);
     const [segment] = segments;
     const spans = segments.length === 1 ? spansAround(state, segment, kind) : [];
     if (spans.length === 1 && spans[0].from === segment.from && spans[0].to === segment.to) {

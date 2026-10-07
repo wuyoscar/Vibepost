@@ -10,7 +10,7 @@
     return !needle || command.label.toLowerCase().includes(needle) || command.aliases.some((alias) => alias.startsWith(needle));
   }
 
-  // commands：[{ id, glyph, label, keys?, aliases, run(view) }]
+  // commands：[{ id, glyph, label, keys?, aliases, hint?（悬停时的说明）, run(view) }]
   function slashMenu(commands) {
     const plugin = ViewPlugin.fromClass(class {
       constructor(view) {
@@ -67,6 +67,7 @@
           option.className = "menu-item";
           option.setAttribute("role", "option");
           option.setAttribute("aria-label", command.label);
+          if (command.hint) option.title = command.hint;
           option.setAttribute("aria-selected", String(index === this.active));
           const glyph = document.createElement("span");
           glyph.className = "menu-glyph";

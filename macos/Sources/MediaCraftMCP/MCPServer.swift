@@ -11,12 +11,16 @@ public final class MCPServer: @unchecked Sendable {
     static let supportedVersions = [currentVersion] + legacyVersions
     static let versionKey = "io.modelcontextprotocol/protocolVersion"
     static let serverInfo: [String: Any] = ["name": "mediacraft", "title": "Vibepost", "version": "1"]
+    /// 握手说明的通用部分。App 开着、允许外部 Agent 连接时，后面再接上 App 给的操作手册全文（页面从 src/engine/manual.js 写出）；
+    /// 连不上时只有这段，并提示用 get_manual 读手册（不为了握手把 App 打开）
     static let instructions = """
-        MediaCraft 是用户这台 Mac 上的排版 App：把 Markdown 排成小红书图文卡片（3:4，每页 864 × 1152）或长文长图，再隔空投送到 iPhone。\
+        Vibepost 是用户这台 Mac 上的排版 App：把 Markdown 排成小红书图文卡片（3:4，每页 864 × 1152）或长文长图，再隔空投送到 iPhone。\
         工具操作的是 App 里正在编辑的那篇稿子，改动马上出现在用户眼前，每一步都能 ⌘Z 撤销、也列在 AI 助手的「外部 Agent 的操作」里。\
         一般流程：create_draft（或 list_drafts + open_draft）→ update_draft 写正文与标题 → set_theme / set_style 挑样式 → \
-        render_pages 看每页的图、按需 insert_page_break / move_section 调分页 → export 导出或 send_to_iphone（会在 App 里弹出隔空投送，由用户选设备）。\
-        正文是 Markdown，另有自定义标记：[[image:图片编号]]、[[分页]]、{{color:#色值|文字}}、{{bg:#色值|文字}}。内置说明书只读，先新建稿子再改。
+        render_pages 看每页的图、get_pages 看每页的问题，按需 insert_page_break / move_section / restyle_block 调整 → \
+        export 导出或 send_to_iphone（会在 App 里弹出隔空投送，由用户选设备）。内置说明书只读，先新建稿子再改。\
+        块样式、组件（:::小标签 这类）、记号（[[分页]]、{{字色:#色值|文字}} 这类）的写法与排版经验在操作手册里，用 get_manual 读全文；\
+        写什么内容、什么口味看写作手册（list_writing_manuals、read_writing_manual）。
         """
 
     private let link: AppLink
@@ -79,7 +83,7 @@ public final class MCPServer: @unchecked Sendable {
                 "supportedVersions": Self.supportedVersions,
                 "capabilities": ["tools": [:]],
                 "_meta": ["io.modelcontextprotocol/serverInfo": Self.serverInfo],
-                "instructions": Self.instructions,
+                "instructions": handshakeInstructions(),
             ])))
         case "ping":
             send(Self.result(id, modern ? Self.complete([:]) : [:]))
@@ -100,8 +104,15 @@ public final class MCPServer: @unchecked Sendable {
             "protocolVersion": Self.legacyVersions.contains(wanted) ? wanted : Self.legacyVersions[0],
             "capabilities": ["tools": [:]],
             "serverInfo": Self.serverInfo,
-            "instructions": Self.instructions,
+            "instructions": handshakeInstructions(),
         ]
+    }
+
+    /// 握手说明：通用部分，App 开着时再接上操作手册全文。在调用队列上取（连接只在那一个线程里用），App 没开时不等
+    private func handshakeInstructions() -> String {
+        let manual = calls.sync { link.callIfRunning(method: "manual/get", params: [:])?["text"] as? String }
+        guard let manual, !manual.isEmpty else { return Self.instructions }
+        return Self.instructions + "\n\n" + manual
     }
 
     private func forward(id: Any, method: String, params: [String: Any], modern: Bool) {

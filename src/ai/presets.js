@@ -13,8 +13,12 @@
   // 小红书标题最多 20 个全角字，也就是 40 个显示宽度
   const TITLE_WIDTH_LIMIT = 40;
   const TITLE_COUNT = 5;
-  const MARKERS = "保留所有自定义标记（[[image:…]] 图片、[[分页]]、{{color:…|…}} 字色、{{bg:…|…}} 高亮、{{underline:…|…}} 下划线）和 #话题标签，原样不动";
-  const OTHER_MARKERS = "其余自定义标记（[[image:…]] 图片、{{color:…|…}} 字色、{{bg:…|…}} 高亮、{{underline:…|…}} 下划线）和 #话题标签原样保留";
+  // 要原样保留的自定义标记：写法照操作手册（src/engine/manual.js）
+  const manual = root.MediaCraftManual;
+  const markers = (ids) => ids.map((id) => `${manual.marker(id).syntax.split("　")[0]} ${manual.marker(id).name}`).join("、");
+  const MARKERS = `保留所有自定义标记（${markers(["image", "pageBreak", "color", "bg", "underline", "mark"])}、:::组件）和 #话题标签，原样不动`;
+  const OTHER_MARKERS = `其余自定义标记（${markers(["image", "color", "bg", "underline", "mark"])}、:::组件）和 #话题标签原样保留`;
+  const MARK = manual.marker("mark").syntax;
 
   // 设计方向（借鉴设计师常说的几个词）：都先看再改、改完再看，用和用户在卡片上点选一块后一样的操作
   const DESIGN_STEPS = [
@@ -60,12 +64,12 @@
         "直接修改 draft.md，改完用一两句话说明主要改了什么。",
       ].join("\n"),
     },
-    bolder: design("更醒目", "层次更分明、重点一眼能看到：标题更有分量，关键句换成提示或小标签，并列的要点排成标签列表或步骤，用 {{mark:类别|文字}} 标出关键词；不是每一块都要加重，留出对比。"),
+    bolder: design("更醒目", `层次更分明、重点一眼能看到：标题更有分量，关键句换成提示或小标签，并列的要点排成标签列表或步骤，用 ${MARK} 标出关键词；不是每一块都要加重，留出对比。`),
     quieter: design("更安静", "去掉多余的强调与装饰：少用颜色和组件，标注只留最关键的，留白更多，读起来更从容。"),
     distill: design("精简", "每页只讲一件事：删掉重复和可有可无的句子，合并相近的段落，太挤的页拆开或挪走次要内容；每页控制在 180–280 字。"),
-    colorize: design("上色", "给颜色一点作用：用 {{mark:类别|文字}} 把同一类的词标成同一种颜色，关键提示用提示框；颜色少而有用，不花哨。"),
+    colorize: design("上色", `给颜色一点作用：用 ${MARK} 把同一类的词标成同一种颜色，关键提示用提示框；颜色少而有用，不花哨。`),
     typeset: design("调字", "把字排得更好读：标题级别分明（用 restyle_block 的 headingLevel），字号与行距合适（set_style），长段拆短，数字、英文与中文混排不挤；需要时用 set_card_css 调字重与间距。"),
-    layout: design("理版式", "让每一页有主次：开头一句点题（可换成小标签或大标题），要点用标签列表或步骤，结尾用页尾收一句；分页落在要点之间，不把一个要点拆到两页。"),
+    layout: design("理版式", "让每一页有主次：开头一句点题（可换成小标签或大标题），要点用标签列表或步骤，出处、来源放在这一页最后的页尾；分页落在要点之间，不把一个要点拆到两页。"),
     caption: {
       label: "写小红书正文",
       prompt: [

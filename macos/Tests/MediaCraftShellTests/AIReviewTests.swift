@@ -27,8 +27,8 @@ struct AIReviewTests {
         window.cmdZ = (shift = false) => document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "z", metaKey: true, shiftKey: shift, bubbles: true, cancelable: true }));
     """
 
-    static let base = "# 周末\n\n今天天气很好，我们去公园散步。\n湖边有柳树。\n\n[[image:a|b]]\n\n[[分页]]\n\n傍晚是{{color:#d9480f|橘子色}}。"
-    static let proposal = "# 周末\n\n天气正好，我们去公园走了走。\n湖边有几棵柳树。\n\n[[image:b|a]]\n\n新的一段。\n\n[[分页]]\n\n傍晚是{{color:#2f9e44|橘子色}}。"
+    static let base = "# 周末\n\n今天天气很好，我们去公园散步。\n湖边有柳树。\n\n[[图片:a|b]]\n\n[[分页]]\n\n傍晚是{{字色:#d9480f|橘子色}}。"
+    static let proposal = "# 周末\n\n天气正好，我们去公园走了走。\n湖边有几棵柳树。\n\n[[图片:b|a]]\n\n新的一段。\n\n[[分页]]\n\n傍晚是{{字色:#2f9e44|橘子色}}。"
 
     /// 回放脚本里的 `#write`：把整个文件写成 content（像 Write 工具）
     static func write(_ file: String, _ content: String) -> String {
@@ -87,14 +87,14 @@ struct AIReviewTests {
         #expect(hunks.map { [$0["before"] as? String ?? "", $0["after"] as? String ?? ""] } == [
             ["旧", "新"],
             ["今天天气很好，我们去公园散步。\n湖边有柳树。", "天气正好，我们去公园走了走。\n湖边有几棵柳树。"],
-            ["[[image:a|b]]", "[[image:b|a]]"],
+            ["[[图片:a|b]]", "[[图片:b|a]]"],
             ["", "新的一段。\n"],
-            ["傍晚是{{color:#d9480f|橘子色}}。", "傍晚是{{color:#2f9e44|橘子色}}。"],
+            ["傍晚是{{字色:#d9480f|橘子色}}。", "傍晚是{{字色:#2f9e44|橘子色}}。"],
         ], "同一段里的两行合成一处；标记整个在一处之内")
         #expect(hunks.allSatisfy { $0["decision"] as? String == "pending" && $0["conflict"] as? Bool == false })
         let source = hunks[2]["source"] as? [Int] ?? []
         let base = Array(Self.base.utf16)
-        #expect(source.count == 2 && String(utf16CodeUnits: Array(base[source[0]..<source[1]]), count: source[1] - source[0]) == "[[image:a|b]]")
+        #expect(source.count == 2 && String(utf16CodeUnits: Array(base[source[0]..<source[1]]), count: source[1] - source[0]) == "[[图片:a|b]]")
 
         let during = result?["during"] as? [String: Any]
         #expect(during?["markdown"] as? String == Self.base, "确认之前正文不动")
@@ -103,7 +103,7 @@ struct AIReviewTests {
         #expect(during?["titleRow"] as? String == "aiReviewTitle", "标题的修改在编辑器上方那一条里")
         let deleted = during?["deleted"] as? [String] ?? []
         let inserted = during?["inserted"] as? [String] ?? []
-        #expect(deleted.contains("{{color:#d9480f|") && inserted.contains("{{color:#2f9e44|"), "改了的标记整个标出来：\(deleted) \(inserted)")
+        #expect(deleted.contains("{{字色:#d9480f|") && inserted.contains("{{字色:#2f9e44|"), "改了的标记整个标出来：\(deleted) \(inserted)")
         #expect(inserted.contains("新的一段。\n"))
         #expect((during?["card"] as? String ?? "").contains("天气正好"), "舞台是接受后的样子")
         #expect(during?["summary"] as? String == "AI 改了 5 处 逐处接受或拒绝 · 舞台上是全部接受后的样子")
@@ -160,7 +160,7 @@ struct AIReviewTests {
         """) as? [String: Any]
         await harness.tearDown()
 
-        let expected = "# 周末\n\n天气正好，我们去公园走了走。\n湖边有几棵柳树。\n\n[[image:a|b]]\n\n新的一段。\n\n[[分页]]\n\n傍晚是{{color:#2f9e44|橘子色}}。"
+        let expected = "# 周末\n\n天气正好，我们去公园走了走。\n湖边有几棵柳树。\n\n[[图片:a|b]]\n\n新的一段。\n\n[[分页]]\n\n傍晚是{{字色:#2f9e44|橘子色}}。"
         let decisions: [String?] = ["accepted", "accepted", "rejected", "accepted", "pending"]
         #expect(partial?["open"] as? Bool == true)
         #expect((partial?["hunks"] as? [[String: Any]])?.map { $0["decision"] as? String } == decisions)
@@ -371,7 +371,7 @@ struct AIReviewTests {
             await until(async () => (await mc.media.get(id)) === null);
             await mc.render.pages();
             await wait(300);
-            const deleted = { marker: (await markdown()).includes("[[image:"), stored: (await readStore("media")).some((item) => item.id === id) };
+            const deleted = { marker: (await markdown()).includes("[[图片:"), stored: (await readStore("media")).some((item) => item.id === id) };
             ui.click("撤回到这一轮之前");
             await until(async () => (await mc.media.get(id)) !== null);
             const back = { markdown: await markdown(), pixels: await pixels(), src: (await mc.media.src(id))?.startsWith("data:image/png") };

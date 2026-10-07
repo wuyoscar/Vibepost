@@ -180,7 +180,7 @@ struct AIPresetsTests {
         #expect(prompts[0].contains("首图") && prompts[0].contains("一级标题") && prompts[0].contains("保留所有自定义标记"))
         #expect(prompts[1].contains("AI 味") && prompts[1].contains("不编造") && prompts[1].contains("保留所有自定义标记"))
         #expect(prompts[2].contains("[[分页]]") && prompts[2].contains("不要用 insert_page_break") && prompts[2].contains("自定义标记"))
-        #expect(prompts.allSatisfy { $0.contains("[[image:") && $0.contains("{{color:") }, "提示词点名要保留的标记")
+        #expect(prompts.allSatisfy { $0.contains("[[图片:") && $0.contains("{{字色:") }, "提示词点名要保留的标记（中文写法）")
         let calls = fake.calls()
         let session = FakeClaude.option("--session-id", in: calls.first ?? [:])
         #expect(calls.dropFirst().map { FakeClaude.option("--resume", in: $0) } == [session, session], "都在同一个会话里")

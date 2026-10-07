@@ -10,33 +10,40 @@
   const percent = (value, total) => `${(value / total) * 100}%`;
 
   const KIND_LABEL = { heading: "标题", paragraph: "段落", list: "列表", quote: "引用", code: "代码块", table: "表格", rule: "分割线", component: "组件" };
-  const COMPONENT_LABEL = { kicker: "小标签", note: "提示", footnote: "页尾", mono: "等宽", rows: "标签列表", steps: "步骤" };
-  // 换样式菜单里的两组：段落类的块在第一组里互换，列表类的在第二组里（也能拆回正文）
-  const TEXT_STYLES = [["p", "正文"], ["h1", "大标题"], ["h2", "小标题"], ["h3", "三级标题"], ["quote", "引用"], ["kicker", "小标签"], ["note", "提示"], ["footnote", "页尾"], ["mono", "等宽"]];
-  const LIST_STYLES = [["ul", "无序列表"], ["ol", "有序列表"], ["rows", "标签列表"], ["steps", "步骤"], ["p", "正文"]];
+  // 样式的名字、说明与分组都在操作手册（src/engine/manual.js），和编辑器左上角的「样式」是同一份
+  const manual = () => window.MediaCraftManual;
 
-  const labelOf = (block) => (block.kind === "component" ? COMPONENT_LABEL[block.name] ?? block.name : KIND_LABEL[block.kind] ?? "内容");
+  const labelOf = (block) => (block.kind === "component" ? manual().component(block.name)?.name ?? block.name : KIND_LABEL[block.kind] ?? "内容");
 
-  // 这一块现在是哪种样式（与 src/cards/blocks.js 的 setStyle 同一套名字）
+  // 这一块现在是哪种样式（操作手册里的 id，与 src/cards/blocks.js 的 setStyle 同一套）
   function styleOf(block) {
     if (block.kind === "heading") return `h${block.level}`;
     if (block.kind === "paragraph") return "p";
     if (block.kind === "quote") return "quote";
     if (block.kind === "list") return block.ordered ? "ol" : "ul";
-    if (block.kind === "component") return block.name;
+    if (block.kind === "component") return manual().component(block.name)?.id ?? null;
     return null;
   }
 
-  // 这一块能换成的样式：[{ label, run(text) → 新原文 | null, current, group? }]；代码块、表格、分割线没有
+  // 换样式菜单：段落类的块在段落类里互换，列表类的在列表类里（也能拆回正文）
+  function familyOf(current) {
+    const { styles } = manual();
+    const family = manual().style(current)?.family ?? "text";
+    return family === "list" ? [...styles.filter((style) => style.family === "list"), manual().style("p")] : styles.filter((style) => style.family === "text");
+  }
+
+  // 这一块能换成的样式：[{ label, title, run(text) → 新原文 | null, current, group? }]；代码块、表格、分割线、认不出的组件没有
   function stylesOf(block) {
     const { setStyle, setAttr } = ops();
     const current = styleOf(block);
     if (!current) return [];
-    const family = ["ul", "ol", "rows", "steps"].includes(current) ? LIST_STYLES : TEXT_STYLES;
-    const styles = family.map(([style, label]) => ({ label, current: style === current, run: (text) => setStyle(text, block.source, style) }));
+    const styles = familyOf(current).map((style) => ({
+      label: style.name, title: style.summary, current: style.id === current, run: (text) => setStyle(text, block.source, style.id),
+    }));
     if (block.kind !== "component") return styles;
-    const aligns = [["left", "靠左"], ["center", "居中"], ["right", "靠右"]].map(([value, label]) => ({
-      label, group: "align", current: (block.align ?? "left") === value, run: (text) => setAttr(text, block.source, "align", value === "left" ? null : value),
+    const aligns = manual().aligns.map((align) => ({
+      label: align.name, group: "align", current: (block.align ?? "left") === align.id,
+      run: (text) => setAttr(text, block.source, "align", align.id === "left" ? null : align.id),
     }));
     return [...styles, ...aligns];
   }
@@ -205,6 +212,7 @@
         item.setAttribute("role", "menuitemradio");
         item.setAttribute("aria-checked", String(Boolean(style.current)));
         item.textContent = style.label;
+        if (style.title) item.title = style.title;
         item.addEventListener("click", (event) => {
           event.stopPropagation();
           const text = actions.text();

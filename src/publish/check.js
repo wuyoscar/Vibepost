@@ -1,6 +1,7 @@
 // 发布检查的规则（纯函数，不碰界面）：标题按小红书的显示宽度计字，正文栏（图片下面的那段）里的 #话题与字数，
 // 按本地词库（src/publish/lexicon.json，规则与出处见 docs/publish-check.md）在标题、正文栏与卡片文字里找极限词、医疗用语、收益承诺与引流，
-// 再加上话题数、图片数、标题与正文字数、正文还没写、署名还没填与 AI 声明提醒。界面在 src/publish/assistant.js。
+// 再加上话题数、图片数、标题与正文字数、正文还没写、署名还没填、排版（每页的自检问题，src/stage/layout-check.js）与 AI 声明提醒。
+// 界面在 src/publish/assistant.js。
 //
 // 卡片文字只查读者看得到的字：Markdown 标记、代码（行内与代码块）、图片与分页标记、链接的网址都不查（链接网址另按「网址」规则整条算一处）；
 // 正文栏是纯文本，整段照原样查；
@@ -10,8 +11,10 @@
 
   const LIMITS = Object.freeze({ title: 20, caption: 1000, topics: 10, images: 18 });
   // 分组的顺序；词库里的分组（极限词、医疗用语、收益承诺、引流）的名字取自词库
-  const CATEGORY_ORDER = ["limit", "caption", "byline", "absolute", "medical", "finance", "traffic", "ai"];
-  const BUILT_IN_CATEGORIES = { limit: "数量上限", caption: "正文", byline: "署名", ai: "AI 声明" };
+  const CATEGORY_ORDER = ["limit", "layout", "caption", "byline", "absolute", "medical", "finance", "traffic", "ai"];
+  const BUILT_IN_CATEGORIES = { limit: "数量上限", layout: "排版", caption: "正文", byline: "署名", ai: "AI 声明" };
+  // 排版自检的问题在面板里的说法：第几页 + 这几个字
+  const LAYOUT_LABELS = { headingOnly: "只有标题", sparse: "太空", dense: "偏挤", overflow: "溢出" };
   // 同一分组里按位置排：标题在前，正文栏其次，卡片文字按在 Markdown 里的位置，没有位置的最后
   const PLACE_ORDER = { title: 0, caption: 1, body: 2 };
   const LEXICON_URL = "src/publish/lexicon.json";
@@ -227,13 +230,21 @@
     reason: "卡片上只有头像、没有名字；在「样式 › 署名」里填上你的名字（也可以就这样发）", where: null,
   });
 
+  // 排版：每页的自检问题（pageIssues 是 App API 页面摘要里每页的 issues），只提醒、不拦发送
+  function layoutItems(pageIssues = []) {
+    return pageIssues.flatMap((issues, index) => (issues ?? []).map((issue) => ({
+      key: `layout:${issue.id}:${index + 1}`, category: "layout", level: "hint", label: `第 ${index + 1} 页${LAYOUT_LABELS[issue.id] ?? "排版"}`,
+      reason: issue.text, where: null, page: index,
+    })));
+  }
+
   const aiItem = () => ({
     key: "ai:declare", category: "ai", level: "hint", label: "用过 AI 助手",
     reason: "发布时在小红书里勾选「笔记含 AI 合成内容」（《人工智能生成合成内容标识办法》要求标识）", where: null,
   });
 
-  // input：{ title, caption, markdown, mode, pageCount, usedAI, signed }；lexicon：compile() 的结果。长文没有正文栏，不查它与数量。
-  // signed 为 false 时（署名的名字空着）提醒一句；没给时不查。
+  // input：{ title, caption, markdown, mode, pageCount, usedAI, signed, pageIssues }；lexicon：compile() 的结果。长文没有正文栏，不查它与数量。
+  // signed 为 false 时（署名的名字空着）提醒一句；没给时不查。pageIssues 是每页的排版问题（没给时不查）。
   // 返回提醒的列表，按分组、再按位置排好。每条：{ key, category, level: "warn" | "hint", label, reason,
   //   where: "title" | "caption" | "body" | null（标题、正文栏、卡片文字、不在字里）, from?, to?（在那一处的偏移）, text?,
   //   suggest?（建议改成的字，"" 是删掉，null 是没有通用改法）, context?: [前文, 后文] }
@@ -251,6 +262,7 @@
       ...(cards ? limitItems({ ...input, title, caption }) : []),
       ...(cards && !caption.trim() ? [emptyCaptionItem()] : []),
       ...(cards && input.signed === false ? [unsignedItem()] : []),
+      ...(cards ? layoutItems(input.pageIssues) : []),
       ...hits,
       ...(input.usedAI ? [aiItem()] : []),
     ];

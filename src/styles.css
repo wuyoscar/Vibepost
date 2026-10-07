@@ -1379,6 +1379,73 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   font-weight: 400;
 }
 
+/* 菜单里一项的名字与它下面的一句说明（「样式」菜单），分组的小标题，组与组之间的细线 */
+.menu-item-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.menu-hint {
+  overflow: hidden;
+  color: var(--ui-text-3);
+  font-size: 11px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-heading {
+  margin: 6px 10px 2px;
+  color: var(--ui-text-3);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.menu-rule {
+  margin: 4px 6px;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+}
+
+.menu-item[aria-checked="true"] {
+  color: var(--ui-accent-text);
+  font-weight: 600;
+}
+
+/* 格式条最左边的「样式」：按钮上写着光标所在那块的样式（宽度固定，换的时候不跳）；菜单高了在里面滚动 */
+.style-menu .menu-button {
+  min-width: 76px;
+  justify-content: space-between;
+  color: var(--ui-text);
+}
+
+.style-menu-current {
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.style-menu-panel {
+  width: 248px;
+  max-height: min(calc(100vh - 120px), 720px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.style-menu-panel .menu-item {
+  height: auto;
+  min-height: 38px;
+  padding: 4px 10px;
+}
+
+.style-menu-aligns {
+  display: flex;
+  gap: 4px;
+  padding: 2px 8px 6px;
+}
+
 .menu-glyph {
   display: grid;
   flex: none;

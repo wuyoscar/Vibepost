@@ -130,25 +130,26 @@
   }
 
   // 「/」菜单与格式条「插入」里的命令。pickImages / pickLivePhoto 由应用打开文件选择。
+  // 「/」菜单与格式条「插入」里的项：名字、字形、拼音缩写与说明都在操作手册（src/engine/manual.js），组件插入的是中文写法。
+  // 标题、列表、引用这类段落样式不在这里：用格式条的「样式」，或在预览里点选那一块换（直接写 # 、- 、> 也行）
   function insertCommands(hooks) {
+    const manual = window.MediaCraftManual;
+    const runs = {
+      image: () => hooks.pickImages(),
+      live: () => hooks.pickLivePhoto(),
+      divider: commands.insertDivider,
+      pageBreak: commands.insertPageBreak,
+      endPage: commands.insertEndPage,
+      code: commands.insertCodeBlock,
+    };
     return [
-      // 标题、列表、引用这类段落样式不在这里：在预览里点选那一块换（直接写 # 、- 、> 也行）
-      { id: "image", glyph: "图", label: "图片或 PDF", aliases: ["image", "pdf", "tp", "tupian"], run: () => hooks.pickImages() },
-      { id: "live", glyph: "实", label: "实况视频", aliases: ["live", "video", "sk", "shikuang"], run: () => hooks.pickLivePhoto() },
-      { id: "divider", glyph: "—", label: "分割线", aliases: ["hr", "divider", "fgx", "fengexian"], run: commands.insertDivider },
-      { id: "pageBreak", glyph: "页", label: "分页", keys: "⌘↩", aliases: ["page", "fy", "fenye"], run: commands.insertPageBreak },
-      { id: "endPage", glyph: "尾", label: "结尾页", aliases: ["end", "jw", "jiewei"], run: commands.insertEndPage },
-      { id: "code", glyph: "</>", label: "代码块", aliases: ["code", "dm", "daima"], run: commands.insertCodeBlock },
+      ...manual.inserts.map((item) => ({
+        id: item.id, glyph: item.glyph, label: item.name, keys: item.shortcut, aliases: item.keys, hint: item.summary, run: runs[item.id],
+      })),
       // 组件：卡片上各有样子
-      ...[
-        ["kicker", "签", "小标签", ["kicker", "xbq", "xiaobiaoqian"]],
-        ["note", "注", "提示框", ["note", "tsk", "tishi"]],
-        ["footnote", "脚", "页尾小字", ["footnote", "yw", "yewei"]],
-        ["mono", "M", "等宽块", ["mono", "dk", "dengkuan", "prompt"]],
-        ["rows", "▤", "标签列表", ["rows", "bqlb", "biaoqian"], "- [类别] "],
-        ["steps", "①", "步骤", ["steps", "bz", "buzhou"], "- "],
-      ].map(([name, glyph, label, aliases, body = ""]) => ({
-        id: `component-${name}`, glyph, label, aliases, run: (view) => commands.insertComponent(view, name, body),
+      ...manual.styles.filter((style) => style.component).map((style) => ({
+        id: `component-${style.id}`, glyph: style.glyph, label: style.name, aliases: [...style.aliases, ...style.keys], hint: style.summary,
+        run: (view) => commands.insertComponent(view, style.name, style.body ?? ""),
       })),
     ];
   }

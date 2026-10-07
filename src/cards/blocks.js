@@ -27,10 +27,16 @@
     return text.slice(0, left) + joint + text.slice(right);
   }
 
-  // 顶层的块（组件整个算一块）：{ type, name?, attrs?, source }；分页符、结尾页标记也在里面
+  // 顶层的块（组件整个算一块）：{ type, name?, attrs?, level?（标题）, ordered?（列表）, source }；分页符、结尾页标记也在里面
   function list(text) {
     return root.MediaCraftEngine.parseMarkdown(text, { containers: true }).blocks
-      .map(({ type, name, attrs, source }) => ({ type, ...(name ? { name, attrs: { ...attrs } } : {}), source: [...source] }));
+      .map(({ type, name, attrs, level, items, source }) => ({
+        type,
+        ...(name ? { name, attrs: { ...attrs } } : {}),
+        ...(type === "heading" ? { level } : {}),
+        ...(type === "list" ? { ordered: Boolean(items?.[0]?.ordered) } : {}),
+        source: [...source],
+      }));
   }
 
   // source 所在的那一块（按开头落在哪一块里找）
@@ -74,16 +80,10 @@
     return move(text, blocks[index].source, neighbor.source, direction > 0);
   }
 
-  // 组件开头一行：:::名字 属性
-  function opener(name, attrs = {}) {
-    const parts = Object.entries(attrs).filter(([, value]) => value !== null && value !== undefined && value !== false)
-      .map(([key, value]) => (value === true ? key : /[\s"]/.test(String(value)) ? `${key}="${String(value).replace(/"/g, "")}"` : `${key}=${value}`));
-    return `:::${[name, ...parts].join(" ")}`;
-  }
-
-  // 能换成的样式：段落类（正文、标题、引用、组件）与列表类（列表、标签列表、步骤）
-  const COMPONENT_STYLES = new Set(["kicker", "note", "footnote", "mono", "rows", "steps"]);
-  const STYLES = new Set(["p", "h1", "h2", "h3", "quote", "ul", "ol", ...COMPONENT_STYLES]);
+  // 能换成的样式与组件开头一行的写法都在操作手册（src/engine/manual.js）：段落类（正文、标题、引用、组件）与列表类（列表、标签列表、步骤）。
+  // 写进稿子的是中文写法（:::小标签 居中）
+  const manual = root.MediaCraftManual;
+  const STYLES = new Set(manual.styles.map((style) => style.id));
   const HEADING = /^\s{0,3}#{1,6}\s+/;
   const QUOTE = /^\s{0,3}>\s?/;
   const ITEM = /^\s{0,3}(?:[-*+]|\d+[.)])\s+/;
@@ -104,32 +104,66 @@
       case "quote": return lines.map((line) => (line.trim() ? `> ${line}` : ">")).join("\n");
       case "ul": return filled.map((line) => `- ${line}`).join("\n");
       case "ol": return filled.map((line, index) => `${index + 1}. ${line}`).join("\n");
-      case "rows": case "steps": return `${opener(style, attrs)}\n${filled.map((line) => `- ${line}`).join("\n")}\n:::`;
-      default: return `${opener(style, attrs)}\n${lines.join("\n")}\n:::`;
+      case "rows": case "steps": return `${manual.opener(style, attrs)}\n${filled.map((line) => `- ${line}`).join("\n")}\n:::`;
+      default: return `${manual.opener(style, attrs)}\n${lines.join("\n")}\n:::`;
     }
   }
 
-  // 给一块换样式（style 见 STYLES）：先去掉原来的记号，再按新样式写回去；组件之间互换时属性（对齐）留着。
+  // 给一块换样式（style 是操作手册里的 id 或中文名）：先去掉原来的记号，再按新样式写回去；组件之间互换时属性（对齐）留着。
   // 舞台上连着的几行标题是一块（src/cards/html.js 合并的），source 覆盖它们。没变化时为 null
-  function setStyle(text, source, style) {
-    if (!STYLES.has(style)) throw new TypeError(`样式只能是 ${[...STYLES].join(" / ")}`);
+  function setStyle(text, source, wanted) {
+    const style = manual.style(wanted)?.id;
+    if (!STYLES.has(style)) throw new TypeError(`样式只能是 ${manual.styles.map((item) => item.name).join(" / ")}`);
     const block = blockAt(text, source);
     if (!block || !["paragraph", "heading", "quote", "list", "container"].includes(block.type)) return null;
     const { from, to } = span(text, [Math.min(block.source[0], source[0]), Math.max(block.source[1], source[1])]);
-    const attrs = block.type === "container" && COMPONENT_STYLES.has(style) ? block.attrs : {};
+    const attrs = block.type === "container" && manual.component(style) ? block.attrs : {};
     const next = text.slice(0, from) + styled(contentLines(text, block, from, to), style, attrs) + text.slice(to);
     return next === text ? null : next;
   }
 
-  // 改组件的一个属性（value 为 null 时去掉）；不是组件时为 null
+  // 改组件的一个属性（value 为 null 时去掉）；对齐（key 为 align，value 是 left / center / right）写成中文的一个词。不是组件时为 null
   function setAttr(text, source, key, value) {
     const block = blockAt(text, source);
     if (block?.type !== "container") return null;
     const { from } = span(text, block.source);
     const end = lineEnd(text, from);
-    const next = text.slice(0, from) + opener(block.name, { ...block.attrs, [key]: value }) + text.slice(end);
+    const attrs = key === "align" ? { ...manual.otherAttrs(block.attrs), align: value } : { ...block.attrs, [key]: value };
+    const next = text.slice(0, from) + manual.opener(block.name, attrs) + text.slice(end);
     return next === text ? null : next;
   }
 
-  root.MediaCraftCardBlocks = { list, blockAt, span, remove, move, shift, setStyle, setAttr, insertAt, STYLES };
+  // 一块现在是哪种样式（操作手册里的 id）；代码块、表格、图片、认不出的组件这类不能换样式的为 null
+  function styleOf(block) {
+    if (!block) return null;
+    if (block.type === "paragraph") return "p";
+    if (block.type === "heading") return `h${Math.min(block.level ?? 1, 3)}`;
+    if (block.type === "quote") return "quote";
+    if (block.type === "list") return block.ordered ? "ol" : "ul";
+    if (block.type === "container") return manual.component(block.name)?.id ?? null;
+    return null;
+  }
+
+  // 和 [start, end] 相交的、能换样式的顶层块（光标只在一处时是它所在的那一块）
+  function blocksIn(text, [start, end]) {
+    return list(text).filter((block) => styleOf(block) && block.source[0] <= Math.max(start, end - 1) && start < Math.max(block.source[1], block.source[0] + 1));
+  }
+
+  // 编辑器左上角的「样式」：选区里的几块都换成 style（和卡片上的「换样式」同一个 setStyle）；从后往前换，前面的位置不受影响。没变化时为 null
+  function restyleRange(text, range, style) {
+    let next = text;
+    for (const block of blocksIn(text, range).reverse()) next = setStyle(next, block.source, style) ?? next;
+    return next === text ? null : next;
+  }
+
+  // 选区里的组件都改成这个对齐（left / center / right）；没有组件或没变化时为 null
+  function alignRange(text, range, align) {
+    let next = text;
+    for (const block of blocksIn(text, range).reverse()) {
+      if (block.type === "container") next = setAttr(next, block.source, "align", align === "left" ? null : align) ?? next;
+    }
+    return next === text ? null : next;
+  }
+
+  root.MediaCraftCardBlocks = { list, blockAt, span, remove, move, shift, setStyle, setAttr, insertAt, styleOf, blocksIn, restyleRange, alignRange, STYLES };
 })(globalThis);

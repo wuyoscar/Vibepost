@@ -320,7 +320,7 @@ struct AIToolsTests {
         let workFile = try String(contentsOf: harness.aiRoot.appendingPathComponent(draftId).appendingPathComponent("draft.md"), encoding: .utf8)
         await harness.tearDown()
 
-        let expected = "# 周末\n\n第一段文字。\n\n[[分页]]\n\n## 第二节\n\n第二节的内容。\n[[image:湖.png]]\n\n## 第一节\n\n第一节的内容。"
+        let expected = "# 周末\n\n第一段文字。\n\n[[分页]]\n\n## 第二节\n\n第二节的内容。\n[[图片:湖.png]]\n\n## 第一节\n\n第一节的内容。"
         let after = result?["after"] as? [String: Any]
         #expect((after?["shape"] as? String)?.trimmingCharacters(in: .newlines) == expected)
         #expect(workFile.replacingOccurrences(of: image, with: "湖.png").trimmingCharacters(in: .newlines) == expected, "结构改动同步进了 draft.md")
@@ -363,7 +363,7 @@ struct AIToolsTests {
         #expect(result?["cropUndone"] is NSNull, "第二次 ⌘Z 撤回了裁剪")
         let undone = result?["undone"] as? [String: Any]
         #expect((undone?["shape"] as? String)?.trimmingCharacters(in: .newlines)
-                == "# 周末\n\n第一段文字。\n\n## 第二节\n\n第二节的内容。\n[[image:湖.png]]\n\n## 第一节\n\n第一节的内容。", "只撤掉分页，之后挪的一节还在")
+                == "# 周末\n\n第一段文字。\n\n## 第二节\n\n第二节的内容。\n[[图片:湖.png]]\n\n## 第一节\n\n第一节的内容。", "只撤掉分页，之后挪的一节还在")
         let undoneActions = undone?["actions"] as? [[String: Any]] ?? []
         #expect(undoneActions.map { $0["undone"] as? Bool } == [true, true, false, false, false, false])
         let undoneLines = (undone?["lines"] as? [[String]] ?? []).filter { $0.first == "action" }.map { $0.last ?? "" }
@@ -429,14 +429,14 @@ struct AIToolsTests {
         """) as? [String: Any]
         await harness.tearDown()
 
-        #expect(result?["after"] as? String == "# 小节\n\n:::footnote align=center\n要提醒的一段\n:::\n\n普通一段\n\n:::rows\n- 甲\n- 乙\n:::")
+        #expect(result?["after"] as? String == "# 小节\n\n:::页尾 居中\n要提醒的一段\n:::\n\n普通一段\n\n:::标签列表\n- 甲\n- 乙\n:::")
         #expect(Self.toolText(fake, "r1") == "「要提醒的一段」换成提示、居中。draft.md 已同步。")
         #expect(Self.toolText(fake, "r4") == "这一块已经是正文了")
         #expect(result?["css"] as? String == ".mc-note { border-radius: 20px; }\n\n.mc-footnote { color: red; }")
         #expect(result?["cssUndone"] as? String == ".mc-note { border-radius: 20px; }", "卡片样式每次改动是撤销历史里的一步")
         #expect(Self.toolText(fake, "r8") == "追加卡片样式（2 条规则）。")
         #expect(Self.toolText(fake, "r5") == "对齐只对组件有用（先用 style 换成组件）")
-        #expect(result?["undone"] as? String == "# 小节\n\n:::footnote align=center\n要提醒的一段\n:::\n\n普通一段\n\n- 甲\n- 乙", "每次换样式是撤销历史里的一步")
+        #expect(result?["undone"] as? String == "# 小节\n\n:::页尾 居中\n要提醒的一段\n:::\n\n普通一段\n\n- 甲\n- 乙", "每次换样式是撤销历史里的一步")
         #expect(harness.pageErrors == [])
     }
 
@@ -517,7 +517,7 @@ struct AIToolsTests {
         #expect(buttons.map { $0["name"] as? String } == ["插入配图「柳树.png」", "插入配图「湖面.png」", "插入配图「本地.png」"])
         #expect(buttons.allSatisfy { $0["thumb"] as? String == "data:image/jpeg;base64" && $0["disabled"] as? Bool == false })
         let inserted = result?["inserted"] as? [String: Any]
-        #expect(inserted?["shape"] as? String == "第一段\n[[image:柳树.png]]\n\n第二段", "插在建议的那一块后面")
+        #expect(inserted?["shape"] as? String == "第一段\n[[图片:柳树.png]]\n\n第二段", "插在建议的那一块后面")
         #expect(inserted?["disabled"] as? Bool == true)
         let images = result?["images"] as? [[String: Any]] ?? []
         #expect(images.map { $0["inserted"] as? Bool } == [true, false])

@@ -15,8 +15,9 @@
   const TYPING_DELAY = 250;
   // 提醒落在哪里：跳过去时的说法
   const PLACES = { title: "标题里的", caption: "正文栏里的", body: "" };
-  // 正文栏空着、署名还没填的提示（src/publish/check.js）：只在检查面板里列，发送前不问
+  // 正文栏空着、署名还没填、排版的提示（src/publish/check.js）：只在检查面板里列，发送前不问
   const QUIET_KEYS = new Set(["caption:empty", "byline:empty"]);
+  const quiet = (item) => QUIET_KEYS.has(item.key) || item.category === "layout";
 
   // { beforeSend: 发送前自动检查, fontNotice: 用到系统字体时提醒, ignored: { 稿子 id: [提醒的 key] } }
   function readPrefs() {
@@ -82,6 +83,7 @@
 
     async function evaluate(pageCount) {
       const [draft, lexicon, profile] = await Promise.all([mc.drafts.current(), publish.loadLexicon(), mc.profile.get()]);
+      const pages = draft.mode === "cards" && !draft.readOnly ? await mc.render.pages() : [];
       const { messages } = await mc.ai.history(draft.id);
       const all = draft.readOnly ? [] : publish.check({
         title: draft.title,
@@ -91,6 +93,7 @@
         pageCount,
         usedAI: messages.some((message) => message.role === "user"),
         signed: Boolean(profile.name.trim()),
+        pageIssues: pages.map((page) => page.issues),
       }, lexicon);
       const ignored = new Set(readPrefs().ignored[draft.id] ?? []);
       const items = all.filter((item) => !ignored.has(item.key));
@@ -317,8 +320,9 @@
       const draft = await mc.drafts.current();
       const pageCount = draft.mode === "cards" ? (await mc.render.pages()).length : 0;
       const result = await refresh(pageCount);
-      // 「正文还没写」「署名还没填」不拦发送：正文栏可以一直空着（发完的提示卡会说剪贴板没动），不想署名也可以
-      const items = result.items.filter((item) => !QUIET_KEYS.has(item.key));
+      // 「正文还没写」「署名还没填」与排版提示不拦发送：正文栏可以一直空着（发完的提示卡会说剪贴板没动），不想署名也可以，
+      // 排版是建议
+      const items = result.items.filter((item) => !quiet(item));
       return items.length ? ask({ ...result, items }) : true;
     }
 

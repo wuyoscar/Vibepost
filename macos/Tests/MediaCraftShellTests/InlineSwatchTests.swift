@@ -139,7 +139,7 @@ struct InlineSwatchTests {
 
         let color = result?["color"] as? String ?? ""
         let highlight = result?["highlight"] as? String ?? ""
-        let written = "看看{{color:\(color)|这段文字}}和{{bg:\(highlight)|那段文字}}吧"
+        let written = "看看{{字色:\(color)|这段文字}}和{{高亮:\(highlight)|那段文字}}吧"
         let night = result?["nightSwatches"] as? [String: [String]] ?? [:]
         #expect(color.hasPrefix("#") && highlight.hasPrefix("#"))
         #expect(result?["written"] as? String == written)

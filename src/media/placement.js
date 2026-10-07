@@ -6,10 +6,9 @@
 
   const docOf = (text) => EditorState.create({ doc: text }).doc;
 
-  // [[image:甲]]、[[image:甲|乙]]、[[image:甲|乙|4x3]]
-  function imageTag(ids, ratio = null) {
-    return `[[image:${ids.join("|")}${ratio ? `|${ratio}` : ""}]]`;
-  }
+  // [[图片:甲]]、[[图片:甲|乙]]、[[图片:甲|乙|4x3]]（中文写法，操作手册 src/engine/manual.js）
+  const imageTag = (ids, ratio = null) => window.MediaCraftManual.imageTag(ids, ratio);
+  const IMAGE_WORD = `(?:${window.MediaCraftManual.markerWords.image.join("|")})[:：]`;
 
   // 一块图片源码里标记本身的范围（块的源码含行首缩进）
   function tagRange(text, [start, end]) {
@@ -95,7 +94,7 @@
   // 拼图标记写的比例（第三段原文，如 "4x3"），没写为 null
   function pairRatio(text, source) {
     const { from, to } = tagRange(text, source);
-    return /^\[\[image:[^|\]]+\|[^|\]]+\|([^|\]]+)\]\]$/.exec(text.slice(from, to))?.[1] ?? null;
+    return new RegExp(`^\\[\\[${IMAGE_WORD}[^|\\]]+\\|[^|\\]]+\\|([^|\\]]+)\\]\\]$`).exec(text.slice(from, to))?.[1] ?? null;
   }
 
   // 把 source 处的图片标记换成 lines（一行或几行标记）

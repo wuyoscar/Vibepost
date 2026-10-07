@@ -253,9 +253,12 @@
     return source ? [{ kind: "block", imageId, y: box.y, height: box.height, source }] : [];
   }
 
-  // 一块是什么：heading / paragraph / list / quote / code / table / rule，组件是 component 加它的名字
+  // 内置组件在卡片上的 class 是「mc-<id>」（操作手册 src/engine/manual.js 里的 id），自定义组件是「c-<名字>」
+  const COMPONENT_CLASSES = new Set(root.MediaCraftManual.styles.filter((style) => style.component).map((style) => `mc-${style.id}`));
+
+  // 一块是什么：heading / paragraph / list / quote / code / table / rule，组件是 component 加它的名字（内置的是 id）
   function blockKind(element) {
-    const component = [...element.classList].find((name) => /^mc-(kicker|mono|rows|note|footnote|steps)$/.test(name))?.slice(3)
+    const component = [...element.classList].find((name) => COMPONENT_CLASSES.has(name))?.slice(3)
       ?? [...element.classList].find((name) => name.startsWith("c-"))?.slice(2);
     if (component) return { kind: "component", name: component, align: element.dataset.align ?? "left" };
     const tag = element.tagName;
@@ -355,6 +358,8 @@
     }
     result.live = result.imageHits.some((hit) => hit.live);
     result.fill = Math.min(1, Math.max(0, (lowest - bounds.top) / (bounds.bottom - bounds.top || 1)));
+    // 有一块超出了正文区（放不下又拆不开）：排版自检（src/stage/layout-check.js）报「溢出」
+    result.overflow = lowest > bounds.bottom + 4;
     result.chars = result.items.reduce((sum, item) => {
       if (item.kind === "text") return sum + countChars(item.text);
       if (item.kind === "table") return sum + item.rows.reduce((total, row) => total + row.cells.reduce((cells, cell) => cells + countChars(cell.text), 0), 0);

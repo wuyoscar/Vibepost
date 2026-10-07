@@ -63,7 +63,7 @@
         crop: null,
         layout: host.defaultLayout(),
       });
-      host.insert(`[[image:${id}]]`, at);
+      host.insert(window.MediaCraftManual.imageTag([id]), at);
       return id;
     }
 

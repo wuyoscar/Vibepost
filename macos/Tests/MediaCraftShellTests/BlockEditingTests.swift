@@ -32,7 +32,7 @@ struct BlockEditingTests {
             const undone = await markdown();
             boxes()[1].focus();
             ui.click("换样式", { within: "段落操作" });
-            ui.click("小标签");
+            ui.click("小标签", { within: document.querySelector(".stage-block-menu") });
             await settle();
             const styled = await markdown();
             const selectedAfterStyle = document.querySelector(".stage-block.is-selected")?.getAttribute("aria-label");
@@ -47,7 +47,7 @@ struct BlockEditingTests {
         #expect(result?["moved"] as? String == "# 标题\n\n第二段\n\n第一段")
         #expect(result?["stillSelected"] as? String == "选择段落", "挪完还选中那一块")
         #expect(result?["undone"] as? String == "# 标题\n\n第一段\n\n第二段", "⌘Z 撤回")
-        #expect(result?["styled"] as? String == "# 标题\n\n:::kicker\n第一段\n:::\n\n第二段")
+        #expect(result?["styled"] as? String == "# 标题\n\n:::小标签\n第一段\n:::\n\n第二段", "写进稿子的是中文写法")
         #expect(result?["selectedAfterStyle"] as? String == "选择小标签")
         #expect(result?["removed"] as? String == "# 标题\n\n第二段")
         #expect(harness.pageErrors == [])
@@ -84,7 +84,7 @@ struct BlockEditingTests {
         #expect(result?["quote"]?["checked"] as? String == "大标题")
         #expect(result?["quote"]?["markdown"] as? String == "# 番茄炒蛋\n\n食材准备\n\n> 番茄两个，鸡蛋三个。\n\n- 打蛋\n- 下锅")
         #expect(result?["list"]?["items"] as? [String] == ["无序列表", "有序列表", "标签列表", "步骤", "正文"])
-        #expect(result?["list"]?["markdown"] as? String == "# 番茄炒蛋\n\n食材准备\n\n> 番茄两个，鸡蛋三个。\n\n:::steps\n- 打蛋\n- 下锅\n:::")
+        #expect(result?["list"]?["markdown"] as? String == "# 番茄炒蛋\n\n食材准备\n\n> 番茄两个，鸡蛋三个。\n\n:::步骤\n- 打蛋\n- 下锅\n:::")
         #expect(harness.pageErrors == [])
     }
 
@@ -109,7 +109,7 @@ struct BlockEditingTests {
             const dragged = await markdown();
             boxes()[0].focus();
             ui.click("换样式", { within: "标题操作" });
-            ui.click("小标题");
+            ui.click("小标题", { within: document.querySelector(".stage-block-menu") });
             await settle();
             const level = await markdown();
             boxes()[1].focus();

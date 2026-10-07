@@ -34,23 +34,23 @@ struct ToolbarShortcutsTests {
           .map((button) => ui.name(button));
     """
 
-    @Test("格式条上没有段落样式（标题、列表、引用在预览里点选那一块换）；「插入」菜单的分割线插在当前段落之后")
-    func toolbarHasNoBlockStylesAndInsertsDivider() async throws {
+    @Test("格式条最左边是「样式」（写着光标所在那块的样式，详见 StyleMenuTests）；「插入」菜单的分割线插在当前段落之后")
+    func toolbarShowsStyleMenuAndInsertsDivider() async throws {
         let harness = ShellHarness()
         try await harness.load()
         let result = try await harness.evaluate(Self.helpers + """
             await mc.drafts.create();
-            const blockStyles = ["段落样式", "大标题", "无序列表", "有序列表", "引用"].filter((name) => ui.find(name, { within: "文字样式" }));
             await setBody("第一段\\n第二段");
             await caretAt("第一段", 1);
             clickTool("分割线");
             const { start: caret } = await mc.editor.selection();
             const divided = await markdown();
-            return { blockStyles, divided, caretBeforeSecond: caret === divided.indexOf("第二段") };
+            const styleMenu = document.querySelector('[role="toolbar"][aria-label="文字样式"] > *:first-child summary');
+            return { styleMenu: styleMenu ? [ui.name(styleMenu), styleMenu.textContent.trim()] : null, divided, caretBeforeSecond: caret === divided.indexOf("第二段") };
         """) as? [String: Any]
         await harness.tearDown()
 
-        #expect(result?["blockStyles"] as? [String] == [], "格式条上不再有段落样式的入口")
+        #expect(result?["styleMenu"] as? [String] == ["样式", "正文"], "格式条最左边是「样式」，写着光标所在那块是正文")
         #expect(result?["divided"] as? String == "第一段\n\n---\n\n第二段")
         #expect(result?["caretBeforeSecond"] as? Bool == true)
         #expect(harness.pageErrors == [])
@@ -114,7 +114,7 @@ struct ToolbarShortcutsTests {
 
         #expect(result?["steps"] as? [String] == [
             "## 标题行", "# 标题行", "### 标题行", "标题行",
-            "看看{{underline:solid|这个网站}}吧", "看看这个网站吧",
+            "看看{{下划线:实线|这个网站}}吧", "看看这个网站吧",
             "看看[这个网站]()吧",
             "**看看**[这个网站]()吧", "看看[这个网站]()吧",
         ])

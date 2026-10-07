@@ -27,7 +27,7 @@ struct DropFilesTests {
           }));
         };
         window.markdown = async () => (await window.mediacraft.drafts.current()).markdown;
-        window.imageTagsInOrder = async () => [...(await markdown()).matchAll(/\\[\\[image:([^\\]|]+)\\]\\]/g)].map((match) => match[1]);
+        window.imageTagsInOrder = async () => [...(await markdown()).matchAll(/\\[\\[(?:图片|image)[:：]([^\\]|]+)\\]\\]/g)].map((match) => match[1]);
         window.imageNames = async () => Promise.all((await imageTagsInOrder()).map(async (id) => (await window.mediacraft.media.get(id)).name));
     """
 
@@ -46,7 +46,7 @@ struct DropFilesTests {
             const text = await markdown();
             return {
               names: await imageNames(),
-              afterLastParagraph: text.indexOf("[[image:") > text.indexOf("第二段"),
+              afterLastParagraph: text.indexOf("[[图片:") > text.indexOf("第二段"),
             };
         """) as? [String: Any]
         await harness.tearDown()
@@ -66,7 +66,7 @@ struct DropFilesTests {
         """)
         let inserted = try await harness.waitForPage("(await imageTagsInOrder()).length === 1")
         let beforeText = try await harness.evaluate(
-            "const text = await markdown(); return text.indexOf('[[image:') < text.indexOf('第一段')"
+            "const text = await markdown(); return text.indexOf('[[图片:') < text.indexOf('第一段')"
         ) as? Bool
         await harness.tearDown()
 
@@ -100,7 +100,7 @@ struct DropFilesTests {
         """)
         let pasted = try await harness.waitForPage("(await imageTagsInOrder()).length === 2")
         let result = try await harness.evaluate("""
-            return { names: await imageNames(), shape: (await markdown()).replace(/\\[\\[image:[^\\]]+\\]\\]/g, "[[图]]") };
+            return { names: await imageNames(), shape: (await markdown()).replace(/\\[\\[(?:图片|image):[^\\]]+\\]\\]/g, "[[图]]") };
         """) as? [String: Any]
         await harness.tearDown()
 

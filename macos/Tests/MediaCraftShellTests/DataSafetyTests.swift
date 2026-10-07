@@ -14,7 +14,7 @@ struct DataSafetyTests {
           canvas.toBlob(resolve, "image/png");
         });
         window.markdown = async () => (await window.mediacraft.drafts.current()).markdown;
-        window.imageTags = async () => [...(await markdown()).matchAll(/\\[\\[image:([^\\]|]+)\\]\\]/g)].map((match) => match[1]);
+        window.imageTags = async () => [...(await markdown()).matchAll(/\\[\\[(?:图片|image)[:：]([^\\]|]+)\\]\\]/g)].map((match) => match[1]);
         // 预览里图片的选择框，可访问名称是「选择图片 / 选择实况 + 图片名」
         window.previewBox = async (id) => {
           const image = await window.mediacraft.media.get(id);

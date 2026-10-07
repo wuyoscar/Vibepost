@@ -5,24 +5,38 @@
 // 方言要点（与通用 Markdown 不同的地方）：
 // - 以行为单位：正文里每一行都是硬换行；列表项只占一行，缩进不产生嵌套；
 // - 行内格式（加粗、颜色、链接……）不跨行，光标所在行露出标记时不会牵连别的行；
-// - 自有语法：[[image:编号]] 图片、[[image:甲|乙|比例]] 拼图、[[分页]]、[[结尾]]、{{color|bg|underline|mark:…|文字}}，
-//   组件容器「:::名字 属性」…「:::」（默认摊开成里面的块；HTML 卡片要容器时传 { containers: true }）。
+// - 自有语法（中文是规范写法，英文照样认，词表在 src/engine/manual.js）：[[图片:编号]] 图片、[[图片:甲|乙|比例]] 拼图、
+//   [[分页]]、[[结尾]]、{{字色|高亮|下划线|标注:…|文字}}，组件容器「:::名字 属性」…「:::」（默认摊开成里面的块；
+//   HTML 卡片要容器时传 { containers: true }）。localizeMarkers 把英文写法换成中文。
 (function (root) {
   "use strict";
 
+  const manual = root.MediaCraftManual;
   const PAGE_BREAK = "[[分页]]";
   const END_PAGE = "[[结尾]]";
   const IMAGE_ID = "[A-Za-z0-9_-]+";
-  const WHOLE_IMAGE = new RegExp(`^\\[\\[image:(${IMAGE_ID})\\]\\]$`);
-  const WHOLE_PAIR = new RegExp(`^\\[\\[image:(${IMAGE_ID})\\|(${IMAGE_ID})(?:\\|(${IMAGE_ID}))?\\]\\]$`);
-  const INLINE_IMAGE = new RegExp(`\\[\\[image:(${IMAGE_ID})\\]\\]`, "y");
+  const regExpEscape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const anyOf = (words) => words.map(regExpEscape).join("|");
+  // 关键词后面的冒号：半角或全角（中文输入法下顺手打的）
+  const COLON = "[:：]";
+  const IMAGE_WORD = `(?:${anyOf(manual.markerWords.image)})${COLON}`;
+  const WHOLE_IMAGE = new RegExp(`^\\[\\[${IMAGE_WORD}(${IMAGE_ID})\\]\\]$`);
+  const WHOLE_PAIR = new RegExp(`^\\[\\[${IMAGE_WORD}(${IMAGE_ID})\\|(${IMAGE_ID})(?:\\|(${IMAGE_ID}))?\\]\\]$`);
+  const INLINE_IMAGE = new RegExp(`\\[\\[${IMAGE_WORD}(${IMAGE_ID})\\]\\]`, "y");
   const MARKDOWN_IMAGE = /^!\[([^\]]*)\]\(([^\s)]+)(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)$/;
   const FENCE_OPEN = /^(`{3,})([^`]*)$/;
   const RULE = /^([-*_])(?:[ \t]*\1){2,}$/;
   const HEADING = /^(#{1,6})[ \t]+/;
   const LIST_ITEM = /^([-*+]|(\d+)[.)])[ \t]+/;
   const TABLE_DELIMITER = /^:?-{3,}:?$/;
-  const SPAN_OPEN = /\{\{(?:(color|bg):(#[0-9a-fA-F]{3,8})|(underline):(solid|dashed)|(mark):([^|{}\s]{1,24}))\|/y;
+  // 行内的 {{字色:#…| {{高亮:#…| {{下划线:实线| {{标注:类别|（英文 color / bg / underline / mark 照样认）
+  const SPAN_WORDS = new Map(Object.entries(manual.markerWords).flatMap(([id, words]) => words.map((word) => [word, id])));
+  const spanWords = (id) => anyOf(manual.markerWords[id]);
+  const SPAN_OPEN = new RegExp(
+    `\\{\\{(?:(${spanWords("color")}|${spanWords("bg")})${COLON}(#[0-9a-fA-F]{3,8})`
+      + `|(${spanWords("underline")})${COLON}(${anyOf(Object.keys(manual.underlineValues))})|(${spanWords("mark")})${COLON}([^|{}\\s]{1,24}))\\|`,
+    "y",
+  );
   // 组件容器：「:::名字 属性」开头，单独一行「:::」收尾（ADR 0006）
   const CONTAINER_OPEN = /^:::[ \t]*([^\s:]+)(?:[ \t]+(.*))?$/;
   const CONTAINER_CLOSE = /^:::$/;
@@ -136,16 +150,18 @@
     return { token: { t: "strike", s: i, e: j, canOpen, canClose }, next: j };
   }
 
-  // {{color:#…| / {{bg:#…| / {{underline:solid|dashed| / {{mark:类别|
+  // {{字色:#…| / {{高亮:#…| / {{下划线:实线|虚线| / {{标注:类别|（和英文写法一样读成 color / bg / underline / mark）
   function scanSpanOpen({ src, end }, i) {
     SPAN_OPEN.lastIndex = i;
     const match = SPAN_OPEN.exec(src);
-    if (!match || i + match[0].length > end) return shownAsText(i + 1); // 「{{{color:…」里真正的开头从下一个 { 起
+    if (!match || i + match[0].length > end) return shownAsText(i + 1); // 「{{{字色:…」里真正的开头从下一个 { 起
     const e = i + match[0].length;
-    return { token: { t: "spanOpen", s: i, e, mark: match[1] || match[3] || match[5], value: match[2] || match[4] || match[6] }, next: e };
+    const mark = SPAN_WORDS.get(match[1] || match[3] || match[5]);
+    const value = mark === "underline" ? manual.underlineValues[match[4]] : match[2] || match[6];
+    return { token: { t: "spanOpen", s: i, e, mark, value }, next: e };
   }
 
-  // [：行内图片 [[image:…]]，否则是链接文字的开头
+  // [：行内图片 [[图片:…]]，否则是链接文字的开头
   function scanBracket({ src, end }, i) {
     INLINE_IMAGE.lastIndex = i;
     const image = INLINE_IMAGE.exec(src);
@@ -688,6 +704,57 @@
     return { type: "document", source: [0, markdown.length], blocks };
   }
 
+  // ===== 中文写法 =====
+
+  // 自有记号的英文写法（以及全角冒号）换成中文的规范写法：图片、拼图、字色、高亮、下划线、标注，与组件开头那一行
+  // （:::kicker align=center → :::小标签 居中）。只换真正的记号——代码块、行内代码里的、没有收尾的组件开头都不动，
+  // 别的字一个不改。没有要换的时原样返回同一个字符串。
+  function localizeMarkers(markdown) {
+    if (typeof markdown !== "string") throw new TypeError("localizeMarkers 需要 Markdown 字符串");
+    const edits = [];
+    const code = [];
+    const openers = new Map();
+    (function walk(blocks) {
+      for (const block of blocks) {
+        if (block.type === "code") code.push(block.source);
+        if (block.type === "container") {
+          openers.set(block.markerSource[0], block);
+          walk(block.blocks);
+        }
+      }
+    })(parseMarkdown(markdown, { containers: true }).blocks);
+    const inCode = (at) => code.some(([from, to]) => at >= from && at < to);
+    const replace = (from, to, text) => {
+      if (markdown.slice(from, to) !== text) edits.push([from, to, text]);
+    };
+    for (const line of splitLines(markdown)) {
+      if (line.contentStart === line.contentEnd || inCode(line.start)) continue;
+      const container = openers.get(line.start);
+      if (container) {
+        // 只在名字或对齐是英文时重写这一行（自定义的组件名、别的属性原样留着）
+        const english = manual.component(container.name) && manual.component(container.name).name !== container.name;
+        const align = manual.alignOf(container.attrs);
+        const alignWritten = align && !Object.keys(container.attrs).includes(manual.alignName(align));
+        if (english || alignWritten) replace(container.markerSource[0], container.markerSource[1], manual.opener(container.name, container.attrs));
+        continue;
+      }
+      const pair = WHOLE_PAIR.exec(line.text);
+      if (pair) {
+        replace(line.contentStart, line.contentEnd, manual.imageTag(pair.slice(1, 3), pair[3] ?? null));
+        continue;
+      }
+      for (const token of tokenize(markdown, line.contentStart, line.contentEnd)) {
+        if (token.t === "spanOpen") replace(token.s, token.e, manual.spanOpener(token.mark, token.value));
+        else if (token.t === "image") replace(token.s, token.e, manual.imageTag([token.id]));
+      }
+    }
+    if (!edits.length) return markdown;
+    let result = markdown;
+    for (const [from, to, text] of edits.sort((a, b) => b[0] - a[0])) result = result.slice(0, from) + text + result.slice(to);
+    return result;
+  }
+
   const engine = root.MediaCraftEngine || (root.MediaCraftEngine = {});
   engine.parseMarkdown = parseMarkdown;
+  engine.localizeMarkers = localizeMarkers;
 })(globalThis);

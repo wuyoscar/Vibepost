@@ -64,7 +64,7 @@ struct SendLivePhotoTests {
             const pages = await mc.render.pages();
             const page = pages.findIndex((item) => item.imageHits.some((hit) => hit.live));
             return {
-              inserted: (await mc.media.get(id))?.kind === "live" && text.trimEnd().endsWith(`[[image:${id}]]`),
+              inserted: (await mc.media.get(id))?.kind === "live" && text.trimEnd().endsWith(`[[图片:${id}]]`),
               page, well: pages[page].imageHits.find((hit) => hit.live),
             };
         """, arguments: ["markdown": SendToIPhoneTests.markdown, "video": live.video]) as? [String: Any]

@@ -10,7 +10,7 @@ extension SendLivePhotoTests {
           pointerId: 1, pointerType: "mouse", isPrimary: true, clientX: x, clientY: y,
         }));
         window.markdown = async () => (await mc.drafts.current()).markdown;
-        window.imageTags = async () => [...(await markdown()).matchAll(/\\[\\[image:([^\\]|]+)\\]\\]/g)].map((match) => match[1]);
+        window.imageTags = async () => [...(await markdown()).matchAll(/\\[\\[(?:图片|image)[:：]([^\\]|]+)\\]\\]/g)].map((match) => match[1]);
         window.liveDialog = () => ui.dialogs().find((element) => ui.name(element) === "实况") ?? null;
         window.inDialog = (name) => ui.find(name, { within: liveDialog() });
         window.track = () => liveDialog()?.querySelector('[role="slider"][aria-label="选取片段"]');
@@ -92,7 +92,7 @@ extension SendLivePhotoTests {
             return {
               summary,
               live: (await mc.media.get(imageId)).live,
-              shape: (await markdown()).replace(/\\[\\[image:[^\\]]+\\]\\]/g, "[[图]]"),
+              shape: (await markdown()).replace(/\\[\\[(?:图片|image):[^\\]]+\\]\\]/g, "[[图]]"),
               cover: await coverSize(src),
               coverTop: await pixel(src, 0.5, 0.25),
             };
