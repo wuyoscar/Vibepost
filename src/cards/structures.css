@@ -1146,3 +1146,188 @@
   border-radius: var(--plate-radius);
   pointer-events: none;
 }
+
+/* ---------- 书卷（报刊同结构）：宋体报头与双线、字大行宽、朱砂一点 ---------- */
+
+/* 这个结构的线比默认的发丝线深：纸上印出来的双线要看得见。从正文色推，报刊（纯黑正文）的线自然更深，深色配色照样清楚 */
+.mc-page[data-structure="scroll"] {
+  --scroll-rule: color-mix(in oklab, var(--mc-text) 52%, var(--mc-bg));
+}
+
+/* 报头：名字居中（第一页带头像），下面一条通栏双线 */
+.mc-scroll-head {
+  position: absolute;
+  top: 72px;
+  right: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.mc-scroll-sign {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--mc-text);
+  font-family: var(--mc-font-display);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 34px;
+  letter-spacing: 5px;
+  font-variant-caps: small-caps;
+}
+
+/* 字距在末尾也留了一份：补回来，名字才真正居中 */
+.mc-scroll-sign .mc-sign {
+  margin-right: -5px;
+}
+
+.mc-scroll-sign .mc-avatar {
+  width: 34px;
+  height: 34px;
+}
+
+/* 双线：两条 1px 的线，隔 3px（报头、分割线、封面标题下、引用的竖线都是这一种） */
+.mc-scroll-rule {
+  width: 100%;
+  height: 5px;
+  border-top: 1px solid var(--scroll-rule);
+  border-bottom: 1px solid var(--scroll-rule);
+}
+
+/* 页码在页脚正中：第 N 页 / 共 N 页 */
+.mc-page[data-structure="scroll"] > .mc-foot {
+  bottom: 60px;
+  justify-content: center;
+}
+
+.mc-page[data-structure="scroll"] .mc-folio {
+  color: var(--mc-muted);
+  font-family: var(--mc-font-display);
+  font-size: 20px;
+  letter-spacing: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 标题：宋体，前后多留白；小标题带一点字距 */
+.mc-page[data-structure="scroll"] .mc-body h1 {
+  letter-spacing: 0.02em;
+}
+
+.mc-page[data-structure="scroll"] .mc-body :is(h2, h3) {
+  letter-spacing: 0.03em;
+}
+
+.mc-page[data-structure="scroll"] .mc-body :is(h1, h2):not(:first-child) {
+  margin-top: 14px;
+}
+
+/* 引用：宋体略大一号、辅助色，左边一条竖排双线 */
+.mc-page[data-structure="scroll"] .mc-body blockquote {
+  position: relative;
+  padding: 4px 0 4px 34px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--mc-secondary);
+  font-family: var(--mc-font-display);
+  font-size: 1.04em;
+}
+
+.mc-page[data-structure="scroll"] .mc-body blockquote::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 5px;
+  border-right: 1px solid var(--mc-accent);
+  border-left: 1px solid var(--mc-accent);
+}
+
+/* 分割线：一小段居中的双线 */
+.mc-page[data-structure="scroll"] .mc-body hr {
+  align-self: center;
+  width: 120px;
+  height: 5px;
+  background: none;
+  border-top: 1px solid var(--scroll-rule);
+  border-bottom: 1px solid var(--scroll-rule);
+}
+
+/* 列表的圆点是小方块；编号、方块都是朱砂 */
+.mc-page[data-structure="scroll"] .mc-marker.is-bullet::before {
+  width: 0.26em;
+  height: 0.26em;
+  border-radius: 0;
+}
+
+/* 报纸的表格：表头上粗下细两条线，不画底色；行间线用这个结构的深一点的线 */
+.mc-page[data-structure="scroll"] .mc-body th {
+  background: none;
+  border-top: 2px solid var(--mc-text);
+  border-bottom: 1px solid var(--mc-text);
+  color: var(--mc-text);
+}
+
+.mc-page[data-structure="scroll"] .mc-body td {
+  border-bottom-color: var(--scroll-rule);
+}
+
+.mc-page[data-structure="scroll"] .mc-body :is(pre, code) {
+  border-radius: 0;
+}
+
+/* 朱砂印：封面标题上方、结尾页署名上方各一方小方印（实心、里面一圈纸色），微微歪 2°；报刊的印是墨色 */
+.mc-page[data-structure="scroll"] .mc-cover-mark,
+.mc-page[data-structure="scroll"] .mc-sig-rule {
+  display: block;
+  width: 24px;
+  height: 24px;
+  background: var(--mc-accent);
+  box-shadow: inset 0 0 0 3px var(--mc-accent), inset 0 0 0 4.5px var(--mc-bg);
+  transform: rotate(2deg);
+}
+
+.mc-page[data-structure="scroll"] .mc-cover-mark {
+  margin-bottom: 44px;
+}
+
+.mc-page[data-structure="scroll"] .mc-sig-rule {
+  margin-bottom: 40px;
+}
+
+/* 封面：居中的宋体标题，下面一小段双线；副标题比正文色淡一点 */
+.mc-page[data-structure="scroll"] .mc-body .mc-cover-title {
+  letter-spacing: 0.02em;
+}
+
+.mc-page[data-structure="scroll"] .mc-cover-rule {
+  display: block;
+  width: 120px;
+  height: 5px;
+  margin: 36px auto 0;
+  border-top: 1px solid var(--scroll-rule);
+  border-bottom: 1px solid var(--scroll-rule);
+}
+
+.mc-page[data-structure="scroll"] .mc-cover-subtitle {
+  color: color-mix(in oklab, var(--mc-text) 62%, var(--mc-bg));
+}
+
+/* 有底图时：照片是一个平平的矩形，下面一条细线；标题下的双线不画，印章也收起 */
+.mc-page[data-structure="scroll"] .mc-cover[data-image="plate"] .mc-cover-image::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -22px;
+  left: 0;
+  height: 1px;
+  background: var(--scroll-rule);
+}
+
+.mc-page[data-structure="scroll"] .mc-cover[data-image="plate"] :is(.mc-cover-rule, .mc-cover-mark) {
+  display: none;
+}

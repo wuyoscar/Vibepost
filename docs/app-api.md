@@ -193,7 +193,7 @@ MarkdownDocument = { type: "document", source: [0, markdown.length], blocks: Blo
 
 | 方法 | 说明 | 返回 |
 | --- | --- | --- |
-| `themes.list()` | 全部主题，按主题面板里的顺序：备忘（默认）、纯白、手帐、柔光、陶土、杂志、撞色、纯黑、电光；之前的八个主题不再有，用它们的稿子打开时换成接替的新主题（[storage.md](storage.md)） | `[{ id, name, label, structure, colors: { bg, text, accent, secondary, surface }, fonts: { zh, en, code } }]` |
+| `themes.list()` | 全部主题，按主题面板里的顺序：备忘（默认）、纯白、手帐、柔光、陶土、杂志、撞色、纯黑、书卷、报刊（报刊共用书卷的卡片结构 `scroll`，只换黑白配色）；之前的八个主题不再有，用它们的稿子打开时换成接替的新主题（[storage.md](storage.md)） | `[{ id, name, label, structure, colors: { bg, text, accent, secondary, surface }, fonts: { zh, en, code } }]` |
 | `themes.apply(id)` | 与主题面板里点选相同：换卡片结构、配色与跟随主题的字体（界面皮肤不变，跟随系统，ADR 0007），这篇调过的配色重置，记为新稿子沿用的主题 | `Draft` |
 | `themes.preview(id)` 〔页内〕 | 当前正文换成这个主题会排成几页、第一页什么样（主题面板的缩略图）：卡片结构、主题配色与「跟随主题」的字体都用它的（就是当前主题时保留这篇调过的配色）。只画第一页；不改稿子、不等预览出图 | `{ pageCount, canvas }`（没有内容时 `canvas` 为 `null`） |
 | `themes.swatches()` | 选中文字浮动条颜色菜单里的字色与高亮底色，由当前稿子的配色推出来（换主题、套配色、调色块后跟着变），规则见下 | `{ text: string[], highlight: string[] }`，各 5–6 个 |

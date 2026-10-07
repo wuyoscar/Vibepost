@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-/// 8 种卡片结构的署名与页码：第一页有头像与名字，内页有页码与名字，页眉页脚不压正文。
+/// 每种卡片结构的署名与页码：第一页有头像与名字，内页有页码与名字，页眉页脚不压正文。
 @MainActor
 struct CardStructureTests {
     static let script = CardDomProbe.script + """
@@ -34,7 +34,8 @@ struct CardStructureTests {
         });
     """
 
-    static let structures = ThemeTests.ids
+    /// 卡片结构的 id（不是主题：报刊与书卷共用一种）
+    static let structures = ThemeTests.structureIds
 
     @Test("每种结构：第一页有头像（杂志只有刊头的名字）与名字；内页有页码与名字、不再画头像；内容不越出正文区")
     func everyStructureSignsItsCards() async throws {
