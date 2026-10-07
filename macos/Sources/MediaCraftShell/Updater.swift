@@ -240,7 +240,7 @@ public final class Updater {
     /// 更新的文件日志：os_log 的 notice 在 ad-hoc 签名的 App 里 `log show` 查不到，这里再写一份，出问题时拿它看；替换脚本也往这里写
     public let logFile: URL
 
-    public static let defaultLogFile = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+    public nonisolated static let defaultLogFile = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("Logs/Vibepost/update.log")
 
     static let lastCheckKey = "MCUpdateLastCheck"
