@@ -9,11 +9,16 @@ const context = vm.createContext({});
 vm.runInContext(readFileSync(new URL("src/templates/format.js", root), "utf8"), context);
 const { entry } = context.MediaCraftTemplateFormat;
 
-// 按文件名排（固定的区域，不跟着这台机器的语言设置变）
+// 画廊里的顺序：先按题材的固定顺序（spec 定的），不在表里的按文件名排（固定的区域，不跟着这台机器的语言设置变）
+const ORDER = ["干货清单", "踩坑经验", "一周要闻", "论文解读", "工具实测", "读书笔记", "旅行日记", "活动通知"];
 const collator = new Intl.Collator("zh-Hans-CN", { numeric: true });
+const rank = (name) => {
+  const index = ORDER.indexOf(name.replace(/\.md$/, ""));
+  return index === -1 ? ORDER.length : index;
+};
 const files = readdirSync(new URL("src/templates/", root))
   .filter((name) => name.endsWith(".md") && name !== "README.md") // README.md 是格式说明，不是模板
-  .sort(collator.compare)
+  .sort((a, b) => rank(a) - rank(b) || collator.compare(a, b))
   .map((name) => `src/templates/${name}`);
 const entries = files.map((file) => entry(file, readFileSync(new URL(file, root), "utf8")));
 

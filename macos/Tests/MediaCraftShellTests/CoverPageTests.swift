@@ -288,7 +288,7 @@ struct CoverPageTests {
         await harness.tearDown()
 
         #expect(result?["fromMenu"] as? String == "第一段\n[[结尾]]\n")
-        #expect(result?["filtered"] as? [String] == ["结尾页"], "拼音缩写 jw 筛出「结尾页」")
+        #expect(result?["filtered"] as? [String] == ["结尾页", "结尾引导"], "拼音缩写 jw 筛出「结尾页」（片段「结尾引导」也匹配，排在后面）")
         #expect(result?["fromSlash"] as? String == "第一段\n[[结尾]]\n")
         #expect(harness.pageErrors == [])
     }
