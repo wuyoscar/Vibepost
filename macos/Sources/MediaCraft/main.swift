@@ -14,6 +14,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var closing: Set<ObjectIdentifier> = []
     /// 已经在退出了（存稿、结束 AI 进程中）：再按 ⌘Q 不重来一遍
     private var terminating = false
+    /// 检查更新（MediaCraftShell/Updater.swift）：「检查更新…」与每天一次的自动检查；准备好的新版在退出时换上
+    private var updater: Updater!
+    private var preparedUpdate: Updater.Prepared?
+    /// 「现在更新」：换好之后重新打开
+    private var relaunchAfterUpdate = false
+    private var checkingForUpdates = false
 
     /// 启动：照退出前开着的窗口恢复（各自的稿子、位置大小），没有记录时开一个窗口打开上次那篇
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -30,6 +36,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if saved.isEmpty { openWindow(WindowRequest()) }
         for entry in saved {
             openWindow(WindowRequest(draftId: entry.draftId), frame: entry.frame.flatMap(Self.frame))
+        }
+        // 上次留下的下载与暂存清掉；稍等一会儿再自动检查更新（一天最多一次）
+        updater = Updater.forRunningApp()
+        updater.cleanStaging()
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(8))
+            await self?.checkForUpdates(automatic: true)
         }
     }
 
@@ -123,9 +136,124 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         core.freezeSession()
         Task {
             await core.saveAllDrafts()
+            installPreparedUpdate()
             core.shutdown { NSApp.reply(toApplicationShouldTerminate: true) }
         }
         return .terminateLater
+    }
+
+    // MARK: - 检查更新
+
+    /// Vibepost › 检查更新…
+    @objc func checkForUpdatesFromMenu(_ sender: Any?) {
+        Task { await checkForUpdates(automatic: false) }
+    }
+
+    /// 自动检查（automatic）一天最多一次，有新版（且没被跳过）才说话；手动检查总有回答
+    private func checkForUpdates(automatic: Bool) async {
+        if let prepared = preparedUpdate {
+            if !automatic { offerRestart(prepared) }
+            return
+        }
+        guard !checkingForUpdates, !automatic || updater.dueForAutomaticCheck() else { return }
+        checkingForUpdates = true
+        defer { checkingForUpdates = false }
+        do {
+            switch try await updater.check() {
+            case .upToDate(let version):
+                if !automatic { inform("已是最新版本", "你用的 Vibepost \(version) 就是最新的。") }
+            case .available(let release):
+                if automatic, updater.isSkipped(release.version) { return }
+                await offer(release)
+            }
+        } catch {
+            if !automatic { inform("没能检查更新", error.localizedDescription) }
+        }
+    }
+
+    private func offer(_ release: UpdateRelease) async {
+        let alert = NSAlert()
+        alert.messageText = "Vibepost \(release.version) 可以更新了"
+        alert.informativeText = "你现在用的是 \(updater.current)。" + Self.summary(release.notes)
+        alert.addButton(withTitle: "下载并安装")
+        alert.addButton(withTitle: "稍后")
+        alert.addButton(withTitle: "跳过这个版本")
+        switch alert.runModal() {
+        case .alertFirstButtonReturn: await download(release)
+        case .alertThirdButtonReturn: updater.skip(release.version)
+        default: break
+        }
+    }
+
+    /// 下载、核对（挂一个转圈的提示在最前面的窗口上，可以先关掉它，在后台接着下），好了问要不要现在更新
+    private func download(_ release: UpdateRelease) async {
+        let progress = NSAlert()
+        progress.messageText = "正在下载 Vibepost \(release.version)…"
+        progress.informativeText = "下载、核对好之后会问你要不要现在更新。"
+        let spinner = NSProgressIndicator(frame: NSRect(x: 0, y: 0, width: 24, height: 24))
+        spinner.style = .spinning
+        spinner.startAnimation(nil)
+        progress.accessoryView = spinner
+        progress.addButton(withTitle: "在后台下载")
+        let host = NSApp.keyWindow ?? windows.values.first?.window
+        if let host { progress.beginSheetModal(for: host) { _ in } }
+        let result: Result<Updater.Prepared, Error>
+        do {
+            result = .success(try await updater.prepare(release))
+        } catch {
+            result = .failure(error)
+        }
+        if let host, let sheet = host.attachedSheet, sheet === progress.window { host.endSheet(sheet) }
+        switch result {
+        case .success(let prepared):
+            preparedUpdate = prepared
+            offerRestart(prepared)
+        case .failure(let error):
+            inform("更新没装上", error.localizedDescription)
+        }
+    }
+
+    /// 准备好了：现在就退出、换上、重新打开；或者等用户自己退出时再换。App 所在的位置不能写时打开 DMG 让用户自己拖
+    private func offerRestart(_ prepared: Updater.Prepared) {
+        guard updater.canReplace else {
+            preparedUpdate = nil
+            NSWorkspace.shared.open(prepared.dmg)
+            inform("请手动安装 Vibepost \(prepared.release.version)", UpdateError.notWritable(Bundle.main.bundleURL.path).localizedDescription)
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = "Vibepost \(prepared.release.version) 已经准备好"
+        alert.informativeText = "现在重新打开 Vibepost 完成更新？开着的稿子会先存好，重新打开后还是这几个窗口。选「稍后」就在你退出 Vibepost 时换上新版。"
+        alert.addButton(withTitle: "现在更新")
+        alert.addButton(withTitle: "稍后")
+        if alert.runModal() == .alertFirstButtonReturn {
+            relaunchAfterUpdate = true
+            NSApp.terminate(nil)
+        }
+    }
+
+    /// 退出时（稿子都存完之后）换上准备好的新版；换不了就打开 DMG
+    private func installPreparedUpdate() {
+        guard let prepared = preparedUpdate else { return }
+        do {
+            try updater.install(prepared, relaunch: relaunchAfterUpdate)
+        } catch {
+            NSWorkspace.shared.open(prepared.dmg)
+        }
+    }
+
+    private func inform(_ title: String, _ message: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.runModal()
+    }
+
+    /// 更新说明（Release 的正文）的开头一段
+    private static func summary(_ notes: String) -> String {
+        let text = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return "" }
+        return "\n\n" + (text.count > 600 ? String(text.prefix(600)) + "…" : text)
     }
 
     /// 显示 › 重新载入：最前面的那个窗口（先存稿）
@@ -167,6 +295,7 @@ enum MainMenu {
         let menu = NSMenu()
         menu.addItem(submenu("Vibepost", [
             item("关于 Vibepost", #selector(NSApplication.orderFrontStandardAboutPanel(_:))),
+            item("检查更新…", #selector(AppDelegate.checkForUpdatesFromMenu(_:))),
             .separator(),
             item("隐藏 Vibepost", #selector(NSApplication.hide(_:)), "h"),
             item("退出 Vibepost", #selector(NSApplication.terminate(_:)), "q"),

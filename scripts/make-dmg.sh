@@ -1,6 +1,7 @@
 #!/bin/zsh
 # 打安装用的 DMG：Release 构建（Apple 芯片 + Intel 通用二进制）→ Vibepost.app、「Applications」快捷方式、背景图
-# → dist/Vibepost-<VERSION>.dmg（压缩、只读）。
+# → dist/Vibepost-<VERSION>.dmg（压缩、只读）与它的校验和 dist/Vibepost-<VERSION>.dmg.sha256（App 的「检查更新」核对用，
+# 一起传到 GitHub Release，步骤见 docs/release.md）。
 #   scripts/make-dmg.sh
 #       ad-hoc 签名，没有公证：别人下载后第一次打开要手动放行（README「安装」）。
 #   scripts/make-dmg.sh --sign "Developer ID Application: 名字 (TEAMID)"
@@ -141,7 +142,11 @@ if [[ -n "$PROFILE" ]]; then
   spctl --assess --type open --context context:primary-signature --verbose "$DMG"
 fi
 
+# 校验和最后算（公证会把票据钉进 DMG，改了文件）：App 的「检查更新」下载后核对它
+(cd "$REPO/dist" && shasum -a 256 "Vibepost-$VERSION.dmg" > "Vibepost-$VERSION.dmg.sha256")
+
 echo "built $DMG"
+echo "built $DMG.sha256"
 if [[ -z "$IDENTITY" ]]; then
   cat <<NOTE
 注意：这是 ad-hoc 签名、没有公证的 DMG。别人下载后第一次打开 Vibepost 会被 Gatekeeper 拦下：

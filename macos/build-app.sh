@@ -77,6 +77,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSHumanReadableCopyright</key><string>© 2026 wuyoscar · CC BY-NC-SA 4.0</string>
+  <key>MCUpdateRepository</key><string>wuyoscar/Vibepost</string>
   $WEB_ROOT_KEY
 </dict>
 </plist>
