@@ -615,7 +615,7 @@ images:                             # 可省：图片编号 → 路径（自带�
 …
 ```
 
-色值直接写 `#rrggbb`（不是 YAML 的注释）；值里有「: 」、以 `#` 以外的特殊符号开头时加双引号。不认识的键、认不出的值跳过；图片编号只能是字母、数字、`_`、`-`。`colors` / `fonts` / `cover` / `images` 这四张表也能写成一行（`src/templates/README.md` 与 `scripts/check-templates.mjs` 的写法，自带模板都这样写）：`cover: enabled true, subtitle 一行副标题, image cover`——半角逗号分开各项，每项第一个空白前是子键（副标题里不能有半角逗号）。`saveAsTemplate` 写回时按这个顺序生成缩进的几行，没有的键不写。
+色值直接写 `#rrggbb`（不是 YAML 的注释）；值里有「: 」、以 `#` 以外的特殊符号开头时加双引号。不认识的键、认不出的值跳过；图片编号只能是字母、数字、`_`、`-`。`colors` / `fonts` / `cover` / `images` 这四张表也能写成一行：`cover: enabled true, subtitle 一行副标题, image cover`——半角逗号分开各项，每项第一个空白前是子键（副标题里不能有半角逗号）；自带模板统一用缩进的几行。`saveAsTemplate` 写回时按这个顺序生成缩进的几行，没有的键不写。
 
 | 动作 | body | 返回 |
 | --- | --- | --- |

@@ -135,7 +135,7 @@
     const images = {};
     for (const [imageId, image] of Object.entries(fields.images ?? {})) {
       const { mime, data } = await imageBytes(image.src);
-      if (!data) continue;
+      if (!data) throw new Error(`图片「${image.name || imageId}」读不出来，这套模板没有存`);
       const file = `${imageId}.${EXTENSIONS[mime] ?? "png"}`;
       files.push({ name: file, data });
       images[imageId] = file;

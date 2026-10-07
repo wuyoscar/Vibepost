@@ -16,7 +16,7 @@
 //   caption       小红书正文：`caption: |` 后面缩进的几行，换行照原样
 //   images        缩进的 `编号: 路径` 几行：自带模板相对网页根（docs/guide-assets/…、docs/template-assets/…），
 //                 用户模板相对它自己的文件夹；正文里写 [[图片:编号]]
-// colors / fonts / cover / images 这四张表也能写成一行（src/templates/README.md 与 scripts/check-templates.mjs 的写法）：
+// colors / fonts / cover / images 这四张表也能写成一行（自带模板统一用缩进的几行，一行的写法只是也认）：
 // `cover: enabled true, subtitle 一行副标题, image valley`——半角逗号分开各项，每项第一个空白前是子键（所以副标题里不能有半角逗号）。
 // 读进来一样，写回（compose）一律用缩进的几行。
 // 色值直接写 #rrggbb（不是 YAML 的注释）；值里有「: 」、以 # 以外的特殊符号开头时加双引号。
@@ -30,6 +30,7 @@
   // 键名（ASCII）、冒号（半角或全角）、值
   const ENTRY = /^([A-Za-z_][\w-]*)\s*[:：]\s*(.*)$/;
   const SUB_ENTRY = /^\s+([^\s:：]+)\s*[:：]\s*(.*)$/;
+  const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
   const oneLine = (text) => String(text ?? "").split(/\s+/).filter(Boolean).join(" ");
 
@@ -94,10 +95,11 @@
       } else if (/^>[+-]?$/.test(value)) {
         fields[key] = continued.join(" ");
       } else if (!value && block.length && block.every((item) => !item.trim() || SUB_ENTRY.test(item))) {
-        const map = {};
+        // 子键只收普通的名字：__proto__ / constructor 这类会改掉对象原型（模板文件可以是用户自己写的）
+        const map = Object.create(null);
         for (const item of block) {
           const sub = SUB_ENTRY.exec(item);
-          if (sub) map[sub[1]] = unquote(sub[2]);
+          if (sub && !FORBIDDEN_KEYS.has(sub[1])) map[sub[1]] = unquote(sub[2]);
         }
         fields[key] = map;
       } else {
@@ -139,7 +141,7 @@
       .map((script) => [script, map(fields.fonts)[script].trim()]));
     const cover = map(fields.cover);
     const images = Object.fromEntries(Object.entries(map(fields.images))
-      .filter(([id, path]) => /^[\w-]+$/.test(id) && text(path).trim())
+      .filter(([id, path]) => /^[\w-]+$/.test(id) && !FORBIDDEN_KEYS.has(id) && text(path).trim())
       .map(([id, path]) => [id, text(path).trim()]));
     return {
       file: String(file),

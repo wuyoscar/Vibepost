@@ -120,29 +120,36 @@ struct GalleryTests {
               originalAgain: originalAgain.markdown,
               clicked: { theme: clicked.theme, markdown: clicked.markdown === registry[2].markdown.join("\\n") },
               escClosed, backdropClosed, own,
+              expectedNames: registry.map((item) => item.name),
+              expectedRight: registry[1].name, expectedDown: registry[5].name,
+              pickedTheme: pickedEntry.theme, clickedTheme: registry[2].theme,
+              expectedTags: registry[2].tags,
+              expectedTopics: ["全部", ...new Set(registry.map((item) => item.tags[0]))],
+              expectedStyles: ["全部", ...new Set(registry.map((item) => item.tags[1]))],
             };
         """) as? [String: Any]
         await harness.tearDown()
 
         #expect(result?["opened"] as? Bool == true, "画廊是一个对话框")
-        #expect(result?["names"] as? [String] == ["踩坑经验", "读书笔记", "干货清单", "工具实测", "活动通知", "旅行日记", "论文解读", "一周要闻"], "8 套自带模板按登记表顺序")
+        #expect(result?["names"] as? [String] == result?["expectedNames"] as? [String], "8 套自带模板按登记表顺序：\(result?["names"] ?? [])")
+        #expect((result?["names"] as? [String])?.count == 8)
         #expect(result?["focusedFirst"] as? Bool == true, "打开时焦点在第一格")
         #expect(result?["thumbs"] as? [Bool] == Array(repeating: true, count: 8), "每格的缩略图都画出来了：\(result?["thumbs"] ?? [])")
         #expect(result?["descriptions"] as? Bool == true)
-        #expect((result?["tags"] as? [[String]])?[2] == ["清单", "简洁"], "格子下面是题材与风格的标签")
-        #expect(result?["topicChips"] as? [String] == ["全部", "经验", "读书", "清单", "实测", "通知", "日记", "解读", "新闻"])
-        #expect(result?["styleChips"] as? [String] == ["全部", "柔和", "简洁", "有态度"])
+        #expect((result?["tags"] as? [[String]])?[2] == result?["expectedTags"] as? [String], "格子下面是题材与风格的标签")
+        #expect(result?["topicChips"] as? [String] == result?["expectedTopics"] as? [String], "\(result?["topicChips"] ?? [])")
+        #expect(result?["styleChips"] as? [String] == result?["expectedStyles"] as? [String], "\(result?["styleChips"] ?? [])")
         #expect(result?["byTopic"] as? [String] == ["干货清单"])
         #expect(result?["byStyle"] as? [String] == ["踩坑经验", "读书笔记", "旅行日记"])
         #expect(result?["byBoth"] as? [String] == ["旅行日记"], "两组一起筛")
         #expect(result?["none"] as? [AnyHashable] == [0, false] as [AnyHashable], "筛不到时说一声")
         #expect(result?["all"] as? Int == 8)
-        #expect(result?["afterRight"] as? String == "读书笔记" && result?["afterDown"] as? String == "旅行日记", "方向键在格子间走：\(result?["afterRight"] ?? "") / \(result?["afterDown"] ?? "")")
+        #expect(result?["afterRight"] as? String == result?["expectedRight"] as? String && result?["afterDown"] as? String == result?["expectedDown"] as? String, "方向键在格子间走：\(result?["afterRight"] ?? "") / \(result?["afterDown"] ?? "")")
         let picked = result?["picked"] as? [String: Any]
-        #expect(picked?["theme"] as? String == "glow" && picked?["markdown"] as? Bool == true && picked?["readOnly"] as? Bool == false && picked?["cover"] as? Bool == true, "回车新建的稿子照模板：\(picked ?? [:])")
+        #expect(picked?["theme"] as? String == result?["pickedTheme"] as? String && picked?["markdown"] as? Bool == true && picked?["readOnly"] as? Bool == false && picked?["cover"] as? Bool == true, "回车新建的稿子照模板：\(picked ?? [:])")
         #expect(result?["originalAgain"] as? String == "原来的稿子", "原来的稿子不变")
         let clicked = result?["clicked"] as? [String: Any]
-        #expect(clicked?["theme"] as? String == "notes" && clicked?["markdown"] as? Bool == true, "点一格新建的稿子照模板：\(clicked ?? [:])")
+        #expect(clicked?["theme"] as? String == result?["clickedTheme"] as? String && clicked?["markdown"] as? Bool == true, "点一格新建的稿子照模板：\(clicked ?? [:])")
         #expect(result?["escClosed"] as? [Bool] == [true, true], "Esc 关上，焦点离开画廊")
         #expect(result?["backdropClosed"] as? Bool == true, "点遮罩关上")
         #expect(result?["own"] as? Int == 3, "原来的一篇加新建的两篇")
@@ -276,6 +283,8 @@ struct GalleryTests {
             press("Escape");
             return {
               guideHasItem, prefilled, focused, topics, styles, emptyError, statusAfter, switched,
+              expectedTopics: ["不填", ...new Set(window.MediaCraftTemplateRegistry.map((item) => item.tags[0]))],
+              expectedStyles: ["不填", ...new Set(window.MediaCraftTemplateRegistry.map((item) => item.tags[1]))],
               saved: saved ? [saved.name, saved.description, saved.tags.join(","), saved.theme, String(saved.builtIn)] : null,
               lastName, userActions, builtInActions, userThumb, alertTitle, stillThere, removed, galleryStillOpen,
             };
@@ -291,8 +300,8 @@ struct GalleryTests {
         #expect(result?["guideHasItem"] as? Bool == false, "说明书的右键菜单里没有「存为模板…」")
         #expect(result?["prefilled"] as? String == "湖边一晚", "名字预填稿子的名字")
         #expect(result?["focused"] as? Bool == true, "焦点在名字上")
-        #expect(result?["topics"] as? [String] == ["不填", "经验", "读书", "清单", "实测", "通知", "日记", "解读", "新闻"], "题材列出已有模板的")
-        #expect(result?["styles"] as? [String] == ["不填", "柔和", "简洁", "有态度"])
+        #expect(result?["topics"] as? [String] == result?["expectedTopics"] as? [String], "题材列出已有模板的：\(result?["topics"] ?? [])")
+        #expect(result?["styles"] as? [String] == result?["expectedStyles"] as? [String], "\(result?["styles"] ?? [])")
         #expect(result?["emptyError"] as? [AnyHashable] == ["先给模板起个名字", true] as [AnyHashable], "名字空着留在对话框里")
         #expect((result?["statusAfter"] as? String ?? "").contains("已存为模板「我的湖」"), "\(result?["statusAfter"] ?? "")")
         #expect(result?["switched"] as? Bool == true, "存的是右键的那篇：先切过去")

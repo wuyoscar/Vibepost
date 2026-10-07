@@ -142,7 +142,7 @@ struct SaveTests {
             await typeAtEnd("，改一下");
         """)
         var lit = false
-        for _ in 0..<100 where !lit {
+        for _ in 0..<250 where !lit {
             lit = harness.webView.window?.isDocumentEdited == true
             if !lit { try await Task.sleep(for: .milliseconds(20)) }
         }

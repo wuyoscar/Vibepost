@@ -50,7 +50,9 @@ final class TemplateLibrary: @unchecked Sendable {
             let template = try templateLocked(name)
             var images: [String: String] = [:]
             let files = (try? FileManager.default.contentsOfDirectory(at: template.folder, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])) ?? []
-            for file in files {
+            // 文件夹里的图最多读 imageCountLimit 张（用户往里丢几百张也不会一次读成一个巨大的回复）
+            for file in files.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+                guard images.count < Self.imageCountLimit else { break }
                 guard let mime = Self.imageTypes[file.pathExtension.lowercased()],
                       let data = try? Data(contentsOf: file, options: .mappedIfSafe), data.count <= Self.imageLimit
                 else { continue }
@@ -70,7 +72,8 @@ final class TemplateLibrary: @unchecked Sendable {
         var seen: Set<String> = []
         for image in images {
             let file = (image.name as NSString).lastPathComponent
-            guard file == image.name, !file.hasPrefix("."), Self.imageTypes[(file as NSString).pathExtension.lowercased()] != nil else {
+            guard file == image.name, !file.hasPrefix("."), file.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) }),
+                  Self.imageTypes[(file as NSString).pathExtension.lowercased()] != nil else {
                 throw Failure("图片文件名不对：\(image.name)（只能是 jpg / png / gif / webp）")
             }
             guard file.lowercased() != Self.fileName.lowercased(), seen.insert(file.lowercased()).inserted else { throw Failure("图片文件名重复：\(file)") }
@@ -86,11 +89,13 @@ final class TemplateLibrary: @unchecked Sendable {
             for image in images {
                 try image.data.write(to: staging.appendingPathComponent(image.name))
             }
-            // 同名的整套换掉（文件夹名大小写不同也算同一套：APFS 默认不分大小写）
-            if FileManager.default.fileExists(atPath: target.path) {
-                try FileManager.default.removeItem(at: target)
+            // 同名的整套换掉：原子替换（换到一半出错时旧的那套还在）；文件夹名大小写不同也算同一套（APFS 默认不分大小写）
+            if let existing = try? templateLocked(name) {
+                _ = try FileManager.default.replaceItemAt(existing.folder, withItemAt: staging)
+                if existing.folder.lastPathComponent != name { try? FileManager.default.moveItem(at: existing.folder, to: target) }
+            } else {
+                try FileManager.default.moveItem(at: staging, to: target)
             }
-            try FileManager.default.moveItem(at: staging, to: target)
             return Template(name: name, folder: target, content: content)
         }
     }
@@ -132,8 +137,9 @@ final class TemplateLibrary: @unchecked Sendable {
         .sorted { WritingManuals.ordered($0.name, $1.name) }
     }
 
+    /// 按名字找（不分大小写：APFS 默认不分，`save("foo")` 换掉的 "Foo" 读回来也得认）
     private func templateLocked(_ name: String) throws -> Template {
-        guard let template = try templatesLocked().first(where: { $0.name == name }) else {
+        guard let template = try templatesLocked().first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
             throw Failure("没有这个模板：\(name)", status: 404)
         }
         return template

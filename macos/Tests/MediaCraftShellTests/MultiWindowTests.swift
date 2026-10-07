@@ -63,7 +63,7 @@ struct MultiWindowTests {
             ui.click("在新窗口打开", { within: menu });
             return { items, focused, hidden: menu.hidden };
         """, arguments: ["id": d]) as? [String: Any]
-        #expect(menu?["items"] as? [String] == ["在新窗口打开 ⌘ 点按", "删除…"], "\(menu?["items"] ?? "")")
+        #expect(menu?["items"] as? [String] == ["在新窗口打开 ⌘ 点按", "存为模板…", "删除…"], "\(menu?["items"] ?? "")")
         #expect(menu?["focused"] as? String == "在新窗口打开 ⌘ 点按", "菜单开着时焦点在第一项")
         #expect(menu?["hidden"] as? Bool == true, "点了就收起")
         let fourth = try await harness.window(3)
