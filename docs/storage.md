@@ -164,6 +164,22 @@ description: 通用的小红书图文笔记：给谁看、标题怎么抓人…�
 - 用户用任何编辑器改，App 每次都读最新的（AI 下一轮就用新的）。Agent 经 `save_writing_manual` 提议的新建、修改，用户在确认框里同意才写：已有的名字写回它原来的文件，新的写成 `<名字>.md`（名字 1–40 字，不能有 `/ \ :` 与控制字符、不以 `.` 开头；文件名撞上别的手册时不覆盖）；写回时开头重新生成（要加引号的加上），正文末尾留一个换行，最多 200 KB。
 - **App 从不删这个文件夹和里面的文件**（删稿子、重新开始对话、检查更新替换 App 都不碰）；要删一份手册在 Finder 里删（AI 设置 › 写作手册 › 打开文件夹）。
 
+### 模板：`模板/`
+
+`~/Library/Application Support/MediaCraft/模板/`（壳管，`TemplateLibrary.swift`；测试时是 harness 临时目录里的 `模板/`）：用户自己存的模板（「存为模板」，`drafts.saveAsTemplate`），每套一个文件夹：
+
+```
+模板/
+  我的清单/
+    模板.md                 # 开头 front matter（name、description、tags、title、theme、colors、fonts、cover、caption、images），后面是卡片内容
+    img_….jpg               # 图片，文件名就是 images 里的路径（相对这个文件夹）
+```
+
+- 格式见 [app-api.md](app-api.md#模板原生桥)（`src/templates/format.js`，和写作手册同一套 front matter 写法）；文件夹名就是模板名（1–40 字，不能有 `/ \ :` 与控制字符、不以 `.` 开头）。没有 `模板.md`、不是 UTF-8、超过 1 MB 的文件夹不算模板；隐藏文件夹跳过。列出时按名字的拼音排。
+- 文件夹不在时列出为空，第一次「存为模板」（或「打开文件夹」）时才建。存是整套换掉：先在旁边的临时文件夹里写好 `模板.md` 与图片，再换到 `<名字>/`。
+- 用户用 Finder 整套拷给别人、或自己改 `模板.md` 都行，App 每次都重新读目录；图片经 `templates/read` 读成 data URL 交给页面。**App 只删用户点了删除的那一套**（`drafts.removeTemplate`），从不删整个文件夹。
+- 仓库自带的模板不在这里：随网页打包的登记表 `src/templates/index.js`（由 `src/templates/*.md` 生成），图片是 `docs/guide-assets/`、`docs/template-assets/` 里的相对路径。
+
 ### 窗口：`windows.json`
 
 `~/Library/Application Support/MediaCraft/windows.json`（壳管）：开着的窗口，`[{ draftId, frame: [x, y, 宽, 高] }]`，按先后（最后一个在最前面）。开关窗口、窗口换稿子、到前面来、挪动、改大小时重写；App 退出时的样子不再改，下次启动照着恢复（见 [app-api.md](app-api.md#窗口一个窗口一篇稿子)）。关掉最后一个窗口时写成空的，下次开一个窗口打开上次那篇。丢了只是不恢复窗口。

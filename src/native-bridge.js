@@ -177,6 +177,17 @@
       reveal: (name) => callJson("manuals/reveal", name ? { name } : {}),
       open: (name) => callJson("manuals/open", { name }),
     },
+    // 用户自己存的模板：App 支持目录「模板」文件夹里每套一个文件夹「<名字>/模板.md」+ 同目录的图片（TemplateLibrary.swift；
+    // 格式见 src/templates/format.js，页面读写，壳只管文件）。list() → { templates: [{ name, content }], folder }（content 是 模板.md 全文）；
+    // read(name) → { name, content, images: { 文件名: data URL } }；save({ name, content, images: [{ name, data（base64）}] }) 新建或整套换掉；
+    // remove(name) 删掉那一套；reveal(name) 在 Finder 中显示它的文件夹（不给 name 时打开模板文件夹）
+    templates: {
+      list: () => callJson("templates/list"),
+      read: (name) => callJson("templates/read", { name }),
+      save: ({ name, content, images }) => callJson("templates/save", { name, content, images }),
+      remove: (name) => callJson("templates/remove", { name }),
+      reveal: (name) => callJson("templates/reveal", name ? { name } : {}),
+    },
     // 外部 Agent（MCP，src/mcp/server.js 用）：终端里的 Claude Code 等经 mediacraft-mcp 连进壳，请求由壳交给 window.MediaCraftMCP。
     mcp: {
       // { available, enabled, clients, command }：有没有在监听、「允许外部 Agent 连接」开没开、连着几个、接入命令

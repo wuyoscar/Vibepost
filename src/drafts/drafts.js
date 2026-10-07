@@ -2,6 +2,8 @@
 // 不等出图），也能马上存（saveNow：保存按钮、⌘S、壳在退出 / 关窗 / 重新载入前）；新建、打开、删除、署名、上次的主题。
 // 界面（编辑器、表单）由宿主适配：start(host) 时传进来，这里不碰 src/app.js 的内部名字。
 //   host.builtIns        内置说明书：[{ id, title, record }]，只读，不存盘
+//   host.template(id)    模板库里的一份（src/templates/templates.js）：稿子记录的形状，没有为 null。模板不是稿子：不在列表里、
+//                        不能打开，只能 createFrom 复制一份；get 与 firstPage 认得它们（画廊缩略图）
 //   host.defaultProfile  默认署名 { name, handle, avatar, avatarCrop }（还没存过署名时用）
 //   host.guideProfile    内置说明书的署名（没给时用默认署名）
 //   host.blank()         新稿子的字段（沿用上次选的主题）
@@ -132,7 +134,12 @@
   }
 
   function get(id) {
-    return records.get(id) ?? builtIns.find((item) => item.id === id)?.record ?? null;
+    return records.get(id) ?? builtIns.find((item) => item.id === id)?.record ?? host.template?.(id) ?? null;
+  }
+
+  // 模板库里的一份（不是自己的稿子、不是说明书）
+  function isTemplate(id) {
+    return !records.has(id) && !isBuiltIn(id) && Boolean(host.template?.(id));
   }
 
   function own() {
@@ -379,7 +386,7 @@
   async function firstClaimable(wanted) {
     const seen = new Set();
     for (const id of [...wanted, ...own().map((record) => record.id)]) {
-      if (!id || seen.has(id) || !get(id)) continue;
+      if (!id || seen.has(id) || !get(id) || isTemplate(id)) continue;
       seen.add(id);
       if (await claim(id, { focus: false })) return id;
     }
@@ -397,6 +404,7 @@
   function open(id, { focus = true } = {}) {
     return serially(async () => {
       assertExists(id);
+      if (isTemplate(id)) throw new Error("模板不能直接打开：从模板新建一篇再改");
       if (id !== currentId && !(await claim(id, { focus }))) throw elsewhere(id);
       try {
         await leaveCurrent();
@@ -414,13 +422,16 @@
     return `draft_${Date.now().toString(36)}_${random}`;
   }
 
-  // 新的一篇空稿子（沿用上次选的主题），存进本机，返回它的 id
-  async function addBlank() {
+  // 新的一篇（fields 是记录里除 id、时间戳外的字段，sources 是图片 id → data URL），存进本机，返回它的 id
+  async function add(fields, sources = {}) {
     const now = Date.now();
-    const record = { ...host.blank(), id: newId(), createdAt: now, updatedAt: now };
+    const record = { ...fields, id: newId(), createdAt: now, updatedAt: now };
     records.set(record.id, record);
     try {
-      await enqueue({ drafts: [record] });
+      await enqueue({
+        drafts: [record],
+        media: Object.entries(sources).map(([imageId, src]) => ({ draftId: record.id, kind: "image", id: imageId, data: store.dataUrlToStored(src) })),
+      });
     } catch (error) {
       records.delete(record.id);
       emit("list");
@@ -429,12 +440,47 @@
     return record.id;
   }
 
+  // 新的一篇空稿子（沿用上次选的主题）
+  const addBlank = () => add(host.blank());
+
+  // 一份模板（或别的稿子记录）复制成新稿子的字段：id、时间戳、模板自己的字段（template）、AI 会话与版本都不带过去；
+  // 图片的画面是 data URL 的另放（sources，存进媒体库），随网页打包的相对路径留在记录里（和 host.capture 一样）
+  function copyOf(record) {
+    const { id, createdAt, updatedAt, template, ai, versions, images, ...fields } = record;
+    const stored = {};
+    const sources = {};
+    for (const [imageId, image] of Object.entries(images || {})) {
+      const { src, ...info } = image;
+      if (typeof src === "string" && src.startsWith("data:")) sources[imageId] = src;
+      else if (src) info.src = src;
+      stored[imageId] = structuredClone(info);
+    }
+    return { fields: { ...structuredClone(fields), images: stored }, sources };
+  }
+
+  function assertRoom() {
+    if (records.size >= LIMIT) throw new RangeError(`稿子已经存满 ${LIMIT} 篇，请先删掉不需要的稿子`);
+  }
+
   // 新建一篇并打开它；到上限时报错，不删旧稿。
   function create() {
     return serially(async () => {
-      if (records.size >= LIMIT) throw new RangeError(`稿子已经存满 ${LIMIT} 篇，请先删掉不需要的稿子`);
+      assertRoom();
       await leaveCurrent();
       const id = await addBlank();
+      await show(id);
+      return get(id);
+    });
+  }
+
+  // 照一份记录（模板库里的一份，或任何稿子记录的形状）新建一篇并打开它：新 id 与时间戳，内容、主题、配色、字体、封面、图片都照它
+  function createFrom(record) {
+    return serially(async () => {
+      if (!record || typeof record !== "object") throw new TypeError("createFrom 需要一份稿子记录");
+      assertRoom();
+      await leaveCurrent();
+      const { fields, sources } = copyOf(record);
+      const id = await add(fields, sources);
       await show(id);
       return get(id);
     });
@@ -629,7 +675,9 @@
     // 这个窗口是「新建窗口」开的、还开着启动时新建的那篇空稿子时是它的 id，否则为 null
     freshId: () => (freshId && freshId === currentId ? freshId : null),
     isBuiltIn,
+    isTemplate,
     create,
+    createFrom,
     open,
     remove,
     save,

@@ -41,6 +41,10 @@ else
   mkdir -p "$WEB/docs"
   cp -R "$REPO/index.html" "$REPO/src" "$REPO/brand" "$WEB/"
   cp -R "$REPO/docs/guide-assets" "$WEB/docs/"
+  # 自带模板的示例图（src/templates/*.md 里相对网页根的路径）；还没有这个目录时跳过
+  if [[ -d "$REPO/docs/template-assets" ]]; then
+    cp -R "$REPO/docs/template-assets" "$WEB/docs/"
+  fi
   # 打包字体由 scripts/fetch-fonts.py 下载生成，不在 git 里。
   if [[ -f "$REPO/fonts/manifest.json" ]]; then
     cp -R "$REPO/fonts" "$WEB/"

@@ -24,7 +24,7 @@ final class ShellHarness: NSObject {
     private(set) var windows: [HarnessWindow] = []
     /// 页面里点开、交给默认浏览器的外链（`ShellCore.openExternal`）
     private(set) var openedExternally: [URL] = []
-    /// 要在 Finder 中显示的（`ShellCore.revealFile`）与要用默认的 App 打开的（`ShellCore.openFile`）写作手册
+    /// 要在 Finder 中显示的（`ShellCore.revealFile`：写作手册、用户模板的文件夹）与要用默认的 App 打开的（`ShellCore.openFile`）写作手册
     private(set) var revealedFiles: [URL] = []
     private(set) var openedFiles: [URL] = []
     /// 模拟系统切换浅色 / 深色外观（页面的界面皮肤跟着 prefers-color-scheme 走）
@@ -79,7 +79,9 @@ final class ShellHarness: NSObject {
             appEnvironment: appEnvironment, imageAPI: ImageAPI(openAI: imageAPI),
             keyFile: aiRoot.appendingPathComponent("test.env"),
             // 写作手册（代替 ~/Library/Application Support/MediaCraft/写作手册）：第一次用时照 src/writing-manuals/ 建好
-            writingManuals: aiRoot.appendingPathComponent("写作手册", isDirectory: true)
+            writingManuals: aiRoot.appendingPathComponent("写作手册", isDirectory: true),
+            // 用户模板（代替 ~/Library/Application Support/MediaCraft/模板）：第一次存时才建
+            templates: aiRoot.appendingPathComponent("模板", isDirectory: true)
         )
         shell = ShellWebView(
             webRoot: webRoot, dataStore: store, downloadsDirectory: downloadsDirectory,

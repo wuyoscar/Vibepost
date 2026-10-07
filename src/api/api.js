@@ -85,7 +85,28 @@
       ...Object.fromEntries(NUMBER_FIELDS.map((field) => [field, root.MediaCraftStyleForm.normalizeNumber(field, fields[field])])),
       cover: { ...root.MediaCraftCoverForm.normalize(fields.cover) },
       cardCss: String(fields.cardCss ?? ""),
-      readOnly: root.MediaCraftGuides.isGuide(id),
+      readOnly: root.MediaCraftGuides.isGuide(id) || root.MediaCraftTemplates.isTemplate(id),
+    };
+  }
+
+  // 模板库的一项（src/templates/templates.js 的摘要）→ API 的 Template
+  const apiTemplate = ({ id, name, description, tags, theme, builtIn }) => ({ id, name, description, tags: [...tags], theme, builtIn });
+
+  // drafts.saveAsTemplate 的参数：名字 1–40 字、没有 / \ : 与控制字符、不以「.」开头（和壳里写文件夹的规矩一样），说明一行，标签是字符串数组
+  function assertTemplateMeta(meta) {
+    assertFields(meta, ["name", "description", "tags"], "saveAsTemplate：");
+    const name = String(meta.name ?? "").trim();
+    if (!name) throw new TypeError("模板名不能空着");
+    if (Array.from(name).length > 40) throw new TypeError("模板名最多 40 字");
+    if (/[/\\:]/.test(name)) throw new TypeError("模板名里不能有 / \\ :");
+    if (/[\u0000-\u001f\u007f]/.test(name)) throw new TypeError("模板名里不能有换行、制表这类控制字符");
+    if (name.startsWith(".")) throw new TypeError("模板名不能以「.」开头");
+    if ("description" in meta && typeof meta.description !== "string") throw new TypeError("description 需要是字符串");
+    if ("tags" in meta && (!Array.isArray(meta.tags) || meta.tags.some((tag) => typeof tag !== "string"))) throw new TypeError("tags 需要是字符串数组");
+    return {
+      name,
+      description: String(meta.description ?? "").split(/\s+/).filter(Boolean).join(" "),
+      tags: [...new Set((meta.tags ?? []).map((tag) => tag.trim()).filter(Boolean))],
     };
   }
 
@@ -192,11 +213,14 @@
   }
 
   // 别的稿子（不切换过去）出图用的设置：它存下的字段与图片（画面从本机媒体库里取），署名用界面上现在的。
+  // 模板库里的一份也行（画廊的缩略图）：图片的画面在记录里（相对路径或壳读来的 data URL）
   async function storedRenderSettings(app, id) {
     const drafts = root.MediaCraftDrafts;
+    const templates = root.MediaCraftTemplates;
+    if (templates.isTemplate(id)) await templates.load(id);
     const record = drafts.get(id);
     if (!record) throw new Error(`没有这篇稿子：${id}`);
-    const stored = await drafts.store.readMedia(id);
+    const stored = templates.isTemplate(id) ? { images: {} } : await drafts.store.readMedia(id);
     const images = Object.fromEntries(Object.entries(record.images || {}).map(([imageId, info]) => [
       imageId,
       { ...info, src: stored.images[imageId] ?? info.src ?? "" },
@@ -208,6 +232,7 @@
   function draftsApi(app, current) {
     const { editor } = app;
     const drafts = root.MediaCraftDrafts;
+    const templates = root.MediaCraftTemplates;
     const update = async (patch, options = {}) => {
       assertFields(options, ["undoable"], "drafts.update 的选项：");
       await updateDraft(app, patch, { undoable: Boolean(options.undoable) });
@@ -225,14 +250,44 @@
       list: async () => drafts.list(),
       async get(id) {
         if (id === app.draft.id) return current();
+        // 模板库里的一份也读得到（readOnly），用户模板的图片这时才读进来
+        if (templates.isTemplate(id)) await templates.load(id);
         const record = drafts.get(id);
         return record ? apiDraft(id, record) : null;
       },
       current: async () => current(),
+      // init.template：模板的 id 或名字（见 templates()），先照它复制一份再套用其余的字段；没有这个模板时 reject
       async create(init = {}) {
-        assertDraftPatch(init, {});
-        await drafts.create();
-        return Object.keys(init).length ? update(init) : current();
+        if (!init || typeof init !== "object" || Array.isArray(init)) throw new TypeError("稿子字段：需要一个对象");
+        const { template: key, ...patch } = init;
+        let record = null;
+        if (key !== undefined) {
+          if (typeof key !== "string" || !key.trim()) throw new TypeError("template 需要是模板的 id 或名字");
+          record = await templates.load(key.trim());
+          if (!record) throw new Error(`没有这个模板：${key}`);
+        }
+        assertDraftPatch(patch, record?.images ?? {});
+        if (record) await drafts.createFrom(record);
+        else await drafts.create();
+        return Object.keys(patch).length ? update(patch) : current();
+      },
+      // 模板库：仓库自带的与自己存的（App 支持目录「模板」文件夹，每次都重新读目录），[{ id, name, description, tags, theme, builtIn }]
+      templates: async () => (await templates.refresh()).map(apiTemplate),
+      // 把正在编辑的这篇存成自己的模板：卡片内容、小红书正文、标题、主题、配色、字体、封面与图片（画面存成文件）；
+      // 同名的整套换掉。只在 App 里能存。返回这份模板
+      async saveAsTemplate(meta) {
+        const checked = assertTemplateMeta(meta);
+        app.assertEditable();
+        await app.pipeline.settle();
+        return apiTemplate(await templates.save(checked, app.fields()));
+      },
+      // 删自己存的模板（自带的 reject）
+      async removeTemplate(id) {
+        await templates.remove(id);
+      },
+      // 在 Finder 中显示自己存的那份模板的文件夹；不给 id 时打开模板文件夹（自带的 reject）
+      async revealTemplate(id) {
+        await templates.reveal(id);
       },
       // options.focus：那篇在别的窗口里开着时要不要把那个窗口调到前面（默认要；外部 Agent 开的不抢焦点）
       async open(id, options = {}) {
@@ -249,7 +304,7 @@
       saveNow: async () => drafts.saveNow(),
       update,
       // 页内专用：这篇（不切换过去）的第一张卡片，按它自己的正文、主题、配色、字体与图片出图，不管模式；
-      // 正在编辑的这篇按界面上的样子。只画第一页；不改稿子、不等预览出图。
+      // 正在编辑的这篇按界面上的样子；模板库里的一份也行（画廊的缩略图）。只画第一页；不改稿子、不等预览出图。
       async firstPage(id) {
         const settings = id === app.draft.id ? app.renderSettings({ preview: false }) : await storedRenderSettings(app, id);
         const { pageCount, canvases } = await root.MediaCraftRender.cards(settings, { paint: 1 });

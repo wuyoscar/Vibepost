@@ -66,6 +66,8 @@ public final class ShellCore {
     let cardRasterizer: CardRasterizer
     /// 写作手册（`manuals/*`；AI 的每一轮也拷一份进工作副本）
     let writingManuals: WritingManuals
+    /// 用户自己存的模板（`templates/*`）
+    let templates: TemplateLibrary
     /// 开着的窗口（不拥有它们：窗口关掉就没了），最近到前面来的排在最后
     private var windows: [WeakPage] = []
     /// 要开新窗口（「新建窗口」、稿件列表里的「在新窗口打开」、外部 Agent 新建或打开的稿子）时怎么开，返回新窗口的网页：
@@ -153,6 +155,7 @@ public final class ShellCore {
         self.configure = configure
         // 示例手册随网页一起（build-app.sh 把 src/ 拷进 App）
         writingManuals = WritingManuals(folder: ai.writingManuals, examples: webRoot.appendingPathComponent("src/writing-manuals", isDirectory: true))
+        templates = TemplateLibrary(folder: ai.templates)
         aiSessions = AISessions(configuration: ai, manuals: writingManuals)
         livePhotos = LivePhotos()
         externalAgents = ExternalAgents(configuration: mcp)
@@ -461,6 +464,50 @@ public final class ShellCore {
             return .failure(failure.status, failure.message)
         } catch {
             return .failure(500, "写作手册：\(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - 模板
+
+    /// 页面经原生桥 `templates/<动作>` 要的用户模板的事（见 TemplateLibrary.swift；文件的格式页面自己读写）：
+    /// - list：`{ templates: [{ name, content }], folder }`（content 是 模板.md 全文，按名字的拼音排）
+    /// - read `{ name }`：`{ name, content, images: { 文件名: data URL } }`
+    /// - save `{ name, content, images: [{ name, data }] }`（data 是 base64）：新建或整套换掉，`{ name, folder }`；名字、图片不合规矩时 400 带原因
+    /// - remove `{ name }`：删掉那一套；没有时 404
+    /// - reveal `{ name? }`：在 Finder 里显示那一套的文件夹；没给 name 时打开模板文件夹
+    nonisolated func templateAction(_ action: String, _ request: [String: Any]) async -> NativeBridge.Reply {
+        let templates = templates
+        let name = request["name"] as? String ?? ""
+        do {
+            switch action {
+            case "list":
+                let list = try templates.list()
+                return .ok(["templates": list.map { ["name": $0.name, "content": $0.content] }, "folder": templates.folder.path])
+            case "read":
+                let (template, images) = try templates.read(name)
+                return .ok(["name": template.name, "content": template.content, "images": images])
+            case "save":
+                let images = try (request["images"] as? [[String: Any]] ?? []).map { item -> TemplateLibrary.Image in
+                    let file = item["name"] as? String ?? ""
+                    guard let data = Data(base64Encoded: item["data"] as? String ?? "") else { throw TemplateLibrary.Failure("图片的内容不是 base64：\(file)") }
+                    return TemplateLibrary.Image(name: file, data: data)
+                }
+                let saved = try templates.save(name: name, content: request["content"] as? String ?? "", images: images)
+                return .ok(["name": saved.name, "folder": saved.folder.path])
+            case "remove":
+                try templates.remove(name)
+                return .ok()
+            case "reveal":
+                let target = try templates.location(of: name.isEmpty ? nil : name)
+                await MainActor.run { revealFile(target) }
+                return .ok()
+            default:
+                return .failure(404, "没有这个模板动作：templates/\(action)")
+            }
+        } catch let failure as TemplateLibrary.Failure {
+            return .failure(failure.status, failure.message)
+        } catch {
+            return .failure(500, "模板：\(error.localizedDescription)")
         }
     }
 

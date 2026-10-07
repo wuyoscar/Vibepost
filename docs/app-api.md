@@ -20,7 +20,7 @@
   - `ai.newSession()` 是「重新开始这篇的对话」：除了 v4 的清空，还解锁这篇的后端（有了对话后只有这样才能换后端）。
   - 用 Codex 时生图是它自带的：生成的图直接成为配图候选（会话里的 `candidates`），`history().generating` 多了 `byBackend: true`，这时 `ai.stopImages()` 停掉整轮（没法只停生图）。
   - 只加的：`ai.backends()`、`ai.setBackend()`、`ai.models()`；`status({ backend })`、`setPath(path, backend)`；`model()` / `setModel()` 返回多了 `backend`；`history()` 多了 `backend`、`locked`；`status` 事件多了 `backend`。
-  - 后来又加的（不升版本）：`ai.sessions()`（会话历史）；`AIStatus` 多了 `reason`。
+  - 后来又加的（不升版本）：`ai.sessions()`（会话历史）；`AIStatus` 多了 `reason`；模板库：`drafts.templates()`、`drafts.create({ template })`、`drafts.saveAsTemplate()`、`drafts.removeTemplate()`、`drafts.revealTemplate()`，`drafts.get` / `firstPage` 认得模板的 id（见 [drafts](#drafts稿子)）。
 - `"4"`：小红书正文（发布时图片下面的那段）和卡片内容分开了，稿子多了 `caption` 字段（见 [drafts](#drafts稿子)）。
   - `output.sendToIPhone()` 在图文卡片模式下剪贴板放 `caption`（空着时不动剪贴板），不再是卡片内容的纯文本；长文照旧放全文的纯文本。返回值多了 `copied`。v3 里剪贴板总是 `render.plainText()`。
   - `render.plainText()` 只是卡片内容（长文是全文）的纯文本，界面上是「复制卡片文字」（长文里是「复制全文」）；小红书正文的字数按 `caption` 算。
@@ -55,11 +55,15 @@
 | `list()` | 所有稿子，含内置说明书 | `DraftSummary[]` |
 | `get(id)` | 读一篇（不切换）；没有时为 `null` | `Draft \| null` |
 | `current()` | 正在编辑的这篇 | `Draft` |
-| `create(init?)` | 新建并切过去；`init` 同 `update` 的字段。沿用上一次选的主题。到上限时 reject（不删旧稿） | `Draft` |
+| `create(init?)` | 新建并切过去；`init` 同 `update` 的字段，另可带 `template`（模板的 id 或名字，见 `templates()`）：先照模板复制一份（卡片内容、标题、小红书正文、主题、配色、字体、封面、图片都照它），再套用其余的字段；没有这个模板时 reject。不带 `template` 时是空白稿子，沿用上一次选的主题。到上限时 reject（不删旧稿） | `Draft` |
+| `templates()` | 模板库：仓库自带的（`src/templates/*.md`，按登记表顺序在前）与自己存的（App 支持目录「模板」文件夹，每次都重新读目录；浏览器里没有），见[模板](#模板原生桥) | `Template[]` |
+| `saveAsTemplate({ name, description?, tags? })` | 把正在编辑的这篇存成自己的模板：写进「模板/<名字>/模板.md」+ 图片文件（画面存成文件，实况只存封面那张；随网页打包的图片先取回来）；存的是卡片内容、标题、小红书正文、主题、配色（背景、文字、强调与单独调过的辅助、衬底）、字体（不跟随主题的）、封面与图片，不存字号、行距、卡片样式。`name` 1–40 字，不能有 `/ \ :` 与控制字符、不以 `.` 开头（`TypeError`）；同名的整套换掉。内置说明书、浏览器里 reject | `Template` |
+| `removeTemplate(id)` | 删自己存的那一套（整个文件夹）；自带的 reject | — |
+| `revealTemplate(id?)` | 在 Finder 中显示自己存的那一套的文件夹；不给 `id` 时打开模板文件夹（不在时先建好）；自带的 reject | — |
 | `open(id)` | 切换到这篇 | `Draft` |
 | `remove(id)` | 直接删除（不弹确认框；界面上的删除按钮仍会先确认），连同它的图片、实况视频与 AI 的工作副本、配图候选（[storage.md](storage.md#ai-的工作副本)）；后端自己的会话记录（`~/.claude/projects/`、`~/.codex/sessions/`）不删。工作副本没删掉时稿子照样删了，reject 说明原因 | — |
 | `update(patch, options?)` | 改当前稿子的任意字段，出图并存盘（返回时已写进本机，写不进时 reject）；先整体校验，不会只改一半。`options.undoable: true` 时正文与改了的字段（标题、小红书正文、模式、主题、配色、字体、字号、行距、图片最大高）合成撤销历史里的一步，⌘Z / `undo()` 一起撤回（App 的工具与外部 Agent 都这样改）；不给时只有正文的改动进撤销历史 | `Draft` |
-| `firstPage(id)` 〔页内〕 | 这篇（不切换过去）的第一张卡片：按它自己存下的正文、主题、配色、字体与图片出图，不管它的模式，署名用现在的；正在编辑的这篇按界面上的样子。只画第一页；不改稿子、不等预览出图。手机预览的发现页、主页用它画别的稿子的首图。没有这篇时 reject | `{ pageCount, canvas }`（没有内容时 `canvas` 为 `null`） |
+| `firstPage(id)` 〔页内〕 | 这篇（不切换过去）的第一张卡片：按它自己存下的正文、主题、配色、字体与图片出图，不管它的模式，署名用现在的；正在编辑的这篇按界面上的样子；模板的 id 也认（画廊的缩略图，用户模板的图片这时才读进来）。只画第一页；不改稿子、不等预览出图。手机预览的发现页、主页用它画别的稿子的首图。没有这篇时 reject | `{ pageCount, canvas }`（没有内容时 `canvas` 为 `null`） |
 | `undo()` / `redo()` | 撤销 / 重做正文的改动（与 ⌘Z / ⇧⌘Z 相同）；图片的版式、裁剪和正文在同一条撤销历史里 | `Draft` |
 | `saveState()` | 当前稿子的存盘状态（顶栏的保存按钮显示的就是它） | `SaveState` |
 | `saveNow()` | 马上存（与点保存按钮、⌘S 相同）：不再等自动存、写进本机后返回；之前没存上过就整篇重写；写不进时 reject 原因。内置说明书什么都不做 | `SaveState` |
@@ -96,6 +100,8 @@
 **封面**（`cover`，检查器的「封面」）：`enabled` 为 `true` 时第 1 张是封面、正文从第 2 张开始（正文页都按内页排）。封面的标题取 `title`，空着时取正文第一行字；副标题是 `subtitle`（空着不显示）；`image` 是这篇里的一张图或实况（可以不在正文里），给了没有的 id 时 reject（`drafts.create` 在建稿之前就 reject）。各项类型不对是 `TypeError`。封面的样子随卡片结构（`src/engine/structures.js` 的 `cover`），规则见 [markdown-syntax.md](markdown-syntax.md#封面首页做封面)。
 
 `DraftSummary`：`{ id, title, mode, updatedAt, builtIn, current }`，其中 `title` 是稿件抽屉里显示的名字（没填标题时取正文第一行的文字，最多 24 字）；`list()` 里内置说明书在前，自己的按最近修改在前（只是打开不算修改）。
+
+**模板**（`Template`：`{ id, name, description, tags, theme, builtIn }`）：`id` 自带的是 `template_<登记表里的 id>`（如 `template_checklist`），自己存的是 `user_template_<名字>`；`tags` 是题材一个、风格一个（如 `["清单", "简洁"]`）；`theme` 是主题 id。模板不是稿子：不在 `list()` 与稿件抽屉里，`open(id)` reject，`get(id)` 读得到（`readOnly: true`，用户模板的图片这时才读进来），`firstPage(id)` 能画第一页，`create({ template })` 复制一份成自己的稿子。模板文件的格式与文件夹见[模板](#模板原生桥)。
 
 ## editor：编辑器
 
@@ -562,6 +568,58 @@ App 可以开几个窗口，每个窗口开着一篇稿子，各改各存（都�
 | `manuals/open` | `{ name }` | 用默认的 App 打开这份。`{ ok }` |
 
 在 Finder 中显示、用默认的 App 打开经 `ShellCore.revealFile` / `openFile`（测试 harness 换成记下来）。**界面**：AI 助手 › 设置 › 写作手册（`src/ai/manuals.js`）：一句说明、每份一块（名字、说明、「打开」「在 Finder 中显示」）、「打开文件夹」；每次打开设置重新列一遍，`save_writing_manual` 存好后也刷新。
+
+## 模板（原生桥）
+
+模板是写好的整篇稿子（卡片内容 + 主题、配色、字体、封面、小红书正文、示例图），复制一份就能改（`drafts.create({ template })`，见 [drafts](#drafts稿子)）。两处来源，页面在 `src/templates/templates.js` 把它们登记成稿子记录的形状：
+
+- **自带的**：仓库里 `src/templates/<名字>.md`，`node scripts/build-templates.mjs` 合成登记表 `src/templates/index.js`（提交进仓库；`TemplatesTests` 在页面里重新读这些文件比对，过期就不过）。图片用随网页打包的相对路径（`docs/guide-assets/…`、`docs/template-assets/…`），记录里留相对路径，和内置说明书一样直接出图。
+- **自己存的**：App 支持目录「模板」文件夹（布局见 [storage.md](storage.md#模板模板)，壳 `TemplateLibrary.swift`），每套一个文件夹 `<名字>/模板.md` + 同目录的图片；页面经原生桥 `POST mediacraft://app/__native/templates/<动作>`（body 是 JSON）读写，`src/native-bridge.js` 包成 `MediaCraftNative.templates`；浏览器里没有。几个窗口共用一份，读写排在一把锁里。
+
+**文件的格式**（`src/templates/format.js`，Node 与页面共用）：开头两行 `---` 之间是 front matter，和写作手册同一套写法（一行一个 `键: 值`，值可以加引号；`|` 后面缩进的几行换行照原样，`>` 并成一行；`键:` 后面缩进的 `子键: 值` 几行是一张表），后面是卡片内容，只用中文记号：
+
+```markdown
+---
+name: 干货清单                      # 模板名（用户模板就是文件夹名）
+description: 一条一页的经验清单……      # 一句话说明
+tags: 清单, 简洁                     # 题材一个、风格一个
+id: checklist                       # 登记表里的 id（ASCII，不写时用文件名）；用户模板不用
+title: 租房第一年，我踩过的 5 个坑     # 新稿子的标题（封面用它）
+theme: notes                        # 主题 id；认不出按默认主题
+colors:                             # 可省：只给 bg / text / accent 时辅助、衬底按三色规则推；给了的辅助、衬底算单独调过
+  bg: #ffffff
+  text: #1c1c1e
+  accent: #ffbd2e
+fonts:                              # 可省：zh / en / code 的字体 id，没给跟随主题
+  zh: lxgw-wenkai
+cover:                              # 可省：首页做封面
+  enabled: true
+  subtitle: 看完至少省下一个月房租
+  image: cover                      # 这篇里的一张图
+caption: |                          # 可省：小红书正文，换行照原样
+  第一段
+  #话题
+images:                             # 可省：图片编号 → 路径（自带的相对网页根，用户的相对它自己的文件夹）
+  cover: docs/guide-assets/valley-morning.jpg
+---
+
+:::小标签
+租房经验 · 第 1 期
+:::
+…
+```
+
+色值直接写 `#rrggbb`（不是 YAML 的注释）；值里有「: 」、以 `#` 以外的特殊符号开头时加双引号。不认识的键、认不出的值跳过；图片编号只能是字母、数字、`_`、`-`。`saveAsTemplate` 写回时按这个顺序生成，没有的键不写。
+
+| 动作 | body | 返回 |
+| --- | --- | --- |
+| `templates/list` | — | `{ templates: [{ name, content }], folder }`：每套的名字（文件夹名）与 `模板.md` 全文，按名字的拼音排；文件夹还不在时为空 |
+| `templates/read` | `{ name }` | `{ name, content, images: { 文件名: data URL } }`（`模板.md` 旁边认得的图片：jpg / png / gif / webp，每张最多 20 MB）；没有这套时 404 |
+| `templates/save` | `{ name, content, images: [{ name, data }] }`（`data` 是 base64） | 新建或整套换掉：先在旁边的临时文件夹里写好再换到 `<名字>/`，`{ name, folder }`；名字不合规矩（同写作手册）、`content` 空着或超过 1 MB、图片文件名不对、超过 40 张时 400 带中文原因 |
+| `templates/remove` | `{ name }` | 删掉那一套（整个文件夹）；没有时 404。`{ ok }` |
+| `templates/reveal` | `{ name? }` | 在 Finder 中显示那一套的文件夹；没给 `name` 时打开模板文件夹（不在时先建好）。`{ ok }` |
+
+在 Finder 中显示经 `ShellCore.revealFile`（测试 harness 换成记下来）。
 
 ## mcp：外部 Agent
 

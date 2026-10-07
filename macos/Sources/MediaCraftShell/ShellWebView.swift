@@ -45,6 +45,9 @@ public final class ShellWebView: NSObject {
             },
             manuals: { [weak core] action, request in
                 await core?.manualAction(action, request) ?? .failure(410, "Vibepost 正在关闭")
+            },
+            templates: { [weak core] action, request in
+                await core?.templateAction(action, request) ?? .failure(410, "Vibepost 正在关闭")
             }
         )
         config.setURLSchemeHandler(AppSchemeHandler(root: core.webRoot, bridge: bridge), forURLScheme: Self.scheme)

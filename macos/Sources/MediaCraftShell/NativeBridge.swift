@@ -1,7 +1,7 @@
 import Foundation
 
 /// 网页 → 壳的原生能力。页面通过 `POST mediacraft://app/__native/<action>?<参数>` 调用，
-/// body 是文件的二进制内容（`ai/*`、`window/*`、`manuals/*`、`mcp/status`、`mcp/settings` 是 JSON，`live-photo` 是带文件的分段 body），
+/// body 是文件的二进制内容（`ai/*`、`window/*`、`manuals/*`、`templates/*`、`mcp/status`、`mcp/settings` 是 JSON，`live-photo` 是带文件的分段 body），
 /// 返回 JSON（`live-photo` 成功时回分段 body）。文件读写与实况合成在后台执行，AirDrop 与剪贴板回到主线程。
 /// 每个窗口一个：知道请求来自哪个窗口（AI 的一轮只推给发起它的窗口），服务是全 App 共用的。
 final class NativeBridge: @unchecked Sendable {
@@ -45,16 +45,20 @@ final class NativeBridge: @unchecked Sendable {
     private let windows: (@Sendable (_ action: String, _ request: [String: Any]) async -> Reply)?
     /// 写作手册的事（列出、读、存、在 Finder 中显示、打开），由 ShellCore 接上；nil 时没有
     private let manuals: (@Sendable (_ action: String, _ request: [String: Any]) async -> Reply)?
+    /// 用户模板的事（列出、读、存、删、在 Finder 中显示），由 ShellCore 接上；nil 时没有
+    private let templates: (@Sendable (_ action: String, _ request: [String: Any]) async -> Reply)?
 
     init(
         downloadsDirectory: URL, iPhoneSender: IPhoneSender, clipboard: TextClipboard, ai: AISessions,
         livePhotos: LivePhotos, externalAgents: ExternalAgents, cards: CardRasterizer? = nil, staging: SendStaging = SendStaging(),
         window: String = "main", windows: (@Sendable (_ action: String, _ request: [String: Any]) async -> Reply)? = nil,
-        manuals: (@Sendable (_ action: String, _ request: [String: Any]) async -> Reply)? = nil
+        manuals: (@Sendable (_ action: String, _ request: [String: Any]) async -> Reply)? = nil,
+        templates: (@Sendable (_ action: String, _ request: [String: Any]) async -> Reply)? = nil
     ) {
         self.window = window
         self.windows = windows
         self.manuals = manuals
+        self.templates = templates
         self.cards = cards
         self.downloadsDirectory = downloadsDirectory
         self.iPhoneSender = iPhoneSender
@@ -106,6 +110,10 @@ final class NativeBridge: @unchecked Sendable {
             guard let manuals else { return .failure(404, "这里没有写作手册") }
             let request = (try? JSONSerialization.jsonObject(with: body) as? [String: Any]) ?? [:]
             return await manuals(String(action.dropFirst("manuals/".count)), request)
+        case _ where action.hasPrefix("templates/"):
+            guard let templates else { return .failure(404, "这里没有模板文件夹") }
+            let request = (try? JSONSerialization.jsonObject(with: body) as? [String: Any]) ?? [:]
+            return await templates(String(action.dropFirst("templates/".count)), request)
         case _ where action.hasPrefix("mcp/"):
             return externalAgents.handle(action: String(action.dropFirst("mcp/".count)), query: query, body: body)
         default:

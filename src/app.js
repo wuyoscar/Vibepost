@@ -401,6 +401,8 @@ for (const button of modeButtons) button.addEventListener("click", () => void sw
 // 稿子的存取、切换与稿件抽屉都在稿件模块里；这里告诉它怎样读写界面上的这一篇。
 const draftHost = {
   builtIns: MediaCraftGuides.builtIns(),
+  // 模板库里的一份（src/templates/templates.js）：get 与 firstPage 认得，createFrom 复制成稿子
+  template: (id) => MediaCraftTemplates.record(id),
   defaultProfile: DEFAULT_PROFILE,
   guideProfile: GUIDE_PROFILE,
   // 新稿子：空白正文，沿用上一次选的主题与它的配色，其余是默认值

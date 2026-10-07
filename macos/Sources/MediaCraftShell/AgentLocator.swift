@@ -20,13 +20,15 @@ public struct AIConfiguration: Sendable {
     public var keyFile: URL
     /// 写作手册的文件夹（每份一个 .md，见 WritingManuals.swift）；没给时是 `root/写作手册`
     public var writingManuals: URL
+    /// 用户自己存的模板的文件夹（每套一个文件夹，见 TemplateLibrary.swift）；没给时是 `root/模板`
+    public var templates: URL
 
     public init(
         root: URL, loginShell: URL, cancelGrace: Duration = .seconds(2), exitGrace: Duration = .seconds(10),
         shellTimeout: Duration = .seconds(15), appEnvironment: [String: String] = ProcessInfo.processInfo.environment,
         imageAPI: ImageAPI = .standard,
         keyFile: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".env"),
-        writingManuals: URL? = nil
+        writingManuals: URL? = nil, templates: URL? = nil
     ) {
         self.root = root
         self.loginShell = loginShell
@@ -37,9 +39,10 @@ public struct AIConfiguration: Sendable {
         self.imageAPI = imageAPI
         self.keyFile = keyFile
         self.writingManuals = writingManuals ?? root.appendingPathComponent("写作手册", isDirectory: true)
+        self.templates = templates ?? root.appendingPathComponent("模板", isDirectory: true)
     }
 
-    /// `~/Library/Application Support/MediaCraft/ai`，写作手册在 `MediaCraft/写作手册`，登录 shell 取账户设置里的那个。
+    /// `~/Library/Application Support/MediaCraft/ai`，写作手册在 `MediaCraft/写作手册`、模板在 `MediaCraft/模板`，登录 shell 取账户设置里的那个。
     public static var standard: AIConfiguration {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         var shell = "/bin/zsh"
@@ -48,7 +51,8 @@ public struct AIConfiguration: Sendable {
         }
         return AIConfiguration(
             root: support.appendingPathComponent("MediaCraft/ai"), loginShell: URL(fileURLWithPath: shell),
-            writingManuals: support.appendingPathComponent("MediaCraft/写作手册", isDirectory: true)
+            writingManuals: support.appendingPathComponent("MediaCraft/写作手册", isDirectory: true),
+            templates: support.appendingPathComponent("MediaCraft/模板", isDirectory: true)
         )
     }
 }
