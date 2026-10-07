@@ -959,3 +959,190 @@
   background: var(--mc-accent);
   mask: var(--fresh-wave) 0 0 / 24px 8px repeat-x;
 }
+
+/* ---------- 电光：深色底、极淡的网格、一抹强调色；页眉像终端的一条，标签与页码都是等宽字 ----------
+   装饰色一律从配色推（正文色的一点点、强调色的一点点叠在底色上）：换成别的深色或浅色配色也清楚。 */
+
+/* 网格：1px 的线、48px 一格，颜色是正文色的 4%，对齐版心（横竖都从 72 起），压在正文下面 */
+.mc-page[data-structure="neon"] {
+  --neon-line: color-mix(in oklab, var(--mc-text) 4%, transparent);
+  --neon-grid:
+    linear-gradient(to right, var(--neon-line) 1px, transparent 1px) 72px 72px / 48px 48px repeat,
+    linear-gradient(to bottom, var(--neon-line) 1px, transparent 1px) 72px 72px / 48px 48px repeat;
+
+  background: var(--neon-grid), var(--mc-bg);
+}
+
+/* 封面与结尾页：右上角一团很淡的强调色光，网格照旧 */
+.mc-page[data-structure="neon"]:is([data-kind="cover"], [data-kind="end"]) {
+  background:
+    radial-gradient(56% 42% at 100% 0%, color-mix(in oklab, var(--mc-accent) 18%, transparent), transparent 70%) 0 0 / 100% 100% no-repeat,
+    var(--neon-grid),
+    var(--mc-bg);
+}
+
+.mc-neon-head {
+  position: absolute;
+  top: 64px;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 40px;
+  padding-bottom: 16px;
+  box-sizing: content-box;
+  border-bottom: 1px solid color-mix(in oklab, var(--mc-text) 22%, transparent);
+  color: var(--mc-text);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 3px;
+}
+
+.mc-neon-head .mc-avatar {
+  width: 36px;
+  height: 36px;
+}
+
+/* 内页顶上的光标块（第一页这个位置是头像） */
+.mc-neon-cursor {
+  flex: none;
+  width: 12px;
+  height: 22px;
+  border-radius: 2px;
+  background: var(--mc-accent);
+}
+
+/* 页码的胶囊：细线框、一点强调色的底 */
+.mc-neon-head .mc-count {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  margin-left: auto;
+  padding: 0 12px;
+  border: 1px solid color-mix(in oklab, var(--mc-accent-text) 55%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--mc-accent) 10%, var(--mc-bg));
+  color: var(--mc-accent-text);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 粗黑标题收紧一点字距；小标题前面一个强调色的 //，代码注释的味道 */
+.mc-page[data-structure="neon"] .mc-body :is(h1, .mc-cover-title) {
+  letter-spacing: -0.01em;
+}
+
+.mc-page[data-structure="neon"] .mc-body h2::before {
+  content: "// ";
+  color: var(--mc-accent-text);
+  font-family: var(--mc-font-mono);
+  font-weight: 700;
+}
+
+.mc-page[data-structure="neon"] .mc-body blockquote {
+  padding: 14px 24px;
+  border-left: 3px solid var(--mc-accent);
+  border-radius: 0 4px 4px 0;
+  background: color-mix(in oklab, var(--mc-text) 6%, var(--mc-bg));
+  color: var(--mc-text);
+}
+
+.mc-page[data-structure="neon"] .mc-marker.is-bullet::before {
+  width: 0.28em;
+  height: 0.28em;
+  border-radius: 1px;
+}
+
+.mc-page[data-structure="neon"] .mc-body :is(pre, code) {
+  border-radius: 4px;
+}
+
+.mc-page[data-structure="neon"] .mc-body pre {
+  border: 1px solid color-mix(in oklab, var(--mc-text) 12%, transparent);
+}
+
+.mc-page[data-structure="neon"] .mc-body th {
+  border-bottom: 2px solid color-mix(in oklab, var(--mc-accent) 60%, transparent);
+}
+
+/* 图片：直角小圆角，一圈正文色的细线 */
+.mc-page[data-structure="neon"] .mc-img {
+  outline: 1px solid color-mix(in oklab, var(--mc-text) 20%, transparent);
+  outline-offset: -1px;
+}
+
+/* 小标签、步骤号：等宽、强调色 */
+.mc-page[data-structure="neon"] .mc-kicker {
+  color: var(--mc-accent-text);
+  font-family: var(--mc-font-mono);
+  font-size: 18px;
+  letter-spacing: 0.08em;
+}
+
+.mc-page[data-structure="neon"] .mc-step-no {
+  font-family: var(--mc-font-mono);
+}
+
+/* 提示：强调色细框、一点强调色的底 */
+.mc-page[data-structure="neon"] .mc-note {
+  padding: 16px 22px;
+  border: 1px solid color-mix(in oklab, var(--mc-accent) 50%, transparent);
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--mc-accent) 8%, var(--mc-bg));
+}
+
+/* 等宽块：嵌进去的一块，左边一道强调色 */
+.mc-page[data-structure="neon"] .mc-mono {
+  padding: 12px 22px;
+  border-left: 2px solid var(--mc-accent);
+  border-radius: 0 4px 4px 0;
+  background: color-mix(in oklab, var(--mc-text) 5%, var(--mc-bg));
+}
+
+/* 标签列表的胶囊：线框、标签色的字居中（白字压在深色的标签色上会看不清） */
+.mc-page[data-structure="neon"] .mc-badge {
+  justify-content: center;
+  border: 1px solid color-mix(in oklab, var(--mark) 60%, transparent);
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--mark) 12%, var(--mc-bg));
+  color: var(--mark);
+  letter-spacing: 0.04em;
+}
+
+/* 次要文字提亮一点（同纯黑）：账号、图注、页尾小字、封面副标题 */
+.mc-page[data-structure="neon"] :is(.mc-sig-handle, .mc-body figcaption, .mc-footnote, .mc-cover-subtitle) {
+  color: color-mix(in oklab, var(--mc-text) 66%, var(--mc-bg));
+}
+
+.mc-page[data-structure="neon"] .mc-sig-rule {
+  width: 56px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.mc-page[data-structure="neon"] .mc-sig-handle {
+  font-family: var(--mc-font-label);
+  letter-spacing: 1px;
+}
+
+/* 封面：标题下一小段强调色的粗线；有底图时底图是一圈细线的直角相框 */
+.mc-page[data-structure="neon"] .mc-cover-rule {
+  display: block;
+  width: 72px;
+  height: 4px;
+  margin-top: 36px;
+  border-radius: 2px;
+  background: var(--mc-accent);
+}
+
+.mc-page[data-structure="neon"] .mc-cover[data-image="plate"] .mc-cover-image::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid color-mix(in oklab, var(--mc-text) 26%, transparent);
+  border-radius: var(--plate-radius);
+  pointer-events: none;
+}

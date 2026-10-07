@@ -7,6 +7,8 @@
   const pad2 = (value) => String(value).padStart(2, "0");
   const pageOf = (page) => `${page.index + 1}/${page.total}`;
   const counter = (page) => `${pad2(page.index + 1)} / ${pad2(page.total)}`;
+  // 电光的页码挤在胶囊里：01/08
+  const slashed = (page) => `${pad2(page.index + 1)}/${pad2(page.total)}`;
   // 第一页（署名页）：没开封面时是第一张正文，开了封面是封面
   const first = (page) => page.index === 0 && page.kind !== "end";
 
@@ -79,6 +81,12 @@
         head: (page, context) => `<div class="mc-fresh-head">${freshTag(page, context)}</div>`,
         foot: () => "",
       },
+    },
+    // 电光：终端似的一条——第一页是头像、内页是一个强调色的光标块，大写等宽的名字，右边胶囊里的页码
+    neon: {
+      head: (page, context) => `<div class="mc-neon-head">${first(page) ? avatar(context) : `<span class="mc-neon-cursor"></span>`}`
+        + `<span class="mc-sign">${upper(context)}</span><span class="mc-count">${slashed(page)}</span></div>`,
+      foot: () => "",
     },
   };
 

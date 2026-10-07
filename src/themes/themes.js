@@ -87,6 +87,14 @@
       fonts: { zh: "noto-sans-sc", en: "inter", code: "jetbrains-mono" },
       titleFonts: { zh: "lxgw-wenkai", en: "lxgw-wenkai" },
     },
+    {
+      id: "neon",
+      name: "电光",
+      label: "深蓝底 · 一抹电蓝 · 等宽标签",
+      structure: "neon",
+      colors: { bg: "#0f172a", text: "#e6edf7", accent: "#4cc9ff", secondary: "#e6edf7", surface: "#252c3f" },
+      fonts: { zh: "noto-sans-sc", en: "inter", code: "jetbrains-mono" },
+    },
   ]);
 
   // 没选过主题时新稿子用它；认不出的主题也按它

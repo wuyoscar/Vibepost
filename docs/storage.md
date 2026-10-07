@@ -49,7 +49,7 @@
 - `images` 里可以有不在正文里的图：只给封面用的底图（检查器「封面」里上传的）、从正文里删掉了文字标记的图。它们跟着稿子存、跟着稿子删。
 - `colors`：这版之前存的稿子只有 `bg`、`text`、`accent`，打开时辅助色与衬底按三色规则推出来（[app-api.md](app-api.md#五个颜色角色)），之后改了这篇、存盘时写成五个（只是打开不算改动）；撤回到这版之前存的版本（`versions`）时同样处理。旧版迁移来的缺哪个按主题配色补。
 - `markdown`（v6 起，每轮 AI 之前存的版本里的 `draft.markdown` 一样）：这版之前写的英文记号（`[[image:…]]`、`{{color:…|…}}`、`:::kicker`、`align=center` 等）打开时换成中文写法（`src/engine/markdown.js` 的 `localizeMarkers`，代码块、行内代码里的不动），换过的一次写回存储，不算修改、不改 `updatedAt`。
-- `theme`：v5 定稿的八个主题是 `notes`（备忘，默认）、`plain`（纯白）、`journal`（手帐）、`glow`（柔光）、`clay`（陶土）、`editorial`（杂志）、`poster`（撞色）、`ink`（纯黑）。之前的八个主题不再有，用它们的稿子换成接替的新主题（`src/themes/themes.js` 的 `RETIRED` 与 `migrate`）：
+- `theme`：v5 定稿的八个主题是 `notes`（备忘，默认）、`plain`（纯白）、`journal`（手帐）、`glow`（柔光）、`clay`（陶土）、`editorial`（杂志）、`poster`（撞色）、`ink`（纯黑）；v7 加了 `neon`（电光）。之前的八个主题不再有，用它们的稿子换成接替的新主题（`src/themes/themes.js` 的 `RETIRED` 与 `migrate`）：
 
   | 旧主题 | 换成 |
   | --- | --- |

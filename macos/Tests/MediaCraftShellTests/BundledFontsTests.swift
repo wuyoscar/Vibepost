@@ -217,6 +217,7 @@ struct BundledFontsTests {
             "editorial": ["noto-serif-sc", "source-serif-4", "ibm-plex-mono"],
             "notes": ["noto-sans-sc", "inter", "jetbrains-mono"],
             "glow": ["noto-sans-sc", "inter", "jetbrains-mono"],
+            "neon": ["noto-sans-sc", "inter", "jetbrains-mono"],
         ]]) as? [String: [String: Any]]
         await bundled.tearDown()
         let missing = ShellHarness(webRoot: root)
@@ -228,7 +229,7 @@ struct BundledFontsTests {
 
         #expect(withFonts?["defaults"]?["fonts"] as? [String] == ["theme", "theme", "theme"], "新稿子的字体默认跟随主题")
         // 带标题字体的主题（陶土、手帐、撞色）自己选了字体时标题也换，不在这里比
-        for theme in ["plain", "ink", "editorial", "notes", "glow"] {
+        for theme in ["plain", "ink", "editorial", "notes", "glow", "neon"] {
             #expect(withFonts?[theme]?["same"] as? Bool == true, "\(theme)：跟随主题 = 这个主题的中文、英文、代码字体")
         }
         #expect(withoutFonts?["notes"]?["same"] as? Bool == true, "没有 fonts/ 时回退系统字体（苹方 / SF / Menlo）")
