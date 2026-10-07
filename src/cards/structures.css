@@ -824,3 +824,138 @@
 .mc-page[data-structure="glow"] .mc-body pre {
   border-radius: 18px;
 }
+
+/* ---------- 清新：奶油白底、两个页角各一团淡淡的粉与薄荷、正文写在圆角白卡片上、文楷标题、波浪短线 ---------- */
+
+/* 色团只在左上、右下两角：粉的是强调色淡出，薄荷的是强调色转 150° 色相（relative color syntax，Safari 16.4）。
+   两团都够不着页面左边正中（主题测试在那里取底色）与右上角的页码。 */
+.mc-page[data-structure="fresh"] {
+  --fresh-inset: 40px; /* 白卡片离页边 */
+  --fresh-mint: oklch(from var(--mc-accent) l c calc(h + 150));
+  --fresh-butter: oklch(from var(--mc-accent) l c calc(h + 60));
+  /* 波浪短线：封面标题下、结尾署名上同一条，颜色跟着强调色 */
+  --fresh-wave: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='8' viewBox='0 0 24 8'%3E%3Cpath d='M0 4Q6 0 12 4T24 4' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+
+  background:
+    radial-gradient(52% 34% at 0% 0%, color-mix(in oklab, var(--mc-accent) 26%, transparent), transparent),
+    radial-gradient(56% 36% at 100% 100%, color-mix(in oklab, var(--fresh-mint) 24%, transparent), transparent),
+    var(--mc-bg);
+}
+
+/* 白卡片压在正文下面（::before 排在页眉、正文之前，所以在最底下）；封面没有卡片 */
+.mc-page[data-structure="fresh"]::before {
+  content: "";
+  position: absolute;
+  inset: 128px var(--fresh-inset) var(--fresh-inset);
+  border-radius: 36px;
+  background: var(--mc-paper);
+  box-shadow: 0 14px 32px -16px color-mix(in oklab, var(--mc-text) 22%, transparent);
+}
+
+.mc-page[data-structure="fresh"][data-kind="cover"]::before {
+  display: none;
+}
+
+.mc-fresh-head {
+  position: absolute;
+  top: 44px;
+  right: calc(var(--fresh-inset) - var(--pad-r));
+  left: calc(var(--fresh-inset) - var(--pad-l));
+  display: flex;
+  align-items: center;
+  height: 48px;
+  font-size: 22px;
+}
+
+.mc-fresh-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  padding: 0 22px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--mc-accent) 16%, var(--mc-paper));
+  color: var(--mc-text);
+  font-weight: 600;
+}
+
+.mc-fresh-tag .mc-avatar {
+  width: 34px;
+  height: 34px;
+  margin-left: -13px;
+}
+
+/* 还没填署名：胶囊里只有头像，收成一个小圆 */
+.mc-fresh-tag.is-avatar-only {
+  padding: 0 7px;
+}
+
+.mc-fresh-tag.is-avatar-only .mc-avatar {
+  margin-left: 0;
+}
+
+.mc-fresh-head .mc-count {
+  margin-left: auto;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 小标题：文楷，下面一条细细的波浪线 */
+.mc-page[data-structure="fresh"] .mc-body h2 {
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: color-mix(in oklab, var(--mc-accent) 85%, transparent);
+  text-decoration-thickness: 2px;
+  text-decoration-skip-ink: none;
+  text-underline-offset: 9px;
+}
+
+/* 引用是淡粉的圆角块，提示是奶黄的便签 */
+.mc-page[data-structure="fresh"] .mc-body blockquote {
+  padding: 18px 26px;
+  border: 0;
+  border-radius: 20px;
+  background: color-mix(in oklab, var(--mc-accent) 11%, var(--mc-paper));
+  color: var(--mc-text);
+}
+
+.mc-page[data-structure="fresh"] .mc-note {
+  padding: 20px 26px;
+  border-radius: 20px;
+  background: color-mix(in oklab, var(--fresh-butter) 22%, var(--mc-paper));
+}
+
+.mc-page[data-structure="fresh"] .mc-body pre {
+  border-radius: 18px;
+}
+
+.mc-page[data-structure="fresh"] .mc-body th:first-child {
+  border-top-left-radius: 12px;
+}
+
+.mc-page[data-structure="fresh"] .mc-body th:last-child {
+  border-top-right-radius: 12px;
+}
+
+/* 封面：居中的文楷标题，底下一小段波浪线；照片是一张带白边的圆角小卡（圆角与里面的图同心） */
+.mc-page[data-structure="fresh"] .mc-cover-rule {
+  display: block;
+  width: 120px;
+  height: 8px;
+  margin: 30px auto 0;
+  background: var(--mc-accent);
+  mask: var(--fresh-wave) 0 0 / 24px 8px repeat-x;
+}
+
+.mc-page[data-structure="fresh"] .mc-cover[data-image="plate"] .mc-cover-image {
+  border-radius: calc(var(--plate-radius) + 14px);
+  box-shadow: 0 0 0 14px var(--mc-paper), 0 20px 44px -14px color-mix(in oklab, var(--mc-text) 28%, transparent);
+}
+
+/* 结尾署名上的短线也是波浪 */
+.mc-page[data-structure="fresh"] .mc-sig-rule {
+  width: 96px;
+  height: 8px;
+  background: var(--mc-accent);
+  mask: var(--fresh-wave) 0 0 / 24px 8px repeat-x;
+}

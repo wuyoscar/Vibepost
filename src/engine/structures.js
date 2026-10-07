@@ -237,6 +237,41 @@
         signature: { avatar: 96, name: { size: 32, weight: 600, font: "body", upper: false, spacing: 0 }, handle: { size: 24 } },
       },
     },
+    fresh: {
+      name: "清新",
+      // 正文写在页面中央的圆角白卡片上（卡片是 structures.css 画的：离页边 40px，顶上留一条页眉带）；版心是卡片再往里收一圈
+      pages: { inner: { top: 180, right: 88, bottom: 92, left: 88 }, first: { top: 180, right: 88, bottom: 92, left: 88 } },
+      body: { scale: 1 },
+      headings: {
+        h1: { scale: 1.8, lineHeight: 1.3, weight: 700 },
+        h2: { scale: 1.3, lineHeight: 1.42, weight: 700 },
+        h3: { scale: 1.1, lineHeight: 1.5, weight: 700 },
+      },
+      imageRadius: 22,
+      labelFont: "body",
+      // 正文在白卡片上：颜色角色按底板算（src/engine/colors.js 的 roles：浅色配色的卡片是纯白，深色配色的比底色亮一点）
+      board: true,
+      cover: {
+        title: { weight: 700, max: 116, min: 60, lineHeight: 1.3, maxLines: 3 },
+        subtitle: { size: 32, weight: 400, lineHeight: 1.7, gap: 28, maxLines: 3, pin: null },
+        align: "center",
+        column: { left: 96, right: 96 },
+        area: { top: 220, bottom: 940, anchor: "center" },
+        image: {
+          mode: "plate",
+          // 照片是一张带白边的圆角小卡（白边 14px 是 structures.css 的 box-shadow，框要给它留出位置）
+          box: { x: 132, y: 150, width: 600, height: 450, radius: 24 },
+          area: { top: 680, bottom: 1040, anchor: "top" },
+          lead: 0,
+          titleMax: 88,
+          subtitleLines: 2,
+        },
+      },
+      end: {
+        inset: 64,
+        signature: { avatar: 96, name: { size: 32, weight: 600, font: "body", upper: false, spacing: 0 }, handle: { size: 24 } },
+      },
+    },
   };
 
   const { deepFreeze } = root.MediaCraftEngine;

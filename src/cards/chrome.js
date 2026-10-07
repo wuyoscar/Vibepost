@@ -20,6 +20,10 @@
   const minimalHead = (page, context) => `<div class="mc-plain-head">${first(page) ? avatar(context) : ""}<span class="mc-sign">${upper(context)}</span>`
     + `<span class="mc-count">${counter(page)}</span></div>`;
   const upper = (context) => escape(String(context.profile.name).toUpperCase());
+  // 清新：左上的软胶囊（第一页带头像）；名字空着时第一页的胶囊里只放头像，之后的页不画胶囊
+  const freshTag = (page, context) => (unnamed(context)
+    ? (first(page) ? `<span class="mc-fresh-tag is-avatar-only">${avatar(context)}</span>` : "")
+    : `<span class="mc-fresh-tag">${first(page) ? avatar(context) : ""}${name(context)}</span>`);
 
   // 每种结构：head / foot 返回 HTML（空串表示没有），deco 是压在正文下面的装饰层
   const CHROME = {
@@ -66,6 +70,15 @@
       head: (page, context) => `<div class="mc-glow-head">${first(page) ? avatar(context) : ""}<span class="mc-sign">${name(context)}</span>`
         + `<span class="mc-count">${counter(page)}</span></div>`,
       foot: () => "",
+    },
+    fresh: {
+      // 胶囊在左，右边是「1 / 8」式的页码；封面只有胶囊，不标页码
+      head: (page, context) => `<div class="mc-fresh-head">${freshTag(page, context)}<span class="mc-count">${page.index + 1} / ${page.total}</span></div>`,
+      foot: () => "",
+      cover: {
+        head: (page, context) => `<div class="mc-fresh-head">${freshTag(page, context)}</div>`,
+        foot: () => "",
+      },
     },
   };
 

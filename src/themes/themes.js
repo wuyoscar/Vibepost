@@ -78,6 +78,15 @@
       colors: { bg: "#0c0c0c", text: "#e8e8e5", accent: "#e8e8e5", secondary: "#e8e8e5", surface: "#222222" },
       fonts: { zh: "noto-sans-sc", en: "inter", code: "jetbrains-mono" },
     },
+    {
+      id: "fresh",
+      name: "清新",
+      label: "奶油白底 · 圆角白卡片 · 粉与薄荷的小点缀",
+      structure: "fresh",
+      colors: { bg: "#fffaf3", text: "#3a3330", accent: "#f08a8a", secondary: "#3a3330", surface: "#ebe6e0" },
+      fonts: { zh: "noto-sans-sc", en: "inter", code: "jetbrains-mono" },
+      titleFonts: { zh: "lxgw-wenkai", en: "lxgw-wenkai" },
+    },
   ]);
 
   // 没选过主题时新稿子用它；认不出的主题也按它
