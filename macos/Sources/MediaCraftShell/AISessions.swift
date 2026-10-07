@@ -43,10 +43,13 @@ final class AISessions: @unchecked Sendable {
     /// 正在删除的稿子：不再起新的一轮、不再载入候选
     private var removing: Set<String> = []
     private var sink: Sink?
+    /// 写作手册：每轮拷进工作副本的「写作手册/」、目录写在 AGENTS.md 末尾；nil 时不给
+    private let manuals: WritingManuals?
 
-    init(configuration: AIConfiguration) {
+    init(configuration: AIConfiguration, manuals: WritingManuals? = nil) {
         _ = Self.brokenPipesIgnored
         self.configuration = configuration
+        self.manuals = manuals
         let terminal = TerminalEnvironment(configuration: configuration)
         self.terminal = terminal
         let settings = AgentSettings(root: configuration.root)
@@ -552,17 +555,52 @@ final class AISessions: @unchecked Sendable {
     }
 
     /// 工作副本：这篇稿子的常驻目录（`--resume` 要在同一个目录里），每轮开始时写进最新的卡片内容、标题与小红书正文，
-    /// 以及 `AGENTS.md`（操作手册；Codex 自己会读它，Claude Code 的说明书里指向它）。
+    /// 以及 `AGENTS.md`（操作手册 + 写作手册的目录；Codex 自己会读它，Claude Code 的说明书里指向它）与写作手册的拷贝（`写作手册/`）。
+    /// 每轮都重写，Agent 在这一轮里改了也不留。
     private func prepareWorkCopy(for request: TurnRequest) throws -> URL {
         let directory = configuration.root.appendingPathComponent(request.draftId, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try Data(request.markdown.utf8).write(to: directory.appendingPathComponent("draft.md"), options: .atomic)
         try Data(request.title.utf8).write(to: directory.appendingPathComponent("title.txt"), options: .atomic)
         try Data(request.caption.utf8).write(to: directory.appendingPathComponent("caption.txt"), options: .atomic)
-        if !request.agentsFile.isEmpty {
-            try Data(request.agentsFile.utf8).write(to: directory.appendingPathComponent("AGENTS.md"), options: .atomic)
+        var agents = request.agentsFile
+        if let manuals {
+            let section = Self.manualsSection(manuals, copiedInto: directory.appendingPathComponent(Self.manualsFolder, isDirectory: true))
+            agents = agents.isEmpty ? section : agents.replacingOccurrences(of: #"\n+$"#, with: "", options: .regularExpression) + "\n\n" + section
+        }
+        if !agents.isEmpty {
+            try Data(agents.utf8).write(to: directory.appendingPathComponent("AGENTS.md"), options: .atomic)
         }
         return directory
+    }
+
+    /// 工作副本里放写作手册拷贝的子目录
+    static let manualsFolder = "写作手册"
+
+    /// 把写作手册拷进工作副本，返回 AGENTS.md 末尾的「写作手册」一节（读不出来时说明原因，这一轮照样起）
+    static func manualsSection(_ manuals: WritingManuals, copiedInto folder: URL) -> String {
+        var lines = [
+            "## 写作手册",
+            "",
+            "写作手册只管写什么、什么口味（题材、读者、语气、结构、话题），排版的写法看上面的操作手册。"
+                + "按这篇的题材挑一份最合适的照着写；用户在对话里点名用哪份就用那份；都不合适就按常识写，不用硬套。全文在当前目录的 \(manualsFolder)/ 里。",
+            "用户要你把这次的经验记进写作手册、或新建一份时，用工具 save_writing_manual 提议：先读原来的全文，整份改好交过去，"
+                + "App 弹确认框给用户看改动，用户同意才保存。直接改 \(manualsFolder)/ 里的文件不会保留（每轮开始时重写）。",
+            "",
+        ]
+        do {
+            let copied = try manuals.copy(into: folder)
+            if copied.isEmpty {
+                lines.append("现在还没有写作手册（用户可以在 AI 助手 › 设置 › 写作手册里打开文件夹添加）。")
+            }
+            for manual in copied {
+                let path = "\(manualsFolder)/\(manual.file.lastPathComponent)"
+                lines.append(manual.description.isEmpty ? "- \(manual.name)（\(path)）" : "- \(manual.name)：\(manual.description)（\(path)）")
+            }
+        } catch {
+            lines.append("写作手册这一轮没能读出来：\(error.localizedDescription)")
+        }
+        return lines.joined(separator: "\n") + "\n"
     }
 
     /// 起进程并登记为这篇稿子正在跑的一轮（epoch：页面发起时这个窗口的页面是第几个，换过页面就不起）。

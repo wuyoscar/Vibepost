@@ -64,6 +64,8 @@ public final class ShellCore {
     let externalAgents: ExternalAgents
     /// HTML 卡片出图（`cards/raster`）：一个不上屏的 WKWebView，几个窗口的请求排着来
     let cardRasterizer: CardRasterizer
+    /// 写作手册（`manuals/*`；AI 的每一轮也拷一份进工作副本）
+    let writingManuals: WritingManuals
     /// 开着的窗口（不拥有它们：窗口关掉就没了），最近到前面来的排在最后
     private var windows: [WeakPage] = []
     /// 要开新窗口（「新建窗口」、稿件列表里的「在新窗口打开」、外部 Agent 新建或打开的稿子）时怎么开，返回新窗口的网页：
@@ -75,6 +77,17 @@ public final class ShellCore {
     public var closeWindow: ((ShellWebView) -> Void)?
     /// 点了网页里的外链时怎么打开（默认交给默认浏览器 / 邮件 App）；测试 harness 换成记下来
     public var openExternal: (URL) -> Void = { NSWorkspace.shared.open($0) }
+    /// 「在 Finder 中显示」一份写作手册（是文件夹时打开那个文件夹）；测试 harness 换成记下来
+    public var revealFile: (URL) -> Void = { url in
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory), isDirectory.boolValue {
+            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: url.path)
+        } else {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
+    }
+    /// 用默认的 App 打开一份写作手册；测试 harness 换成记下来
+    public var openFile: (URL) -> Void = { NSWorkspace.shared.open($0) }
     /// 每个窗口占着的稿子：current 是它正开着的（恢复窗口时照它开，可以是说明书），drafts 是别的窗口不能再开的
     private var occupancy: [String: Occupancy] = [:]
     /// 每个窗口现在的页面（页面自己起的 id）与它最近一次报占用的序号
@@ -134,7 +147,9 @@ public final class ShellCore {
         self.haptics = haptics
         self.glass = glass
         self.configure = configure
-        aiSessions = AISessions(configuration: ai)
+        // 示例手册随网页一起（build-app.sh 把 src/ 拷进 App）
+        writingManuals = WritingManuals(folder: ai.writingManuals, examples: webRoot.appendingPathComponent("src/writing-manuals", isDirectory: true))
+        aiSessions = AISessions(configuration: ai, manuals: writingManuals)
         livePhotos = LivePhotos()
         externalAgents = ExternalAgents(configuration: mcp)
         cardRasterizer = CardRasterizer(root: webRoot)
@@ -385,6 +400,54 @@ public final class ShellCore {
             }
         default:
             return .failure(404, "没有这个窗口动作：window/\(action)")
+        }
+    }
+
+    // MARK: - 写作手册
+
+    /// 页面经原生桥 `manuals/<动作>` 要的写作手册的事（见 WritingManuals.swift；文件夹不在时先用示例建好）：
+    /// - list：`{ manuals: [{ name, description }], folder }`
+    /// - read `{ name }`：`{ name, description, content }`（content 是正文，不含开头的 name / description）
+    /// - save `{ name, description, content }`：新建或整份换掉（页面先问过用户），`{ name, description }`；名字、说明、正文不合规矩时 400 带原因
+    /// - reveal `{ name? }`：在 Finder 里显示这份；没给 name 时打开文件夹
+    /// - open `{ name }`：用默认的 App 打开这份
+    nonisolated func manualAction(_ action: String, _ request: [String: Any]) async -> NativeBridge.Reply {
+        let manuals = writingManuals
+        let name = request["name"] as? String ?? ""
+        do {
+            switch action {
+            case "list":
+                let list = try manuals.list()
+                return .ok(["manuals": list.map { ["name": $0.name, "description": $0.description] }, "folder": manuals.folder.path])
+            case "read":
+                let (manual, body) = try manuals.read(name)
+                return .ok(["name": manual.name, "description": manual.description, "content": body])
+            case "save":
+                let saved = try manuals.save(
+                    name: name, description: request["description"] as? String ?? "", body: request["content"] as? String ?? ""
+                )
+                return .ok(["name": saved.name, "description": saved.description])
+            case "reveal":
+                let target: URL
+                if name.isEmpty {
+                    try manuals.ensure()
+                    target = manuals.folder
+                } else {
+                    target = try manuals.read(name).manual.file
+                }
+                await MainActor.run { revealFile(target) }
+                return .ok()
+            case "open":
+                let file = try manuals.read(name).manual.file
+                await MainActor.run { openFile(file) }
+                return .ok()
+            default:
+                return .failure(404, "没有这个写作手册动作：manuals/\(action)")
+            }
+        } catch let failure as WritingManuals.Failure {
+            return .failure(failure.status, failure.message)
+        } catch {
+            return .failure(500, "写作手册：\(error.localizedDescription)")
         }
     }
 

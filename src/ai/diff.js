@@ -225,5 +225,6 @@
     return after.map((line, index) => (changed.has(index) ? localized[index] : line)).join("").slice(0, -1);
   }
 
-  (root.MediaCraftAI ||= {}).diff = { review, apply, parts, localizeChanged };
+  // changes 也给别处按行比对用（写作手册的确认框，src/ai/tools.js）
+  (root.MediaCraftAI ||= {}).diff = { review, apply, parts, localizeChanged, changes };
 })(window);

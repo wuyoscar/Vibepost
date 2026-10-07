@@ -14,9 +14,9 @@
   const shared = root.MediaCraftAITools.shared;
   const LOG_LIMIT = 50;
 
-  // 工具在清单里的顺序：手册、稿子、样式、结构、图片、出图与导出
+  // 工具在清单里的顺序：操作手册与写作手册、稿子、样式、结构、图片、出图与导出
   const ORDER = [
-    "get_manual",
+    "get_manual", "list_writing_manuals", "read_writing_manual", "save_writing_manual",
     "list_drafts", "get_draft", "create_draft", "open_draft", "update_draft",
     "set_theme", "set_style", "set_mode", "list_palettes", "apply_palette",
     "insert_page_break", "remove_page_break", "move_section", "restyle_block", "set_card_css",

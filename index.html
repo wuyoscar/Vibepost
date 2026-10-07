@@ -686,6 +686,14 @@
                       <p id="aiImageError" class="ai-settings-error" role="alert" hidden></p>
                       <p id="aiImageNote" class="section-note"></p>
                     </div>
+                    <!-- 写作手册：只管写什么、什么口味，App 支持目录「写作手册」文件夹里的 .md（src/ai/manuals.js）；只在 App 里有 -->
+                    <div id="writingManuals" class="ai-manuals" role="group" aria-labelledby="writingManualsTitle" hidden>
+                      <h2 id="writingManualsTitle" class="section-label">写作手册</h2>
+                      <p class="section-note">只管写什么、什么口味（排版的写法不归它管）。AI 按这篇的题材自己挑一份，也可以在对话里点名；用任何编辑器改文件，下一轮就用新的。</p>
+                      <ul id="writingManualList" class="ai-manual-list"></ul>
+                      <p id="writingManualError" class="ai-settings-error" role="alert" hidden></p>
+                      <button id="writingManualFolderBtn" class="pill-button" type="button" title="在 Finder 里打开写作手册的文件夹">打开文件夹</button>
+                    </div>
                     <!-- 外部 Agent（MCP）：终端里的 Claude Code 等经 mediacraft-mcp 操作 App（src/mcp/panel.js）；只在 App 里有 -->
                     <div id="mcpSettings" class="mcp-settings" role="group" aria-labelledby="mcpSettingsTitle" hidden>
                       <h2 id="mcpSettingsTitle" class="section-label">外部 Agent（MCP）</h2>
@@ -1229,6 +1237,7 @@
     <script src="src/phone-preview.js"></script>
     <script src="src/ai/panel.js"></script>
     <script src="src/ai/history.js"></script>
+    <script src="src/ai/manuals.js"></script>
     <script src="src/mcp/panel.js"></script>
   </body>
 </html>

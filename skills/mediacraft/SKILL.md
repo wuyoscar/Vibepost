@@ -29,6 +29,7 @@ Vibepost 的工具都以 `mcp__mediacraft__` 开头；没有这些工具时，�
   记号（`[[分页]]`、`{{字色:#d9480f|字}}`……）都用中文写法（英文写法也认，App 收下时换成中文）。
   图片不要自己写 `[[图片:…]]`：本机图片用 `import_images`（绝对路径，可以给 `after` 定位到某段原文之后）。
 - 写什么内容、什么口味看写作手册：`list_writing_manuals` 列出名字和说明，按这篇写什么挑一份（用户点名了就用那份），`read_writing_manual` 读全文。
+  用户要把这次的经验记进写作手册（或新建一份）时用 `save_writing_manual` 整份交过去，App 弹确认框，用户同意才保存。
 - 内置说明书（`list_drafts` 里 builtIn）只读，不要改它；要改先新建。
 
 ## 3. 挑样式（set_theme / apply_palette / set_style）

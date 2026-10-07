@@ -163,6 +163,17 @@
       // 外部 Agent 的这次会话（session）认定了这篇：壳记着，之后它的请求交给开着这篇的窗口
       bindAgent: (session, draftId) => callJson("window/bind-agent", { session, draftId }),
     },
+    // 写作手册（只管写什么、什么口味）：App 支持目录「写作手册」文件夹里的 .md，壳在第一次用时用自带的示例建好（WritingManuals.swift）。
+    // list() → { manuals: [{ name, description }], folder }；read(name) → { name, description, content（正文）}；
+    // save({ name, description, content }) 新建或整份换掉（先问过用户），名字、说明、正文不合规矩时 reject 带原因；
+    // reveal(name) 在 Finder 中显示（不给 name 时打开文件夹）；open(name) 用默认的 App 打开
+    manuals: {
+      list: () => callJson("manuals/list"),
+      read: (name) => callJson("manuals/read", { name }),
+      save: ({ name, description, content }) => callJson("manuals/save", { name, description, content }),
+      reveal: (name) => callJson("manuals/reveal", name ? { name } : {}),
+      open: (name) => callJson("manuals/open", { name }),
+    },
     // 外部 Agent（MCP，src/mcp/server.js 用）：终端里的 Claude Code 等经 mediacraft-mcp 连进壳，请求由壳交给 window.MediaCraftMCP。
     mcp: {
       // { available, enabled, clients, command }：有没有在监听、「允许外部 Agent 连接」开没开、连着几个、接入命令

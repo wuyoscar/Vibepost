@@ -24,6 +24,9 @@ final class ShellHarness: NSObject {
     private(set) var windows: [HarnessWindow] = []
     /// 页面里点开、交给默认浏览器的外链（`ShellCore.openExternal`）
     private(set) var openedExternally: [URL] = []
+    /// 要在 Finder 中显示的（`ShellCore.revealFile`）与要用默认的 App 打开的（`ShellCore.openFile`）写作手册
+    private(set) var revealedFiles: [URL] = []
+    private(set) var openedFiles: [URL] = []
     /// 模拟系统切换浅色 / 深色外观（页面的界面皮肤跟着 prefers-color-scheme 走）
     func setAppearance(dark: Bool) {
         window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
@@ -74,7 +77,9 @@ final class ShellHarness: NSObject {
         let ai = AIConfiguration(
             root: aiRoot, loginShell: shellURL, cancelGrace: .milliseconds(500), exitGrace: .seconds(2), shellTimeout: shellTimeout,
             appEnvironment: appEnvironment, imageAPI: ImageAPI(openAI: imageAPI),
-            keyFile: aiRoot.appendingPathComponent("test.env")
+            keyFile: aiRoot.appendingPathComponent("test.env"),
+            // 写作手册（代替 ~/Library/Application Support/MediaCraft/写作手册）：第一次用时照 src/writing-manuals/ 建好
+            writingManuals: aiRoot.appendingPathComponent("写作手册", isDirectory: true)
         )
         shell = ShellWebView(
             webRoot: webRoot, dataStore: store, downloadsDirectory: downloadsDirectory,
@@ -111,6 +116,9 @@ final class ShellHarness: NSObject {
         }
         // 点开的外链只记下来，不真的打开浏览器
         shell.core.openExternal = { [weak self] url in self?.openedExternally.append(url) }
+        // 写作手册的「在 Finder 中显示」「打开」也只记下来
+        shell.core.revealFile = { [weak self] url in self?.revealedFiles.append(url) }
+        shell.core.openFile = { [weak self] url in self?.openedFiles.append(url) }
         shell.core.closeWindow = { [weak self] page in
             guard let window = self?.windows.first(where: { $0.shell === page }) else { return }
             Task { await window.close() }

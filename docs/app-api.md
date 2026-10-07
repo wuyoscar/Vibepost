@@ -431,7 +431,8 @@ Claude 用它们直接操作 App（工具全名 `mcp__mediacraft__<名字>`）�
 
 - **定位**用稿子里的一段原文（照抄 `draft.md`、不跨行、只出现在一处），定位到包含它的那一块；标题指它连同下面的整节（到下一个同级或更高级的标题为止）。
 - **动作**：会改稿子的工具每次在会话里记一行 `action`，行尾「撤销」只撤这一个（正文结构的改动与之后别处的改动三方合并，重叠时说明原因、请你用 ⌘Z）；每个动作同时是撤销历史里的一步（⌘Z）：正文、图片，以及主题、样式、模式（`drafts.update(patch, { undoable: true })`）。
-- **外部 Agent 也用**：标了 shared 的工具（`get_pages`、`set_theme`、`set_style`、`set_mode`、分页、挪段落、摆图片）同样给外部 Agent 的 MCP 服务用（[mcp.md](mcp.md)），描述里提到 `draft.md`、`propose_images` 的那一句只给 AI 助手。
+- **外部 Agent 也用**：标了 shared 的工具（`get_pages`、`set_theme`、`set_style`、`set_mode`、分页、挪段落、摆图片、`save_writing_manual`）同样给外部 Agent 的 MCP 服务用（[mcp.md](mcp.md)），描述里提到 `draft.md`、`propose_images`、工作副本的那一句只给 AI 助手。
+- **写作手册**（只管写什么、什么口味；文件见 [storage.md](storage.md#写作手册写作手册)）：每轮开始时壳把它们拷进工作副本的 `写作手册/`，`AGENTS.md` 末尾列出目录（名字、说明、路径）；说明书里写明按这篇的题材自己挑一份（你在对话里点名的优先），要把经验记进写作手册时用 `save_writing_manual` 提议。
 - **同步 draft.md**：分页、挪段落、摆图片这类结构改动是纯函数（Markdown → Markdown），在编辑器里生效后，同样的改动套到工作副本的 `draft.md` 与这一轮的比对基准上（`ai/work-file`），Claude 之后读到的与编辑器一致，这一轮结束时也不会再套用一次；`draft.md` 那一带被 Claude 改过、套不上时不同步，工具结果里会说。
 - 工具看到的是编辑器里的稿子：Claude 在 `draft.md` 里的文字修改要等这一轮结束才进编辑器。
 
@@ -453,6 +454,7 @@ Claude 用它们直接操作 App（工具全名 `mcp__mediacraft__<名字>`）�
 | `resize_image` | 宽度百分比或固定宽高、对齐，或恢复默认（同 `media.update` 的 `layout`） |
 | `crop_image` | 按比例居中裁（`aspect: "3:4"`）或按原图百分比给裁剪框，或取消裁剪（同 `media.update` 的 `crop`）；实况不能裁 |
 | `generate_image` | 只在用 Claude Code 时有（Codex 用它自带的生图，见上面的「Codex」）。按提示词生成配图：`prompt`、`count`（1–4，默认 1）、`size`（「宽x高」，每边 256–3840，默认 `1024x1536` 竖图，配 3:4 卡片）、`style?`（接在提示词后面「风格：…」）。原生壳直接调 OpenAI 的生图接口（`ai/generate-image`），不经 Bash、不用确认（所以一轮最多生 8 张，超出的那次不发请求、告诉 Claude 原因）：默认模型 `gpt-image-2`（与作者自用的 gpt-image 技能一样 `POST /v1/images/generations`，`quality: "high"`，一次出 `n` 张），在 AI 助手 › 设置 › 生图里可以换模型。密钥取终端环境里的 `OPENAI_API_KEY`，没有时重新读一次登录 shell，再找 `~/.env`（`KEY=值` 或 `export KEY=值`）；密钥只进请求头，不进日志、错误与页面（接口的错误原因里出现密钥时换成「…」）。生成的图和 `propose_images` 的一样存进 `.candidates/`、在会话里显示缩略图（说明是提示词），你点了才插进稿子。生成中会话里一行进度（服务、模型、张数、尺寸、用时）和「停止生成」；没有密钥（说明去哪设）、接口出错（带上接口给的原因）、停止（「已停止生图」）时 Claude 收到原因，会话里记一行「生成图片没成功：…」。按张计费，费用记在你自己的 OpenAI 账户上（工具说明与设置里都这样写）；系统提示词让 Claude 生图用它，不自己跑脚本或 curl |
+| `save_writing_manual` | 提议新建或整份改写一份写作手册：`name`（已有的名字就是改写，新名字就是新建；1–40 字，不能有 `/ \ :` 与控制字符、不以 `.` 开头）、`description`（一句话，最多 200 字）、`content`（正文 Markdown，最多 200 KB）。页面先照壳的规矩查一遍（不合规矩直接回错误、不弹框），再用确认框（`MediaCraftConfirm`）问你：标题「新建写作手册「X」」或「修改写作手册「X」」，内容是说明（改了时前后都给）与正文开头 300 字（新建），或正文 +N / −M 行与前几行改动（修改）；你同意才经原生桥 `manuals/save` 存，拒绝时 Claude 收到「用户没有同意保存这份写作手册」，和原来一模一样时不弹框、直接说没有改动。存好后会话里记一行「新建写作手册「X」」，下一轮起生效。不看、不改稿子（你切到别的稿子也能用）；标了 shared，外部 Agent 也用（见 [mcp.md](mcp.md)）。浏览器里没有 |
 | `propose_images` | 把 Claude 找到的图片（本机路径、`file://` 或 http(s) 网址，最多 8 张）登记成配图候选：这篇工作目录里的直接载入；网上的、工作目录以外的先用确认框问你（一批问一次，和终端里打开网页、读目录外的文件要问一样），不同意时 Claude 收到原因。「本次会话都允许」只放行这批图片所在的**同一目录**（不含子目录），别的目录照样问；**网上的图每批都问**，确认框里写出每个网址，不提供「本次会话都允许」（防提示词注入：放行整个网站的话，被注入的模型能把读到的内容拼进那个网站的网址里带出去），网址里带着一长串编码（base64、十六进制、百分号编码）或特别长的，在确认框里单独点名提醒，超过 2048 字的直接不载入；下载途中重定向到别的站点时停下再问一次（确认框写明「原网址 → 跳去的网址」），同一站点的重定向照跟；主机名解析到本机、局域网、链路本地地址的不载入（网址里直接写的 IP 地址、`localhost`、`.local` 是你在确认框里看得到的，照常问）。同意与放行的范围都由壳记，页面自己说「同意了」不算（见下面原生桥的 `ai/candidate`）。壳读进来、确认真是图片（最多 20 MB、6400 万像素）、存进 `.candidates/`、做缩略图；会话里显示缩略图，你点了才插进稿子 |
 
 调研这类事 Claude 自己用技能与 MCP（agent-reach……）去做，和终端里一样，App 不另外提供；生图用 App 的 `generate_image`，免得 Claude 跑脚本时要一次次确认命令，生成的图也直接进配图候选。
@@ -498,7 +500,7 @@ Claude 用它们直接操作 App（工具全名 `mcp__mediacraft__<名字>`）�
 | `ai/status` | `{ refresh, backend }`（`backend` 没给时是 `"claude"`） | `AIStatus` |
 | `ai/settings` | `{ backend, path }`（`null` 恢复自动查找；旧的 `{ claudePath }` 也认） | `AIStatus` |
 | `ai/models` | `{ backend }` | Codex：起一次 `codex app-server`，握手后问 `model/list` 就关上，`{ models: [{ id, name, isDefault }] }`；别的后端 `{ models: [] }` |
-| `ai/send` | `{ turnId, draftId, backend, prompt, markdown, title, caption, systemPrompt, agentsFile, … }`（`agentsFile`：写进工作副本 `AGENTS.md` 的操作手册全文，每轮重写），后面是这个后端要的：Claude Code 是 `sessionId, resume, model, allowedTools`（`model`：这篇选的模型，`null` 不传 `--model`，格式不对时 `ok: false`；`allowedTools`：这篇的会话里「本次会话都允许」过的规则），Codex 不要别的（线程由页面经 stdin 开） | 进程启动后立即返回 `{ ok }`；找不到这个后端、缺了它要的字段、这篇已在跑时 `ok: false` 带原因 |
+| `ai/send` | `{ turnId, draftId, backend, prompt, markdown, title, caption, systemPrompt, agentsFile, … }`（`agentsFile`：写进工作副本 `AGENTS.md` 的操作手册全文，壳在后面接上写作手册的目录、把写作手册拷进 `写作手册/`，每轮重写），后面是这个后端要的：Claude Code 是 `sessionId, resume, model, allowedTools`（`model`：这篇选的模型，`null` 不传 `--model`，格式不对时 `ok: false`；`allowedTools`：这篇的会话里「本次会话都允许」过的规则），Codex 不要别的（线程由页面经 stdin 开） | 进程启动后立即返回 `{ ok }`；找不到这个后端、缺了它要的字段、这篇已在跑时 `ok: false` 带原因 |
 | `ai/cancel` | `{ draftId }` | `{ cancelled }` |
 | `ai/respond` | `{ draftId, turnId, message }`：`message` 是一整行（Claude Code 是 `control_response`；Codex 是对服务端请求的回答，或 `thread/start`、`thread/resume`、`turn/start`、`turn/interrupt`，壳按上面「Codex」里说的填好工作目录、沙箱与审批、去掉别的字段），不是这个后端认得的样子时不写、`ok: false` | 写进那一轮的 stdin，真写进去了才回 `{ delivered: true }`；这一轮已经结束、stdin 已关时 `{ delivered: false }`；写失败时 `ok: false` 带原因 |
 | `ai/work-file` | `{ draftId, turnId, markdown? }` | 这一轮进行中读工作副本的 `draft.md`；带 `markdown` 时先写进去。返回 `{ markdown }`；这一轮已经结束时 `ok: false` |
@@ -544,6 +546,20 @@ App 可以开几个窗口，每个窗口开着一篇稿子，各改各存（都�
 | `window/bind-agent` | `{ session, draftId }` | 外部 Agent 的这次会话（`mediacraft-mcp` 的会话编号）认定这篇：壳记着，之后它的请求交给开着这篇的窗口（`src/mcp/server.js` 认定、新建、打开之后调用） |
 
 壳 → 页面：`mediacraft:native-window` 事件，`{ type: "show", draftId }` 让这个窗口换到那篇（别的窗口要开它）。`src/native-bridge.js` 包成 `MediaCraftNative.windows.open / claim / occupy / missing / edited`，页面这边在 `src/drafts/windows.js`。
+
+## 写作手册（原生桥）
+
+写作手册只管写什么、什么口味，文件在 App 支持目录的「写作手册」文件夹（布局见 [storage.md](storage.md#写作手册写作手册)，壳 `WritingManuals.swift`，第一次用时照 `src/writing-manuals/` 的示例建好）。页面经原生桥 `POST mediacraft://app/__native/manuals/<动作>`（body 是 JSON）调用，`src/native-bridge.js` 包成 `MediaCraftNative.manuals`；浏览器里没有（AI 设置里这一节不显示，`save_writing_manual` 回错误）。几个窗口共用一份，读写排在一把锁里。
+
+| 动作 | body | 返回 |
+| --- | --- | --- |
+| `manuals/list` | — | `{ manuals: [{ name, description }], folder }`：按名字的拼音排，`folder` 是文件夹的路径 |
+| `manuals/read` | `{ name }` | `{ name, description, content }`（`content` 是正文，不含开头的 `name` / `description`）；没有这份时 404 |
+| `manuals/save` | `{ name, description, content }` | 新建或整份换掉（页面先问过你），`{ name, description }`；名字、说明、正文不合规矩（见 `save_writing_manual`）或文件名撞上别的手册时 400 带中文原因 |
+| `manuals/reveal` | `{ name? }` | 在 Finder 中显示这份；没给 `name` 时打开文件夹。`{ ok }` |
+| `manuals/open` | `{ name }` | 用默认的 App 打开这份。`{ ok }` |
+
+在 Finder 中显示、用默认的 App 打开经 `ShellCore.revealFile` / `openFile`（测试 harness 换成记下来）。**界面**：AI 助手 › 设置 › 写作手册（`src/ai/manuals.js`）：一句说明、每份一块（名字、说明、「打开」「在 Finder 中显示」）、「打开文件夹」；每次打开设置重新列一遍，`save_writing_manual` 存好后也刷新。
 
 ## mcp：外部 Agent
 

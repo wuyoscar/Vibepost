@@ -1,4 +1,4 @@
-// 外部 Agent（MCP）另外要的工具：列稿子、新建、打开、写正文、配色库、从本机路径插图、出图（PNG）、导出到目录、发送到 iPhone。
+// 外部 Agent（MCP）另外要的工具：操作手册与写作手册、列稿子、新建、打开、写正文、配色库、从本机路径插图、出图（PNG）、导出到目录、发送到 iPhone。
 // 换主题、调样式、分页、挪段落、摆图片这些直接用 AI 助手的工具（src/ai/tools.js 里标了 shared 的），分派与操作记录在 src/mcp/server.js。
 // 只经 App API（window.mediacraft）读写。本机文件只由壳碰：插图时壳按 Agent 给的路径读好、校验过交过来（request.files），
 // 导出时页面把做好的文件交给壳（MediaCraftNative.mcp.write），写进 Agent 指定、壳校验过的目录。
@@ -100,6 +100,32 @@
     });
     const pages = next.mode === "cards" ? (await mc().render.pages()).length : 0;
     return `已更新：${parts.join("、")}。${pages ? `现在排成 ${pages} 页，用 render_pages 看看效果。` : "长文模式，没有分页。"}`;
+  }
+
+  // ===== 写作手册（只管写什么、什么口味；壳 WritingManuals.swift 读 App 支持目录里的文件）=====
+  // 新建、修改用共用的 save_writing_manual（src/ai/tools.js，要用户确认）
+
+  const manualsNative = () => {
+    const manuals = root.MediaCraftNative?.manuals;
+    if (!manuals) throw new Error("写作手册只在 Vibepost App 里有");
+    return manuals;
+  };
+
+  async function listWritingManuals() {
+    const { manuals } = await manualsNative().list();
+    if (!manuals.length) return "还没有写作手册。用户要新建时用 save_writing_manual。";
+    return [
+      `共 ${manuals.length} 份写作手册（只管写什么、什么口味；按这篇的题材挑一份，用户点名的优先，用 read_writing_manual 读全文）：`,
+      ...manuals.map(({ name, description }) => (description ? `- ${name}：${description}` : `- ${name}`)),
+    ].join("\n");
+  }
+
+  async function readWritingManual(args) {
+    const name = String(args.name ?? "").trim();
+    if (!name) throw new TypeError("name 要写手册名（见 list_writing_manuals）");
+    const manual = await manualsNative().read(name);
+    // 和文件一样的样子：开头 name / description，后面是正文
+    return `---\nname: ${manual.name}\ndescription: ${manual.description}\n---\n\n${manual.content}`;
   }
 
   // ===== 配色库 =====
@@ -205,7 +231,7 @@
   }
 
   // ===== 工具清单 =====
-  // free：不用先认定是哪篇稿子（列表、新建、打开、配色库）；其余（看、改、出图、导出、发送）只对这次会话认定的那篇动手（见 src/mcp/server.js）
+  // free：不用先认定是哪篇稿子（手册、列表、新建、打开、配色库）；其余（看、改、出图、导出、发送）只对这次会话认定的那篇动手（见 src/mcp/server.js）
 
   const TOOLS = [
     {
@@ -215,6 +241,21 @@
         + "什么时候用哪种、排版经验。改稿、排版之前读一遍；只讲 App 认得的写法，写什么内容看写作手册。",
       inputSchema: { type: "object", properties: {} },
       run: async () => reply(root.MediaCraftManual.document()),
+    },
+    {
+      name: "list_writing_manuals",
+      free: true,
+      description: "列出用户的写作手册：每份一行「名字：说明」。写作手册只管写什么、什么口味（读者、语气、结构、话题），排版写法看 get_manual。"
+        + "写稿之前按这篇的题材挑一份（用户点名的优先），用 read_writing_manual 读全文照着写；都不合适就按常识写。",
+      inputSchema: { type: "object", properties: {} },
+      run: listWritingManuals,
+    },
+    {
+      name: "read_writing_manual",
+      free: true,
+      description: "读一份写作手册的全文（开头 name / description，后面是正文 Markdown）。name 用 list_writing_manuals 列出的名字。",
+      inputSchema: { type: "object", properties: { name: { type: "string", description: "手册名" } }, required: ["name"] },
+      run: readWritingManual,
     },
     {
       name: "list_drafts",

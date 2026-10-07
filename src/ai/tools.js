@@ -717,6 +717,84 @@
     return reply(`已生成 ${images.length} 张图，作为配图候选放在 AI 助手里；用户点了哪张才插进稿子，你不用再插。`);
   }
 
+  // ===== 写作手册（只管写什么、什么口味；文件在 App 支持目录，壳 WritingManuals.swift） =====
+
+  // 和壳的检查一样（名字用作文件名），先在这里挡住，免得用户同意了才发现存不了
+  const MANUAL_NAME_LIMIT = 40;
+  const MANUAL_DESCRIPTION_LIMIT = 200;
+  const MANUAL_BODY_LIMIT = 200_000;
+  // 确认框里：新建的手册给看开头这么多字，修改的给看前几行改动
+  const MANUAL_PREVIEW = 300;
+  const MANUAL_CHANGED_LINES = 6;
+
+  function manualFields(args) {
+    const name = String(args.name ?? "").trim();
+    if (!name) throw new TypeError("name 要写手册名");
+    if (Array.from(name).length > MANUAL_NAME_LIMIT) throw new RangeError(`手册名最多 ${MANUAL_NAME_LIMIT} 字`);
+    if (/[/\\:]/.test(name)) throw new TypeError("手册名里不能有 / \\ :");
+    if (/\p{Cc}|\p{Cf}/u.test(name)) throw new TypeError("手册名里不能有换行、制表这类控制字符");
+    if (name.startsWith(".")) throw new TypeError("手册名不能以「.」开头");
+    const description = String(args.description ?? "").replace(/\s+/g, " ").trim();
+    if (!description) throw new TypeError("description 要一句话写清这份手册管什么");
+    if (Array.from(description).length > MANUAL_DESCRIPTION_LIMIT) throw new RangeError(`description 最多 ${MANUAL_DESCRIPTION_LIMIT} 字`);
+    const content = String(args.content ?? "").replace(/\r\n/g, "\n");
+    if (!content.trim()) throw new TypeError("content 要写手册的正文");
+    if (new TextEncoder().encode(content).length > MANUAL_BODY_LIMIT) throw new RangeError(`正文太长了：最多 ${MANUAL_BODY_LIMIT / 1000} KB`);
+    return { name, description, content };
+  }
+
+  // 正文按行比：去掉开头的空行与末尾的换行（壳存的时候也这样）
+  const manualLines = (text) => text.replace(/\r\n/g, "\n").replace(/^\n+/, "").replace(/\n+$/, "").split("\n");
+
+  // 确认框里的改动摘要：新建的给说明与正文开头；修改的给说明（改了的话前后都给）、正文 +N / −M 行与前几行改动
+  function manualSummary(next, before) {
+    if (!before) {
+      const head = next.content.replace(/^\n+/, "");
+      return [`说明：${next.description}`, "", head.length > MANUAL_PREVIEW ? `${head.slice(0, MANUAL_PREVIEW)}…` : head].join("\n");
+    }
+    const lines = [before.description === next.description ? `说明：${next.description}` : `说明：${before.description || "（空）"} → ${next.description}`];
+    const old = manualLines(before.content);
+    const fresh = manualLines(next.content);
+    const changes = root.MediaCraftAI.diff.changes(old, fresh);
+    if (!changes.length) return [...lines, "正文没有改动"].join("\n");
+    const added = changes.reduce((sum, change) => sum + change.bTo - change.bFrom, 0);
+    const removed = changes.reduce((sum, change) => sum + change.aTo - change.aFrom, 0);
+    const shown = changes.flatMap((change) => [
+      ...old.slice(change.aFrom, change.aTo).map((line) => `− ${clip(line, 60)}`),
+      ...fresh.slice(change.bFrom, change.bTo).map((line) => `+ ${clip(line, 60)}`),
+    ]);
+    return [
+      ...lines,
+      `正文 +${added} / −${removed} 行：`,
+      ...shown.slice(0, MANUAL_CHANGED_LINES),
+      ...(shown.length > MANUAL_CHANGED_LINES ? [`……还有 ${shown.length - MANUAL_CHANGED_LINES} 行改动`] : []),
+    ].join("\n");
+  }
+
+  // Agent 提议新建或修改一份写作手册：弹确认框给用户看改动，用户同意才经壳保存（App 里的 AI 与外部 Agent 都走这里）
+  async function saveWritingManual(args, context) {
+    const manuals = root.MediaCraftNative?.manuals;
+    if (!manuals) throw new Error("写作手册只在 Vibepost App 里有（浏览器里存不了）");
+    const next = manualFields(args);
+    const { manuals: list } = await manuals.list();
+    const before = list.some((manual) => manual.name === next.name) ? await manuals.read(next.name) : null;
+    if (before && before.description === next.description && manualLines(before.content).join("\n") === manualLines(next.content).join("\n")) {
+      return reply(`写作手册「${next.name}」和原来一样，没有改动。`);
+    }
+    const confirmed = await root.MediaCraftConfirm({
+      title: before ? `修改写作手册「${next.name}」` : `新建写作手册「${next.name}」`,
+      message: manualSummary(next, before),
+      okLabel: "保存",
+    });
+    if (!confirmed) throw new Error("用户没有同意保存这份写作手册");
+    const saved = await manuals.save(next);
+    const text = `${before ? "修改" : "新建"}写作手册「${saved.name}」`;
+    context.line(text);
+    context.record?.(text);
+    root.MediaCraftWritingManuals?.refresh();
+    return reply(`已${before ? "修改" : "新建"}写作手册「${saved.name}」并保存，下一轮起生效。`);
+  }
+
   // 用户在会话里点了一张候选：取原图插进稿子（一步可撤销的编辑）。给了 after 就插在那一块后面，找不到时插在光标处
   async function insertCandidate(draftId, candidate) {
     const { type, data } = await native.candidateFile(draftId, candidate.id);
@@ -961,6 +1039,29 @@
       },
       run: generateImage,
     },
+    {
+      name: "save_writing_manual",
+      label: "保存写作手册",
+      shared: true,
+      // 不看、不改稿子：用户切到别的稿子也能用（外部 Agent 也不用先认定一篇）
+      free: true,
+      description: "新建或修改一份写作手册（只管写什么、什么口味：读者、语气、结构、话题；排版写法不归它管）。"
+        + "name 是手册名（已有的名字就是整份换掉，新名字就是新建；1–40 字，不能有 / \\ :），description 是一句话说明它管什么（Agent 按它挑手册，最多 200 字），"
+        + "content 是正文 Markdown（不含开头的 name / description）。用户要你把这次的经验记进写作手册、或新建一份时用它：改已有的先读全文，在上面整份改好再交。"
+        + "App 弹确认框给用户看改动，用户同意才保存，不同意时你会收到原因。",
+      app: "现有的手册在当前目录的 写作手册/ 里（目录在 AGENTS.md 末尾），直接改那里的文件不会保存。",
+      external: "现有的手册用 list_writing_manuals、read_writing_manual 看。",
+      inputSchema: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "手册名" },
+          description: { type: "string", description: "一句话说明这份手册管什么" },
+          content: { type: "string", description: "正文（Markdown）" },
+        },
+        required: ["name", "description", "content"],
+      },
+      run: saveWritingManual,
+    },
   ];
 
   // 描述：共用的一段，加上只给 AI 助手（app）或只给外部 Agent（external）的那一句
@@ -971,7 +1072,7 @@
     if (!tool) return { content: [{ type: "text", text: `没有这个工具：${name}` }], isError: true };
     try {
       const draft = await mc().drafts.current();
-      if (draft.id !== context.draftId) throw new Error("这篇稿子现在不在编辑器里（用户切到了别的稿子），这一轮先别动它");
+      if (!tool.free && draft.id !== context.draftId) throw new Error("这篇稿子现在不在编辑器里（用户切到了别的稿子），这一轮先别动它");
       const outcome = await tool.run(args && typeof args === "object" ? args : {}, context, draft);
       return typeof outcome === "string" ? reply(outcome) : outcome;
     } catch (error) {
@@ -1022,9 +1123,9 @@
     insertCandidate,
     // 外部 Agent（src/mcp/）共用的工具与零件
     shared: {
-      // 共用的工具（name、description、inputSchema）；call(name, args, context) 执行其中一个，和 AI 助手里的一样
+      // 共用的工具（name、description、inputSchema，free 的不用先认定稿子）；call(name, args, context) 执行其中一个，和 AI 助手里的一样
       definitions: () => TOOLS.filter((tool) => tool.shared)
-        .map((tool) => ({ name: tool.name, description: describe(tool, "external"), inputSchema: tool.inputSchema })),
+        .map((tool) => ({ name: tool.name, description: describe(tool, "external"), inputSchema: tool.inputSchema, ...(tool.free ? { free: true } : {}) })),
       call: callTool,
       draftInfo,
       pagesSummary,

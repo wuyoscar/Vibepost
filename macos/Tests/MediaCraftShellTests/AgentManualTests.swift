@@ -38,7 +38,8 @@ struct AgentManualTests {
 
         let manual = result?["manual"] as? String ?? "(没有)"
         #expect(afterFirst == "被 Agent 改坏了\n", "这一轮里 Agent 改的照写")
-        #expect(agents == manual, "下一轮开始时 App 重写 AGENTS.md")
+        #expect(agents?.hasPrefix(manual) == true && agents?.contains("## 写作手册") == true && agents?.contains("被 Agent 改坏了") == false,
+                "下一轮开始时 App 重写 AGENTS.md：操作手册全文，后面是写作手册的目录（见 WritingManualsTests）")
         #expect(systemPrompt.contains("AGENTS.md") && systemPrompt.contains(":::小标签") && systemPrompt.contains("{{字色:#d9480f|文字}}"), "说明书带短版并指向 AGENTS.md")
         #expect((result?["hunks"] as? [String])?.joined(separator: "\n").contains(":::小标签") == true, "修改对比里看到的就是中文写法")
         #expect(result?["markdown"] as? String == ":::小标签\n论文：Agent 写的\n:::\n\n{{字色:#d9480f|红字}}", "收下时换成中文（行尾换行照原来的）")

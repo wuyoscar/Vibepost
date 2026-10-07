@@ -8,7 +8,7 @@ import Testing
 @MainActor
 struct MCPTests {
     static let tools = [
-        "get_manual",
+        "get_manual", "list_writing_manuals", "read_writing_manual", "save_writing_manual",
         "list_drafts", "get_draft", "create_draft", "open_draft", "update_draft",
         "set_theme", "set_style", "set_mode", "list_palettes", "apply_palette",
         "insert_page_break", "remove_page_break", "move_section", "restyle_block", "set_card_css",

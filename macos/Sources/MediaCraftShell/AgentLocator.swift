@@ -18,12 +18,15 @@ public struct AIConfiguration: Sendable {
     public var imageAPI: ImageAPI
     /// 登录 shell 的环境里没有生图密钥时再找这个 dotenv 文件（默认 `~/.env`，和 gpt-image 技能读的一样）
     public var keyFile: URL
+    /// 写作手册的文件夹（每份一个 .md，见 WritingManuals.swift）；没给时是 `root/写作手册`
+    public var writingManuals: URL
 
     public init(
         root: URL, loginShell: URL, cancelGrace: Duration = .seconds(2), exitGrace: Duration = .seconds(10),
         shellTimeout: Duration = .seconds(15), appEnvironment: [String: String] = ProcessInfo.processInfo.environment,
         imageAPI: ImageAPI = .standard,
-        keyFile: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".env")
+        keyFile: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".env"),
+        writingManuals: URL? = nil
     ) {
         self.root = root
         self.loginShell = loginShell
@@ -33,16 +36,20 @@ public struct AIConfiguration: Sendable {
         self.appEnvironment = appEnvironment
         self.imageAPI = imageAPI
         self.keyFile = keyFile
+        self.writingManuals = writingManuals ?? root.appendingPathComponent("写作手册", isDirectory: true)
     }
 
-    /// `~/Library/Application Support/MediaCraft/ai`，登录 shell 取账户设置里的那个。
+    /// `~/Library/Application Support/MediaCraft/ai`，写作手册在 `MediaCraft/写作手册`，登录 shell 取账户设置里的那个。
     public static var standard: AIConfiguration {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         var shell = "/bin/zsh"
         if let entry = getpwuid(getuid()), let path = entry.pointee.pw_shell, !String(cString: path).isEmpty {
             shell = String(cString: path)
         }
-        return AIConfiguration(root: support.appendingPathComponent("MediaCraft/ai"), loginShell: URL(fileURLWithPath: shell))
+        return AIConfiguration(
+            root: support.appendingPathComponent("MediaCraft/ai"), loginShell: URL(fileURLWithPath: shell),
+            writingManuals: support.appendingPathComponent("MediaCraft/写作手册", isDirectory: true)
+        )
     }
 }
 

@@ -42,6 +42,9 @@ public final class ShellWebView: NSObject {
             livePhotos: core.livePhotos, externalAgents: core.externalAgents, cards: core.cardRasterizer, window: windowId,
             windows: { [weak core] action, request in
                 await core?.windowAction(action, request, from: windowId) ?? .failure(410, "Vibepost 正在关闭")
+            },
+            manuals: { [weak core] action, request in
+                await core?.manualAction(action, request) ?? .failure(410, "Vibepost 正在关闭")
             }
         )
         config.setURLSchemeHandler(AppSchemeHandler(root: core.webRoot, bridge: bridge), forURLScheme: Self.scheme)

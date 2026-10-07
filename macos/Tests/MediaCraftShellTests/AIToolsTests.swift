@@ -106,6 +106,7 @@ struct AIToolsTests {
         #expect(tools.map { $0["name"] as? String ?? "" } == [
             "get_draft", "get_pages", "view_page", "set_theme", "set_style", "set_mode", "insert_page_break", "remove_page_break",
             "move_section", "set_card_css", "restyle_block", "move_image", "insert_image", "resize_image", "crop_image", "propose_images", "generate_image",
+            "save_writing_manual",
         ])
         #expect(tools.allSatisfy { ($0["inputSchema"] as? [String: Any])?["type"] as? String == "object" && !($0["description"] as? String ?? "").isEmpty })
         #expect((Self.answer(fake, "m4")?["mcp_response"] as? [String: Any])?["error"] != nil, "别的服务的消息回错误")

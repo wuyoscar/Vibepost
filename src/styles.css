@@ -4500,6 +4500,66 @@ body[data-layout-mode="article"] .card-only {
   border-top: 1px solid var(--ui-border);
 }
 
+/* AI 设置里的「写作手册」（src/ai/manuals.js）：一份一块（名字、说明、打开 / 在 Finder 中显示），下面「打开文件夹」 */
+.ai-manuals {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.ai-manuals > .pill-button {
+  align-self: flex-start;
+}
+
+.ai-manual-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai-manual {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  background: var(--ui-layer);
+}
+
+.ai-manual-name {
+  color: var(--ui-text);
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.ai-manual-description,
+.ai-manual-empty {
+  color: var(--ui-text-2);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.ai-manual-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.ai-manual-actions > .pill-button {
+  height: 24px;
+  padding: 0 9px;
+  font-size: 11px;
+}
+
 /* 正在生图：一行进度（服务、模型、张数、用时），右边「停止生成」 */
 .ai-generating {
   display: flex;
@@ -6171,6 +6231,11 @@ body[data-layout-mode="article"] .card-only {
   color: var(--ui-text-2);
   font-size: 12px;
   line-height: 1.55;
+  /* 换行照原样（写作手册的改动摘要一行一处）；太长时在框里滚动 */
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  max-height: 50vh;
+  overflow-y: auto;
 }
 
 .dialog-actions {

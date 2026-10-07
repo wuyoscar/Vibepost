@@ -62,6 +62,9 @@ Claude Code ──stdio（JSON-RPC）── mediacraft-mcp ──Unix 域套接�
 | 工具 | 做什么 |
 | --- | --- |
 | `get_manual` | 操作手册全文（Markdown）：块样式、组件、记号的写法，什么时候用哪种，排版经验（与 docs/manual.md 一样） |
+| `list_writing_manuals` | 用户的写作手册（只管写什么、什么口味）：每份一行「名字：说明」，Agent 按这篇的题材挑一份，用户点名的优先 |
+| `read_writing_manual` | 一份写作手册的全文（开头 `name` / `description`，后面是正文 Markdown）；没有这份时回错误 |
+| `save_writing_manual` ★ | 提议新建或整份改写一份写作手册（`name`、`description`、`content`）：App 弹确认框给用户看改动（新建的看开头，修改的看 +N / −M 行与前几行），用户同意才存，拒绝时回「用户没有同意保存这份写作手册」；名字不合规矩直接回错误。不用先认定稿子，列进「外部 Agent 的操作」 |
 | `list_drafts` | 全部稿子：id、标题、模式、是不是内置说明书、是不是正在编辑的那篇、最近修改时间 |
 | `get_draft` | 认定的那篇（还没新建、打开过时是正在编辑的那篇）：id、只读、标题、小红书正文 `caption`、卡片内容 Markdown、模式、主题、颜色、字体、字号行距、分页个数、图片，以及可选的主题、字体与取值范围 |
 | `create_draft` | 新建并在新窗口里打开（标题、卡片内容、小红书正文、模式、主题可一起给；卡片内容里的英文记号收下时换成中文写法） |
@@ -87,4 +90,4 @@ Claude Code ──stdio（JSON-RPC）── mediacraft-mcp ──Unix 域套接�
 
 ## 测试
 
-`macos/Tests/MediaCraftShellTests/MCPTests.swift`：测试的客户端经管道对着 `mediacraft-mcp` 的核心（`MCPServer`，可执行文件里跑的就是它）说 JSON-RPC，核心经真的套接字连到 ShellHarness 里的 App，AirDrop 是假接收端。覆盖握手与两代协议版本、工具清单、新建 → 写正文 → 换主题 → 出图 → 导出 → 发送、内置说明书只读、按路径插图、⌘Z 与逐条撤销、切走稿子后不再改（重连后仍记得）、开关与复制接入命令、用户检查、两个 Vibepost 不抢套接字、App 没开时先打开它。
+`macos/Tests/MediaCraftShellTests/MCPTests.swift`：测试的客户端经管道对着 `mediacraft-mcp` 的核心（`MCPServer`，可执行文件里跑的就是它）说 JSON-RPC，核心经真的套接字连到 ShellHarness 里的 App，AirDrop 是假接收端。覆盖握手与两代协议版本、工具清单、写作手册的列出 / 读取 / 提议保存（`WritingManualsTests.swift`）、新建 → 写正文 → 换主题 → 出图 → 导出 → 发送、内置说明书只读、按路径插图、⌘Z 与逐条撤销、切走稿子后不再改（重连后仍记得）、开关与复制接入命令、用户检查、两个 Vibepost 不抢套接字、App 没开时先打开它。
