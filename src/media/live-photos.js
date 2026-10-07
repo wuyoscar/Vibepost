@@ -70,11 +70,17 @@
     // 界面上来的视频（可以几段）：逐段打开实况编辑器，点「插入」的插在 at
     async function importVideos(files, at) {
       if (!guard()) return;
+      const draftId = window.MediaCraftDrafts?.currentId?.() ?? null;
       for (const file of files) {
         const url = URL.createObjectURL(file);
         try {
           const meta = await live.probe(url);
           const settings = await liveDialog.open({ name: file.name, src: url, meta, settings: live.complete({}, meta), confirmLabel: "插入" });
+          // 对话框开着的时候这个窗口被切到了另一篇（别的窗口或 Agent 让它切的）：这段视频不往新稿子里插
+          if (settings && draftId !== (window.MediaCraftDrafts?.currentId?.() ?? null)) {
+            host.notify(`切到了另一篇稿子，「${file.name}」没有插入`);
+            continue;
+          }
           if (settings) await add(file, url, meta, settings, at);
         } catch (error) {
           host.notify(`「${file.name}」没能做成实况：${error.message}`);

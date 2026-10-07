@@ -19,6 +19,8 @@ extension ShellWebView {
         case reattached
         /// 重新挂上还画不出来：存稿后重新载入了
         case reloaded
+        /// 页面的 JS 正忙着（出图、分页），不是画不出来：过几秒再查，不重载（重载会杀掉这个窗口 AI 的这一轮、丢掉页内对话框）
+        case busy
     }
 
     /// 为什么要修
@@ -69,11 +71,11 @@ extension ShellWebView {
     }
 
     /// 过一秒再修（显示器编号会接连变两次）；这期间又来的合成一次，显示器、唤醒的优先
-    func scheduleRepair(_ reason: RepairReason) {
+    func scheduleRepair(_ reason: RepairReason, after delay: Duration = .seconds(1)) {
         if repairPending?.reattachFirst != true || reason.reattachFirst { repairPending = reason }
         repairTask?.cancel()
         repairTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(1))
+            try? await Task.sleep(for: delay)
             guard !Task.isCancelled, let self, let reason = self.repairPending else { return }
             self.repairPending = nil
             await self.repair(reason)
@@ -91,6 +93,11 @@ extension ShellWebView {
         if !reason.reattachFirst, await paints() { return finishRepair(.healthy, reason) }
         reattach()
         if await paints() { return finishRepair(.reattached, reason) }
+        // 一帧没回来有两种可能：JS 线程正忙（连 1+1 都答不上）——那是忙不是坏，过几秒再查；JS 答得上、帧却不来——才是真画不出来
+        if !(await responds()) {
+            scheduleRepair(reason, after: .seconds(5))
+            return finishRepair(.busy, reason)
+        }
         shellLog.error("窗口 \(self.windowId, privacy: .public) 重新挂上网页之后还是画不出新的一帧：存稿后重新载入")
         try? await reload()
         return finishRepair(.reloaded, reason)
@@ -100,6 +107,14 @@ extension ShellWebView {
         lastRepair = repair
         shellLog.notice("窗口 \(self.windowId, privacy: .public) \(reason.rawValue, privacy: .public)：\(repair.rawValue, privacy: .public)")
         return repair
+    }
+
+    /// 页面的 JS 还答不答得上话（和画不画得出分开）：timeout 内算出 1+1 就算答得上
+    func responds(timeout: Duration = .milliseconds(1500)) async -> Bool {
+        let webView = webView
+        return await firstOf(timeout: timeout) {
+            ((try? await webView.evaluateJavaScript("1+1")) as? Int) == 2
+        } ?? false
     }
 
     /// 页面能不能画出新的一帧：请求一帧动画，timeout 内回来就算能（页面卡住、没回也算不能）

@@ -269,12 +269,17 @@ public final class ShellCore {
     }
 
     /// 所有窗口的页面马上存稿并等写完（退出、更新重启之前），每个窗口最多等 timeout
-    public func saveAllDrafts(timeout: Duration = .seconds(3)) async {
+    /// 返回是否每个窗口都存好了（或没回）；有页面明确说「没存上」时为 false（它内存里的改动会随退出丢掉，退出前该问一句）
+    @discardableResult
+    public func saveAllDrafts(timeout: Duration = .seconds(3)) async -> Bool {
         let pages = pages
-        await withTaskGroup(of: Void.self) { group in
+        return await withTaskGroup(of: Bool.self) { group in
             for page in pages {
-                group.addTask { @MainActor in _ = await page.saveDrafts(timeout: timeout) }
+                group.addTask { @MainActor in await page.saveDraftsOutcome(timeout: timeout) != .failed }
             }
+            var ok = true
+            for await result in group { ok = ok && result }
+            return ok
         }
     }
 

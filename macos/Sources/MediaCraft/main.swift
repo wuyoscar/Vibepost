@@ -14,6 +14,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var closing: Set<ObjectIdentifier> = []
     /// 已经在退出了（存稿、结束 AI 进程中）：再按 ⌘Q 不重来一遍
     private var terminating = false
+    /// 已经回复过 AppKit 的 terminateLater（正常路径与兜底二选一，不回复两次）
+    private var repliedToTerminate = false
+    private var terminateFallback: Timer?
     /// 检查更新（MediaCraftShell/Updater.swift）：「检查更新…」与每天一次的自动检查；准备好的新版在退出时换上
     private var updater: Updater!
     private var preparedUpdate: Updater.Prepared?
@@ -39,7 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         // 上次留下的下载与暂存清掉；稍等一会儿再自动检查更新（一天最多一次）。页面里（AI 设置 › 关于）也能点「检查更新…」
         updater = Updater.forRunningApp()
-        updater.cleanStaging()
+        Task { await updater.cleanStaging() }
         core.checkForUpdates = { [weak self] in Task { await self?.checkForUpdates(automatic: false) } }
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(8))
@@ -106,17 +109,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         Task { await entry.shell.saveDrafts() }
     }
 
-    /// 点了关闭：先让这个窗口的页面把稿子存完（最多等 3 秒，页面卡住也照样关），再真正关上。存的途中再点关闭不重来
+    /// 点了关闭：先让这个窗口的页面把稿子存完（最多等 3 秒，页面卡住也照样关），再真正关上。存的途中再点关闭不重来。
+    /// 页面明确说「没存上」（写不进本机，改动还在它内存里）时问一句，别静默丢掉
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         let key = ObjectIdentifier(sender)
         guard let entry = windows[key] else { return true }
         guard !closing.contains(key) else { return false }
         closing.insert(key)
         Task {
-            await entry.shell.saveDrafts()
+            if await entry.shell.saveDraftsOutcome() == .failed, await !confirmDiscard("这个窗口的稿子没能存进本机", "仍要关闭") {
+                closing.remove(key)
+                return
+            }
             sender.close()
         }
         return false
+    }
+
+    /// 没存上时的确认：true = 仍要关 / 退出
+    private func confirmDiscard(_ title: String, _ action: String) async -> Bool {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = "改动还在页面里，现在关掉就丢了。可以先点顶栏的「没存上」再试一次，或者把内容复制出来。"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "取消")
+        alert.addButton(withTitle: action)
+        return await runModal(alert) == .alertSecondButtonReturn
     }
 
     /// 关掉一个窗口：只结束它自己发起的 AI 进程；最后一个关掉时 App 退出（见下）
@@ -135,13 +153,55 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // 已经在退了（存稿、结束 AI 进程中）：这一次不另起一遍，也不留一个永远不回答的 terminateLater
         guard !terminating else { return .terminateCancel }
         terminating = true
+        repliedToTerminate = false
         core.freezeSession()
         Task {
-            await core.saveAllDrafts()
+            // 有页面明确说没存上：问一句，取消就不退了（下次再退重新来）
+            if await !core.saveAllDrafts(), await !confirmDiscard("有稿子没能存进本机", "仍要退出") {
+                terminateFallback?.invalidate()
+                terminateFallback = nil
+                terminating = false
+                repliedToTerminate = true
+                NSApp.reply(toApplicationShouldTerminate: false)
+                return
+            }
             installPreparedUpdate()
-            core.shutdown { NSApp.reply(toApplicationShouldTerminate: true) }
+            core.shutdown { self.replyToTerminate() }
         }
+        // 兜底：上面那条路要靠 MainActor 的任务跑；terminateLater 之后 AppKit 在 terminate: 里原地转嵌套 run loop 等回复，
+        // 要是 terminate 是从主队列的 block（GCD、MainActor 任务）里调的，嵌套 loop 不再 drain 主队列，那条路就永远到不了。
+        // 所以兜底用 run loop 的 Timer（加进 common 模式，嵌套 loop 里照样响）：20 秒后直接换上准备好的新版并回复，
+        // App 不会卡在「退出中」出不去、菜单里的退出变灰
+        let fallback = Timer(timeInterval: 20, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, !self.repliedToTerminate else { return }
+                self.updater.note("退出：存稿或结束 AI 进程 20 秒没完成，直接退出")
+                self.installPreparedUpdate()
+                self.replyToTerminate()
+            }
+        }
+        RunLoop.main.add(fallback, forMode: .common)
+        terminateFallback = fallback
         return .terminateLater
+    }
+
+    /// 弹一个挡住整个 App 的对话框：从 run loop 的回调里进入，而不是在 MainActor 的 async 任务（= 主队列的 block）里直接 runModal。
+    /// 从主队列的 block 里转起来的嵌套 run loop 不 drain 主队列：弹窗期间页面的桥请求、AI 的事件、别的任务全停摆，
+    /// 「现在更新」之后的退出更是永远等不到回复（2026-10-08 用户卡死的根因）。经 run loop 进入就没有这个问题
+    private func runModal(_ alert: NSAlert) async -> NSApplication.ModalResponse {
+        await withCheckedContinuation { continuation in
+            RunLoop.main.perform(inModes: [.common]) {
+                continuation.resume(returning: MainActor.assumeIsolated { alert.runModal() })
+            }
+        }
+    }
+
+    private func replyToTerminate() {
+        guard !repliedToTerminate else { return }
+        repliedToTerminate = true
+        terminateFallback?.invalidate()
+        terminateFallback = nil
+        NSApp.reply(toApplicationShouldTerminate: true)
     }
 
     // MARK: - 检查更新
@@ -154,7 +214,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// 自动检查（automatic）一天最多一次，有新版（且没被跳过）才说话；手动检查总有回答
     private func checkForUpdates(automatic: Bool) async {
         if let prepared = preparedUpdate {
-            if !automatic { offerRestart(prepared) }
+            if !automatic { await offerRestart(prepared) }
             return
         }
         guard !checkingForUpdates, !automatic || updater.dueForAutomaticCheck() else { return }
@@ -163,13 +223,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         do {
             switch try await updater.check() {
             case .upToDate(let version):
-                if !automatic { inform("已是最新版本", "你用的 Vibepost \(version) 就是最新的。") }
+                if !automatic { await inform("已是最新版本", "你用的 Vibepost \(version) 就是最新的。") }
             case .available(let release):
                 if automatic, updater.isSkipped(release.version) { return }
                 await offer(release)
             }
         } catch {
-            if !automatic { inform("没能检查更新", error.localizedDescription) }
+            if !automatic { await inform("没能检查更新", error.localizedDescription) }
         }
     }
 
@@ -180,7 +240,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         alert.addButton(withTitle: "下载并安装")
         alert.addButton(withTitle: "稍后")
         alert.addButton(withTitle: "跳过这个版本")
-        switch alert.runModal() {
+        switch await runModal(alert) {
         case .alertFirstButtonReturn: await download(release)
         case .alertThirdButtonReturn: updater.skip(release.version)
         default: break
@@ -209,18 +269,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         switch result {
         case .success(let prepared):
             preparedUpdate = prepared
-            offerRestart(prepared)
+            await offerRestart(prepared)
         case .failure(let error):
-            inform("更新没装上", error.localizedDescription)
+            updater.note("更新没装上：\(error.localizedDescription)")
+            await inform("更新没装上", error.localizedDescription)
         }
     }
 
     /// 准备好了：现在就退出、换上、重新打开；或者等用户自己退出时再换。App 所在的位置不能写时打开 DMG 让用户自己拖
-    private func offerRestart(_ prepared: Updater.Prepared) {
+    private func offerRestart(_ prepared: Updater.Prepared) async {
         guard updater.canReplace else {
             preparedUpdate = nil
             NSWorkspace.shared.open(prepared.dmg)
-            inform("请手动安装 Vibepost \(prepared.release.version)", UpdateError.notWritable(Bundle.main.bundleURL.path).localizedDescription)
+            await inform("请手动安装 Vibepost \(prepared.release.version)", UpdateError.notWritable(Bundle.main.bundleURL.path).localizedDescription)
             return
         }
         let alert = NSAlert()
@@ -228,32 +289,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         alert.informativeText = "现在重新打开 Vibepost 完成更新？开着的稿子会先存好，重新打开后还是这几个窗口。选「稍后」就在你退出 Vibepost 时换上新版。"
         alert.addButton(withTitle: "现在更新")
         alert.addButton(withTitle: "稍后")
-        if alert.runModal() == .alertFirstButtonReturn {
+        if await runModal(alert) == .alertFirstButtonReturn {
             relaunchAfterUpdate = true
-            NSApp.terminate(nil)
+            // 不在这个 async 任务里直接 terminate，也不经 GCD 派发（两种都会让 terminateLater 的回复永远跑不到，见 runModal 的说明）：
+            // 经 run loop 派发，和 AppKit 自己「最后一窗关闭后退出」一样
+            NSApp.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0)
         }
     }
 
     /// 退出时（稿子都存完之后）换上准备好的新版；换不了就打开 DMG
     private func installPreparedUpdate() {
         guard let prepared = preparedUpdate else { return }
+        preparedUpdate = nil // 正常路径与兜底都会来：只起一次替换脚本
         do {
             try updater.install(prepared, relaunch: relaunchAfterUpdate)
         } catch {
+            updater.note("起不了替换脚本：\(error.localizedDescription)，打开 DMG 让用户自己拖")
             NSWorkspace.shared.open(prepared.dmg)
         }
     }
 
-    private func inform(_ title: String, _ message: String) {
+    private func inform(_ title: String, _ message: String) async {
         let alert = NSAlert()
         alert.messageText = title
         alert.informativeText = message
-        alert.runModal()
+        _ = await runModal(alert)
     }
 
     /// 更新说明（Release 的正文）的开头一段
+    /// Release 的正文是 Markdown，对话框只显示纯文字：去掉粗体、代码的记号，列表换成「·」，标题行照常
     private static func summary(_ notes: String) -> String {
-        let text = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lines = notes.replacingOccurrences(of: "\r\n", with: "\n").split(separator: "\n", omittingEmptySubsequences: false).map { line -> String in
+            var text = String(line).replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "`", with: "")
+            while text.hasPrefix("#") { text.removeFirst() }
+            if text.hasPrefix("- ") { text = "· " + text.dropFirst(2) }
+            return text.trimmingCharacters(in: .whitespaces)
+        }
+        let text = lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return "" }
         return "\n\n" + (text.count > 600 ? String(text.prefix(600)) + "…" : text)
     }

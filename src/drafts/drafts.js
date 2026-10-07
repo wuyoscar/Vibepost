@@ -310,6 +310,7 @@
       if (currentId !== draftId) return;
       baseline = null;
       for (const [id] of puts) persistedImages.delete(id);
+      for (const id of removed) persistedImages.set(id, ""); // 下次存盘照样算要删的，不留孤儿
     })
       .then(
         () => {
@@ -339,6 +340,7 @@
 
   // 打开一篇：自己的稿子以存储里的为准（别的窗口可能刚存过，广播也可能错过），存储里没有了就是在别处删了
   async function show(id) {
+    if (saveTimer) save(); // 离开上一篇之后、打开这篇之前打的字也存上
     await writes; // 这个窗口排着的写入先落盘（它们不会失败出去：失败记在 writeError）
     const [stored, media] = isBuiltIn(id)
       ? [get(id), { images: {}, videos: {} }]
@@ -368,6 +370,10 @@
 
   // 离开当前稿子前先把它存好；存不进去就不走，免得丢改动。之前有写入失败时整篇重写一遍再走。
   async function leaveCurrent() {
+    if (!currentId || isBuiltIn(currentId)) {
+      await writes; // 这篇没有可丢的改动：别处写入失败过也不拦着切换（那份错误等下次真要写时再报）
+      return;
+    }
     if (writeError) baseline = null;
     save();
     await flush();
@@ -383,6 +389,20 @@
   }
 
   // 这个窗口能开的一篇：先 wanted 里的（按顺序），再最近改过的自己的稿子；都在别的窗口里开着时打开第一本说明书
+  // 打开排得上的第一篇：中途被别的窗口删了就跳过再找（连环删除时不留在「没有当前稿子」的幽灵态），最后落到第一本说明书
+  async function showFirstClaimable(wanted) {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const id = await firstClaimable(wanted);
+      try {
+        return await show(id);
+      } catch (error) {
+        if (isBuiltIn(id)) throw error;
+        // show() 已经把这篇记成忘掉的，下一轮 firstClaimable 不会再挑它
+      }
+    }
+    return show(builtIns[0].id);
+  }
+
   async function firstClaimable(wanted) {
     const seen = new Set();
     for (const id of [...wanted, ...own().map((record) => record.id)]) {
@@ -506,7 +526,7 @@
         throw new Error(`没能删除：${error.message || error}`);
       }
       const aiError = await nativeAI?.remove(id).then(() => null, (error) => error);
-      if (wasCurrent) await show(await firstClaimable([]));
+      if (wasCurrent) await showFirstClaimable([]);
       else emit("list");
       if (aiError) throw new Error(`稿子已删除，但 AI 的工作副本没能删掉：${aiError.message || aiError}`);
     });
@@ -612,7 +632,7 @@
     if (removed !== null) {
       await serially(async () => {
         if (currentId) return; // 这期间已经打开了别的
-        await show(await firstClaimable([]));
+        await showFirstClaimable([]);
       });
       emit("removed-elsewhere", { title: removed });
     } else emit("list");
@@ -653,7 +673,7 @@
       await show(freshId);
       return {};
     }
-    await show(await firstClaimable([initialId, prefs.currentDraftId]));
+    await showFirstClaimable([initialId, prefs.currentDraftId]);
     return initialId && !get(initialId) ? { draftMissing: true } : {};
   }
 

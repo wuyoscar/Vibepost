@@ -192,6 +192,10 @@
             <button type="button" class="format-button" data-mark="underline" aria-label="下划线" aria-keyshortcuts="Meta+U" title="下划线 ⌘U"><u>U</u></button>
             <button type="button" class="format-button" data-mark="strike" aria-label="删除线" aria-keyshortcuts="Meta+Shift+X" title="删除线 ⇧⌘X"><s>S</s></button>
             <span class="bar-separator" aria-hidden="true"></span>
+            <!-- 字号（src/editor/font-size.js）：像 PPT 的「减小 / 增大字号」，每按一下这篇的字号 ±1，和检查器「版式 › 字号」是同一个值 -->
+            <button type="button" class="format-button format-size" data-font-step="-1" aria-label="字号减小" aria-keyshortcuts="Meta+Shift+Comma" title="字号减小 ⇧⌘&lt;">A<span class="format-size-sign">−</span></button>
+            <button type="button" class="format-button format-size" data-font-step="1" aria-label="字号增大" aria-keyshortcuts="Meta+Shift+Period" title="字号增大 ⇧⌘&gt;">A<span class="format-size-sign">+</span></button>
+            <span class="bar-separator" aria-hidden="true"></span>
             <details class="pop-menu">
               <summary class="menu-button" aria-label="插入" title="插入（也可以在行首输入 /）">
                 <svg class="icon icon-small" aria-hidden="true"><use href="#i-plus" /></svg>
@@ -1317,6 +1321,7 @@
     <script src="src/drafts/title.js"></script>
     <script src="src/drafts/caption.js"></script>
     <script src="src/drafts/save-button.js"></script>
+    <script src="src/editor/font-size.js"></script>
     <script src="src/shell.js"></script>
     <script src="src/theme-panel.js"></script>
     <script src="src/workspace/palette-panel.js"></script>

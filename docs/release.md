@@ -22,6 +22,11 @@
 - Release 的正文就是 App 里弹窗显示的「更新说明」（前 600 字）。
 - 仓库名写在 App 的 Info.plist（`MCUpdateRepository`，`build-app.sh` 写入，默认 `wuyoscar/Vibepost`）。
 
+## 排障
+
+- 更新器与替换脚本都写 `~/Library/Logs/Vibepost/update.log`（检查到的版本、下载、校验、替换脚本每一步与出错原因）；`log show` 查不到 ad-hoc 签名 App 的 os_log，看这个文件。
+- 「在后台下载」期间退出 App，这次准备作废（暂存在 `~/Library/Caches/MediaCraft/update/`，下次启动清掉，再检查会重新下载）。
+
 ## App 这边怎么做
 
 - **检查**：先不带凭据问 GitHub API（`/repos/<仓库>/releases/latest`）；私有仓库会回 404，这时借本机登录好的 GitHub CLI（在终端的 PATH 里找 `gh`，用 `gh api` 读 Release、`gh release download` 下载）。没有 `gh` 时说清楚要先 `brew install gh`、`gh auth login`。仓库公开以后不需要 `gh`。

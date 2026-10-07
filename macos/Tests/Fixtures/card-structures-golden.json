@@ -443,87 +443,91 @@
     "structure" : "poster"
   },
   "press" : {
-    "pageCount" : 5,
+    "pageCount" : 4,
     "pages" : [
       {
         "bounds" : [
-          80,
-          168,
-          784,
-          1032
+          64,
+          150,
+          800,
+          1052
         ],
         "dropTargets" : [
-          "block y 168 h 78 src 2-15",
-          "text-line y 289 h 235 src 17-81",
-          "text-line y 578 h 112 src 83-109"
+          "block y 150 h 78 src 2-15",
+          "text-line y 271 h 235 src 17-81",
+          "text-line y 560 h 112 src 83-109",
+          "block y 732 h 62 src 114-124",
+          "text-line y 828 h 63 src 126-138",
+          "text-line y 897 h 63 src 139-151",
+          "text-line y 966 h 63 src 152-161"
         ],
         "imageHits" : [
 
         ],
-        "sha256" : "43ec8ed60519f5dfabb1f016d16fc9bed6b5bfb349687cd0586a5d93d3794c8d"
+        "sha256" : "944ebad75e7611e96e063a7dea53b054361fd4694299ffc91765451473dac1db"
       },
       {
         "bounds" : [
-          80,
-          168,
-          784,
-          1032
+          64,
+          150,
+          800,
+          1052
         ],
         "dropTargets" : [
-          "block y 168 h 62 src 114-124",
-          "text-line y 265 h 63 src 126-138",
-          "text-line y 334 h 63 src 139-151",
-          "text-line y 403 h 63 src 152-161",
-          "text-line y 508 h 172 src 163-228",
-          "block single.png y 724 h 306 src 230-263"
+          "text-line y 158 h 172 src 163-228",
+          "block single.png y 374 h 442 src 230-263",
+          "block y 864 h 62 src 268-278",
+          "text-line y 968 h 46 src 280-393"
         ],
         "imageHits" : [
-          "single.png 228,724 408x306 base 704 max 704 resize 704 src 230-263"
+          "single.png 138,374 589x442 base 736 max 736 resize 736 src 230-263"
         ],
-        "sha256" : "7db85ac8f2b009d84a42e8eb03699df5c97ff9e997028222cad07a2263d3c959"
+        "sha256" : "4d4c082df6f99dbc72b3cbc3effa6c02613a40498b35df1287f9ea4d0f60d8d8"
       }
     ],
     "structure" : "scroll"
   },
   "scroll" : {
-    "pageCount" : 5,
+    "pageCount" : 4,
     "pages" : [
       {
         "bounds" : [
-          80,
-          168,
-          784,
-          1032
+          64,
+          150,
+          800,
+          1052
         ],
         "dropTargets" : [
-          "block y 168 h 78 src 2-15",
-          "text-line y 289 h 235 src 17-81",
-          "text-line y 578 h 112 src 83-109"
+          "block y 150 h 78 src 2-15",
+          "text-line y 271 h 235 src 17-81",
+          "text-line y 560 h 112 src 83-109",
+          "block y 732 h 62 src 114-124",
+          "text-line y 828 h 63 src 126-138",
+          "text-line y 897 h 63 src 139-151",
+          "text-line y 966 h 63 src 152-161"
         ],
         "imageHits" : [
 
         ],
-        "sha256" : "e503ddde68802bf2467aa749a3c560b85e23ecab3c08bb6d9de89ed0577b036e"
+        "sha256" : "205937d044d898d5cde113f3759ddef816ac79459f5c333e790cbe7d82be7026"
       },
       {
         "bounds" : [
-          80,
-          168,
-          784,
-          1032
+          64,
+          150,
+          800,
+          1052
         ],
         "dropTargets" : [
-          "block y 168 h 62 src 114-124",
-          "text-line y 265 h 63 src 126-138",
-          "text-line y 334 h 63 src 139-151",
-          "text-line y 403 h 63 src 152-161",
-          "text-line y 508 h 172 src 163-228",
-          "block single.png y 724 h 306 src 230-263"
+          "text-line y 158 h 172 src 163-228",
+          "block single.png y 374 h 442 src 230-263",
+          "block y 864 h 62 src 268-278",
+          "text-line y 968 h 46 src 280-393"
         ],
         "imageHits" : [
-          "single.png 228,724 408x306 base 704 max 704 resize 704 src 230-263"
+          "single.png 138,374 589x442 base 736 max 736 resize 736 src 230-263"
         ],
-        "sha256" : "009aca8f1b737bfd9dc4b62dc5405d9fb7fbebbf775d52965061f556e87bacc9"
+        "sha256" : "6cb45a0a5c655cd3e1b575627f567172967b945ea8b4f18a07dce74d6282092f"
       }
     ],
     "structure" : "scroll"

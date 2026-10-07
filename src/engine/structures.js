@@ -311,7 +311,7 @@
     // 页眉页脚用正文字体（宋体）。
     scroll: {
       name: "书卷",
-      pages: { inner: { top: 168, right: 80, bottom: 120, left: 80 }, first: { top: 168, right: 80, bottom: 120, left: 80 } },
+      pages: { inner: { top: 150, right: 64, bottom: 100, left: 64 }, first: { top: 150, right: 64, bottom: 100, left: 64 } },
       body: { scale: 1 },
       headings: {
         h1: { scale: 1.76, lineHeight: 1.3, weight: 600, align: "center" },
@@ -325,11 +325,11 @@
         title: { weight: 600, max: 116, min: 60, lineHeight: 1.26, maxLines: 4 },
         subtitle: { size: 30, weight: 400, lineHeight: 1.7, gap: 32, maxLines: 3, pin: null },
         align: "center",
-        column: { left: 96, right: 96 },
+        column: { left: 72, right: 72 },
         area: { top: 220, bottom: 960, anchor: "center" },
         image: {
           mode: "plate",
-          box: { x: 80, y: 176, width: 704, height: 500, radius: 0 },
+          box: { x: 64, y: 160, width: 736, height: 500, radius: 0 },
           area: { top: 740, bottom: 1040, anchor: "top" },
           lead: 0,
           titleMax: 92,
@@ -337,7 +337,7 @@
         },
       },
       end: {
-        inset: 80,
+        inset: 64,
         signature: { avatar: 88, name: { size: 26, weight: 600, font: "body", upper: false, spacing: 3 }, handle: { size: 22 } },
       },
     },

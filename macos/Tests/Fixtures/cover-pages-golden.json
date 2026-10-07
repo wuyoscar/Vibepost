@@ -364,7 +364,7 @@
     "structure" : "poster"
   },
   "press" : {
-    "pageCount" : 7,
+    "pageCount" : 6,
     "roles" : [
       "cover",
       "end",
@@ -377,7 +377,7 @@
           "title 116 的三个习惯",
           "subtitle 30 先问再读，三周读完二十篇"
         ],
-        "sha256" : "a49eb7e199731b9b3b50c6d05d8442eb0c24fcf83991a144ffa36cb84e02df7c"
+        "sha256" : "9e21121def2437e51e3cad5bd32e3d14549a2598cdd2afd7c1033443466c49a8"
       },
       "coverImage" : {
         "lines" : [
@@ -385,7 +385,7 @@
           "title 92 的三个习惯",
           "subtitle 30 先问再读，三周读完二十篇"
         ],
-        "sha256" : "20ebe2a25f117bebafa07e9dac2d96d64b360247a413134bbf9c7de53b9c516b"
+        "sha256" : "a591f404514ce1f577306f4bb4b15017b95d9ae8206ef11d3e4f16f5b13c2c4b"
       },
       "end" : {
         "lines" : [
@@ -394,13 +394,13 @@
           "p 34 觉得有用就收藏一下。",
           "p 34 第 3 期"
         ],
-        "sha256" : "6028493a6d2dca3d50b0e37bcb1ac384f701364092c09493f7ee60f0d8132431"
+        "sha256" : "02f81e837287af098149c1bc9ddd23168e934949c334b6b75116e6e6d239d15c"
       }
     },
     "structure" : "scroll"
   },
   "scroll" : {
-    "pageCount" : 7,
+    "pageCount" : 6,
     "roles" : [
       "cover",
       "end",
@@ -413,7 +413,7 @@
           "title 116 的三个习惯",
           "subtitle 30 先问再读，三周读完二十篇"
         ],
-        "sha256" : "d9c3bf4d8d1fe938503892c8cf2ce4765811098e9888686eabe25e639919114e"
+        "sha256" : "fbcd30113f2d8ee53e8bf1ba4725dcee07187911a2a544a4bfe5b7883f349af9"
       },
       "coverImage" : {
         "lines" : [
@@ -421,7 +421,7 @@
           "title 92 的三个习惯",
           "subtitle 30 先问再读，三周读完二十篇"
         ],
-        "sha256" : "59925e64a45895bb9c50ee7dd767da266c1e7651509b6f66328a9ca9d138d3a0"
+        "sha256" : "f2c41a6fcf5bb483b0bac7d52fd31707a7dc3e7743c4c7917cfb52c804c1022b"
       },
       "end" : {
         "lines" : [
@@ -430,7 +430,7 @@
           "p 34 觉得有用就收藏一下。",
           "p 34 第 3 期"
         ],
-        "sha256" : "834eef4133efe95d4538488b254d39a7779364fcdd39a9d538647768e9eb72d8"
+        "sha256" : "ac2aeb3788842b51e4379e63f48367f63e100ae85578ac5ec6a95738aa6973d3"
       }
     },
     "structure" : "scroll"

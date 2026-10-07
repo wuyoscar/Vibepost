@@ -110,7 +110,7 @@ struct UpdaterTests {
                 current: UpdateVersion(current)!, bundleURL: app ?? applications.appendingPathComponent("Vibepost.app"),
                 bundleIdentifier: "com.wuyoscar.mediacraft",
                 source: GitHubReleases(repository: UpdaterTests.repository, api: api) { cli },
-                staging: staging, trash: trash, defaults: defaults
+                staging: staging, trash: trash, defaults: defaults, logFile: root.appendingPathComponent("update.log")
             )
         }
 

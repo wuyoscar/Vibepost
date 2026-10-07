@@ -1178,16 +1178,16 @@
   --scroll-rule: color-mix(in oklab, var(--mc-text) 52%, var(--mc-bg));
 }
 
-/* 报头：名字居中（第一页带头像），下面一条通栏双线 */
+/* 报头：名字居中（第一页带头像），下面一条通栏双线。2026-10-08 收紧：报头 56px 起、版心 150 / 64 / 100（原 72 起、168 / 80 / 120），四周不再空一圈 */
 .mc-scroll-head {
   position: absolute;
-  top: 72px;
+  top: 56px;
   right: 0;
   left: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 18px;
+  gap: 14px;
 }
 
 .mc-scroll-sign {
@@ -1224,7 +1224,7 @@
 
 /* 页码在页脚正中：第 N 页 / 共 N 页 */
 .mc-page[data-structure="scroll"] > .mc-foot {
-  bottom: 60px;
+  bottom: 48px;
   justify-content: center;
 }
 

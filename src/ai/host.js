@@ -32,9 +32,12 @@
     const adapter = {
       // 显示 / 收起审阅：{ hunks, preview: { markdown, title }, decide } 或 null
       review(view) {
-        preview = view && { content: view.preview.markdown, title: view.preview.title };
+        const next = view && { content: view.preview.markdown, title: view.preview.title };
+        // 预览是「没拒绝的都接受」：接受某一处时预览没变，只更新编辑器里的标注，不整篇重出图
+        const same = Boolean(preview && next && preview.content === next.content && preview.title === next.title);
+        preview = next;
         host.editor.showReview(view && { hunks: view.hunks, decide: view.decide });
-        host.render.request();
+        if (!same) host.render.request();
       },
       // 撤销历史里的一步：patch 可含 markdown 与 fieldValues() 里的任意字段（images 只要信息，不要画面）
       async edit(patch) {

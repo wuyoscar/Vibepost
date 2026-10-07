@@ -3,6 +3,13 @@ import ImageIO
 import UniformTypeIdentifiers
 import WebKit
 
+/// 出图器自己的错误（给页面的是一句中文）
+struct RasterError: LocalizedError {
+    let message: String
+    init(_ message: String) { self.message = message }
+    var errorDescription: String? { message }
+}
+
 /// HTML 卡片 → PNG（ADR 0006 草案，`docs/spikes/html-card-renderer.md`）。
 ///
 /// 一个不上屏的 WKWebView 载入 `src/cards/raster-host.html`（和页面同一套打包字体与卡片样式，同一个 `mediacraft://app` 根目录），
@@ -103,28 +110,47 @@ final class CardRasterizer: NSObject {
         return try await work.value.get()
     }
 
+    /// 宿主页载入、布置样式与图片、每页出图的上限：出图进程卡住（不是崩溃）时不能让整条队列永远排死
+    static let loadTimeout: Duration = .seconds(20)
+    static let setupTimeout: Duration = .seconds(60)
+    static let pageTimeout: Duration = .seconds(60)
+
     private func renderNow(_ request: Request) async throws -> [Page] {
-        let webView = try await host(width: request.width, height: request.height)
-        _ = try await webView.callAsyncJavaScript(
-            "return await window.mcRaster.setup(style, media, width, height)",
-            arguments: ["style": request.style, "media": request.media ?? [:], "width": request.width, "height": request.height],
-            contentWorld: .page
-        )
+        let webView = try await bounded(Self.loadTimeout, "载入出图的宿主页") { try await self.host(width: request.width, height: request.height) }
+        _ = try await bounded(Self.setupTimeout, "布置样式与图片") {
+            try await webView.callAsyncJavaScript(
+                "return await window.mcRaster.setup(style, media, width, height)",
+                arguments: ["style": request.style, "media": request.media ?? [:], "width": request.width, "height": request.height],
+                contentWorld: .page
+            )
+        }
         var pages: [Page] = []
         for (index, html) in request.pages.enumerated() {
             let started = ContinuousClock.now
-            _ = try await webView.callAsyncJavaScript(
-                "return await window.mcRaster.show(html)", arguments: ["html": html], contentWorld: .page
-            )
-            let png: Data
-            if request.method == "pdf" {
-                png = try await pdf(webView, request: request, page: index + 1)
-            } else {
-                png = try await snapshot(webView, request: request, page: index + 1)
+            let png = try await bounded(Self.pageTimeout, "出第 \(index + 1) 页") {
+                _ = try await webView.callAsyncJavaScript(
+                    "return await window.mcRaster.show(html)", arguments: ["html": html], contentWorld: .page
+                )
+                if request.method == "pdf" {
+                    return try await self.pdf(webView, request: request, page: index + 1)
+                }
+                return try await self.snapshot(webView, request: request, page: index + 1)
             }
             pages.append(Page(png: png, milliseconds: Self.milliseconds(since: started)))
         }
         return pages
+    }
+
+    /// 一步出图最多等多久：到点了就当宿主页卡住，重建它（下次请求重新载入），这次报错
+    private func bounded<T: Sendable>(_ timeout: Duration, _ what: String, _ operation: @escaping @MainActor () async throws -> T) async throws -> T {
+        let outcome: Result<T, Error>? = await firstOf(timeout: timeout) {
+            do { return .success(try await operation()) } catch { return .failure(error) }
+        }
+        guard let outcome else {
+            reset()
+            throw RasterError("\(what)超过 \(timeout) 没有回应：出图的页面可能卡住了，已重建，请再试一次")
+        }
+        return try outcome.get()
     }
 
     // MARK: 宿主页
@@ -169,12 +195,14 @@ final class CardRasterizer: NSObject {
         webView.frame = NSRect(x: 0, y: 0, width: width, height: height)
     }
 
-    /// 宿主页出错（比如被重新载入）时下次重建
+    /// 宿主页出错（比如被重新载入、卡住）时下次重建；还在等它载入的也放掉（进程在载入途中崩溃时两个回调的先后没有保证）
     func reset() {
         webView?.navigationDelegate = nil
         window?.orderOut(nil)
         webView = nil
         window = nil
+        loaded?.resume(throwing: RasterError("出图的宿主页没有载入成功"))
+        loaded = nil
     }
 
     // MARK: 出图

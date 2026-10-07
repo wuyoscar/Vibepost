@@ -34,6 +34,55 @@ struct ToolbarShortcutsTests {
           .map((button) => ui.name(button));
     """
 
+    @Test("格式条上的 A− / A+：每按一下这篇的字号 ±1（和检查器的字号滑块同一个值），到 24 / 40 按钮变灰；⇧⌘> / ⇧⌘< 在哪都能按；是撤销历史里的一步")
+    func fontSizeButtons() async throws {
+        let harness = ShellHarness()
+        try await harness.load()
+        let result = try await harness.evaluate(Self.helpers + """
+            window.until = async (condition, timeout = 15000) => {
+              const started = Date.now();
+              while (!(await condition())) {
+                if (Date.now() - started > timeout) throw new Error("等不到条件");
+                await new Promise((resolve) => setTimeout(resolve, 50));
+              }
+            };
+            await mc.drafts.create({ markdown: "# 标题\\n\\n一段。" });
+            const slider = () => Number(document.querySelector("#fontSizeInput").value);
+            const start = (await mc.drafts.current()).fontSize;
+            clickTool("字号增大");
+            await until(async () => (await mc.drafts.current()).fontSize === start + 1);
+            const up = { size: (await mc.drafts.current()).fontSize, slider: slider(), title: tool("字号增大").title };
+            await mc.drafts.update({ fontSize: 40 });
+            await settle();
+            const atMax = [tool("字号增大").disabled, tool("字号减小").disabled];
+            // 到顶了：快捷键再按不动；减小的快捷键能按
+            document.body.focus();
+            press(".", { shiftKey: true, code: "Period" });
+            await settle();
+            const stillMax = (await mc.drafts.current()).fontSize;
+            const handled = press(",", { shiftKey: true, code: "Comma" });
+            await until(async () => (await mc.drafts.current()).fontSize === 39);
+            const down = (await mc.drafts.current()).fontSize;
+            const undone = (await mc.drafts.undo()).fontSize;
+            await mc.drafts.update({ fontSize: 24 });
+            await settle();
+            const atMin = [tool("字号增大").disabled, tool("字号减小").disabled];
+            return { start, up, atMax, stillMax, handled, down, undone, atMin };
+        """) as? [String: Any]
+        await harness.tearDown()
+
+        #expect(result?["start"] as? Int == 34)
+        let up = result?["up"] as? [String: Any]
+        #expect(up?["size"] as? Int == 35 && up?["slider"] as? Int == 35, "按一下 +1，滑块跟着：\(up ?? [:])")
+        #expect((up?["title"] as? String ?? "").contains("35"), "提示里写着现在的字号：\(up?["title"] ?? "")")
+        #expect(result?["atMax"] as? [Bool] == [true, false], "到 40 增大变灰")
+        #expect(result?["stillMax"] as? Int == 40 && result?["handled"] as? Bool == true)
+        #expect(result?["down"] as? Int == 39, "⇧⌘< 减一")
+        #expect(result?["undone"] as? Int == 40, "是撤销历史里的一步")
+        #expect(result?["atMin"] as? [Bool] == [false, true], "到 24 减小变灰")
+        #expect(harness.pageErrors == [])
+    }
+
     @Test("格式条最左边是「样式」（写着光标所在那块的样式，详见 StyleMenuTests）；「插入」菜单的分割线插在当前段落之后")
     func toolbarShowsStyleMenuAndInsertsDivider() async throws {
         let harness = ShellHarness()

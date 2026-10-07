@@ -17,6 +17,8 @@
 
   const IMAGE_MAX_HEIGHT = 1048; // 图片最大高的默认值（与检查器的滑杆一致）
   const RASTER_CACHE_SIZE = 160;
+  // 出图缓存按字节也封顶：每页 PNG 2–4 MB，只按条数留 160 条会吃掉几百 MB
+  const RASTER_CACHE_BYTES = 160 * 1024 * 1024;
   const RASTER_BATCH = 40; // 一次交给壳出这么多页（壳一次最多收 200 页） // 出过的页按整页 HTML 留着 PNG：打字时只重出变了的页
 
   const px = (value) => `${Math.round(value * 100) / 100}px`;
@@ -294,13 +296,34 @@
   const mediaIds = (page) => [...new Set([...page.matchAll(/data-media="([^"]+)"/g)].map((match) => match[1]))];
   const mediaSrc = (result, id) => (id === "__avatar" ? result.context.profile.avatar : result.context.images[id]?.src);
 
-  // 出过的页：整页 HTML、样式与用到的图片地址都一样就是同一张图
+  // 出过的页：整页 HTML、样式与用到的图片都一样就是同一张图。
+  // 图片在键里只放指纹（长度 + 均匀抽样的几段字符），不放整条 data URL：一张图几 MB，拼进键里每代都留一份，
+  // 一篇十来张图的稿子审阅几轮就是几百 MB（2026-10-08 的卡顿）
   const rasterCache = new Map();
-  const cacheKey = (result, page) => `${result.style.length}|${page}|${mediaIds(page).map((id) => mediaSrc(result, id)).join("|")}`;
+  let rasterBytes = 0;
+  const SAMPLES = 48;
+  function fingerprint(src) {
+    const text = String(src ?? "");
+    if (!text.startsWith("data:") || text.length < 2048) return text;
+    const stride = Math.floor(text.length / SAMPLES);
+    let sample = "";
+    for (let i = 0; i < SAMPLES; i += 1) sample += text.substr(i * stride, 16);
+    return `${text.length}:${sample}:${text.slice(-32)}`;
+  }
+  const cacheKey = (result, page) => `${result.style.length}|${page}|${mediaIds(page).map((id) => fingerprint(mediaSrc(result, id))).join("|")}`;
   function remember(key, png) {
-    rasterCache.delete(key);
+    const previous = rasterCache.get(key);
+    if (previous) {
+      rasterBytes -= previous.size ?? 0;
+      rasterCache.delete(key);
+    }
     rasterCache.set(key, png);
-    while (rasterCache.size > RASTER_CACHE_SIZE) rasterCache.delete(rasterCache.keys().next().value);
+    rasterBytes += png.size ?? 0;
+    while (rasterCache.size > RASTER_CACHE_SIZE || (rasterBytes > RASTER_CACHE_BYTES && rasterCache.size > 1)) {
+      const oldest = rasterCache.keys().next().value;
+      rasterBytes -= rasterCache.get(oldest)?.size ?? 0;
+      rasterCache.delete(oldest);
+    }
   }
 
   // 每页一个 PNG Blob（2 倍图）。indexes：只出这几页（默认全部）

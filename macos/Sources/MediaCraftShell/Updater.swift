@@ -146,14 +146,20 @@ public struct GitHubReleases: Sendable {
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         let status: Int
         let data: Data
+        let response: URLResponse
         do {
-            let (body, response) = try await URLSession.shared.data(for: request)
-            status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let (body, reply) = try await URLSession.shared.data(for: request)
+            response = reply
+            status = (reply as? HTTPURLResponse)?.statusCode ?? 0
             data = body
         } catch {
             throw UpdateError.network(error.localizedDescription)
         }
         if status == 200 { return try UpdateRelease.parse(data, via: .web) }
+        // 匿名请求每小时有限额（共享出口的校园网、公司网会碰到）：这不是仓库私有，等一会儿就好
+        if status == 403, (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "x-ratelimit-remaining") == "0" {
+            throw UpdateError.network("GitHub 暂时限制了这个网络的匿名请求，过一小时再试")
+        }
         guard [401, 403, 404].contains(status) else { throw UpdateError.network("GitHub 回了 HTTP \(status)") }
         guard let cli = await cli() else { throw UpdateError.needsCLI(repository) }
         let result = try await run(cli, ["api", "repos/\(repository)/releases/latest"], timeout: .seconds(30))
@@ -231,6 +237,11 @@ public final class Updater {
     let trash: URL
     let defaults: UserDefaults
     let enabled: Bool
+    /// 更新的文件日志：os_log 的 notice 在 ad-hoc 签名的 App 里 `log show` 查不到，这里再写一份，出问题时拿它看；替换脚本也往这里写
+    public let logFile: URL
+
+    public static let defaultLogFile = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("Logs/Vibepost/update.log")
 
     static let lastCheckKey = "MCUpdateLastCheck"
     static let skippedKey = "MCUpdateSkippedVersion"
@@ -239,8 +250,9 @@ public final class Updater {
 
     public init(
         current: UpdateVersion, bundleURL: URL, bundleIdentifier: String, source: GitHubReleases,
-        staging: URL, trash: URL, defaults: UserDefaults, enabled: Bool = true
+        staging: URL, trash: URL, defaults: UserDefaults, enabled: Bool = true, logFile: URL = Updater.defaultLogFile
     ) {
+        self.logFile = logFile
         self.current = current
         self.bundleURL = bundleURL
         self.bundleIdentifier = bundleIdentifier
@@ -249,6 +261,20 @@ public final class Updater {
         self.trash = trash
         self.defaults = defaults
         self.enabled = enabled
+    }
+
+    /// 记一行（os_log 一份、文件一份，带时间）
+    public func note(_ message: String) {
+        updateLog.notice("\(message, privacy: .public)")
+        let line = "\(ISO8601DateFormatter().string(from: Date())) \(message)\n"
+        try? FileManager.default.createDirectory(at: logFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if let handle = try? FileHandle(forWritingTo: logFile) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: Data(line.utf8))
+        } else {
+            try? Data(line.utf8).write(to: logFile)
+        }
     }
 
     /// 正在运行的这个 App：版本、位置与仓库取自它的 Info.plist（仓库是构建脚本写的 MCUpdateRepository）；
@@ -275,9 +301,17 @@ public final class Updater {
     public func check() async throws -> Check {
         guard enabled else { throw UpdateError.developmentBuild }
         // 查到了才记下时间：断网没查成的，下次启动照样再试
-        let release = try await source.latest()
+        let release: UpdateRelease
+        do {
+            release = try await source.latest()
+        } catch {
+            // GitHub 回答了、只是 Release 不合规（tag 带后缀之类）：也算查过，别每次启动都重查
+            if case UpdateError.badRelease = error { defaults.set(Date(), forKey: Self.lastCheckKey) }
+            note("检查更新失败：\(error.localizedDescription)")
+            throw error
+        }
         defaults.set(Date(), forKey: Self.lastCheckKey)
-        updateLog.notice("最新的 Release 是 \(release.tag, privacy: .public)，现在是 \(self.current.description, privacy: .public)")
+        note("最新的 Release 是 \(release.tag)，现在是 \(current)（\(bundleURL.path)）")
         return release.version > current ? .available(release) : .upToDate(current)
     }
 
@@ -299,6 +333,15 @@ public final class Updater {
     // MARK: - 准备
 
     public func prepare(_ release: UpdateRelease) async throws -> Prepared {
+        do {
+            return try await prepareOrThrow(release)
+        } catch {
+            note("准备 \(release.tag) 失败：\(error.localizedDescription)")
+            throw error
+        }
+    }
+
+    private func prepareOrThrow(_ release: UpdateRelease) async throws -> Prepared {
         guard let dmgAsset = release.assets.first(where: { $0.name == release.dmgName }) else {
             throw UpdateError.missingAsset(release.dmgName)
         }
@@ -306,10 +349,13 @@ public final class Updater {
             throw UpdateError.missingAsset("\(release.dmgName).sha256")
         }
         let work = staging.appendingPathComponent(release.version.description)
+        await detachMounts(under: work)
         try? FileManager.default.removeItem(at: work)
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        note("下载 \(release.tag) 到 \(work.path)")
         let dmg = try await source.download(dmgAsset, of: release, into: work)
         let checksumFile = try await source.download(checksumAsset, of: release, into: work)
+        note("下载好了，核对校验和")
         let expected = (try? String(contentsOf: checksumFile, encoding: .utf8))?
             .split(whereSeparator: \.isWhitespace).first.map { $0.lowercased() } ?? ""
         let actual = try await Task.detached { try Self.sha256(of: dmg) }.value
@@ -323,13 +369,14 @@ public final class Updater {
             let app = mount.appendingPathComponent("Vibepost.app")
             guard FileManager.default.fileExists(atPath: app.path) else { throw UpdateError.wrongApp("DMG 里没有 Vibepost.app") }
             try await verify(app, version: release.version)
+            note("校验通过（包名、版本、签名）")
             try await tool("/usr/bin/ditto", [app.path, staged.path], "拷出新版")
         } catch {
             await detach(mount)
             throw error
         }
         await detach(mount)
-        updateLog.notice("已经准备好 \(release.tag, privacy: .public)：\(staged.path, privacy: .public)")
+        note("已经准备好 \(release.tag)：\(staged.path)")
         return Prepared(release: release, app: staged, dmg: dmg)
     }
 
@@ -405,34 +452,56 @@ public final class Updater {
         try Self.installScript.write(to: script, atomically: true, encoding: .utf8)
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = [script.path, String(pid), bundleURL.path, prepared.app.path, backup.path, relaunch ? "1" : "0"]
+        process.arguments = [script.path, String(pid), bundleURL.path, prepared.app.path, backup.path, relaunch ? "1" : "0", logFile.path]
         try process.run()
-        updateLog.notice("替换脚本已启动：\(self.bundleURL.path, privacy: .public) ← \(prepared.app.path, privacy: .public)")
+        note("替换脚本已启动（等进程 \(pid) 退出）：\(bundleURL.path) ← \(prepared.app.path)，旧的去 \(backup.path)")
     }
 
-    /// 上次留下的下载与暂存（装好了或放弃了）：启动时清掉
-    public func cleanStaging() {
+    /// 上次留下的下载与暂存（装好了或放弃了）：启动时清掉。准备到一半退出会留下一个隐藏的 DMG 挂载（内核状态，进程退了也在），
+    /// 挂着的目录删不掉、下次 attach 还会叠一层：先把暂存里的挂载点都卸掉
+    public func cleanStaging() async {
+        guard let versions = try? FileManager.default.contentsOfDirectory(at: staging, includingPropertiesForKeys: nil) else { return }
+        for version in versions { await detachMounts(under: version) }
         try? FileManager.default.removeItem(at: staging)
     }
 
-    /// 参数：1 旧 App 的进程号，2 App 的位置，3 新 App（暂存），4 旧 App 挪去的地方（废纸篓），5 换好后打开（1）不打开（0）。
-    /// 参数都经 "$@" 传进来，不拼进脚本。最多等旧进程两分钟。
+    /// 把 work/mount 这个挂载点卸掉（是挂载点才卸；两层叠着的多卸几次）
+    private func detachMounts(under work: URL) async {
+        let mount = work.appendingPathComponent("mount")
+        for _ in 0..<4 {
+            guard (try? mount.resourceValues(forKeys: [.isVolumeKey]).isVolume) == true else { return }
+            await detach(mount)
+        }
+    }
+
+    /// 参数：1 旧 App 的进程号，2 App 的位置，3 新 App（暂存），4 旧 App 挪去的地方（废纸篓），5 换好后打开（1）不打开（0），6 日志文件。
+    /// 参数都经 "$@" 传进来，不拼进脚本。最多等旧进程十分钟（存稿、结束 AI 进程可能慢）；每一步与出错都写进日志。
     static let installScript = """
         #!/bin/sh
-        pid="$1"; current="$2"; staged="$3"; backup="$4"; relaunch="$5"
+        pid="$1"; current="$2"; staged="$3"; backup="$4"; relaunch="$5"; log="$6"
+        [ -n "$log" ] && exec >>"$log" 2>&1
+        say() { echo "$(date '+%Y-%m-%dT%H:%M:%S') 替换脚本：$*"; }
+        say "等进程 $pid 退出"
         i=0
         while kill -0 "$pid" 2>/dev/null; do
           i=$((i + 1))
-          [ "$i" -gt 600 ] && exit 1
+          if [ "$i" -gt 3000 ]; then say "等了十分钟还没退出，放弃"; exit 1; fi
           sleep 0.2
         done
+        say "进程退出了，旧 App → $backup"
         if mv "$current" "$backup"; then
-          if ! mv "$staged" "$current"; then
+          if mv "$staged" "$current"; then
+            say "新 App 就位：$current"
+          else
+            say "新 App 挪不过去，把旧的挪回来"
             mv "$backup" "$current"
           fi
+        else
+          say "旧 App 挪不走（$current → $backup）"
         fi
         if [ "$relaunch" = 1 ]; then
-          open "$current"
+          say "重新打开"
+          open "$current" || say "打开失败"
         fi
         exit 0
 

@@ -195,10 +195,22 @@ public final class ShellWebView: NSObject {
         try await waitForLoad { webView.reload() }
     }
 
+    /// 存稿的结果：存好了 / 页面明确说没存上（改动还在它内存里）/ 页面没回（卡住、还在载入）
+    public enum SaveOutcome: Sendable {
+        case saved
+        case failed
+        case unresponsive
+    }
+
     /// 让这个窗口的页面马上把稿子存进本机、等它写完（退出、关窗、重新载入、更新重启之前）。页面没有 App API
     /// （测试页、还在载入）时直接算完；timeout 内没回（页面卡住了）也不再等。返回页面是否确认存好了
     @discardableResult
     public func saveDrafts(timeout: Duration = .seconds(3)) async -> Bool {
+        await saveDraftsOutcome(timeout: timeout) == .saved
+    }
+
+    /// 同上，但分得清「没存上」与「没回」：关窗、退出前页面明确说没存上时要问一句，别把它内存里的改动静默丢掉
+    public func saveDraftsOutcome(timeout: Duration = .seconds(3)) async -> SaveOutcome {
         let script = """
             const drafts = window.mediacraft?.drafts;
             if (!drafts?.saveNow) return true;
@@ -206,8 +218,12 @@ public final class ShellWebView: NSObject {
         """
         let webView = webView
         return await firstOf(timeout: timeout) {
-            (try? await webView.callAsyncJavaScript(script, arguments: [:], in: nil, contentWorld: .page)) as? Bool ?? false
-        } ?? false
+            switch (try? await webView.callAsyncJavaScript(script, arguments: [:], in: nil, contentWorld: .page)) as? Bool {
+            case .some(true): return .saved
+            case .some(false): return .failed
+            case .none: return .unresponsive // 页面抛了别的错、没回布尔：当没回
+            }
+        } ?? .unresponsive
     }
 
     /// 这个窗口关掉了：结束它发起的 AI 进程，之后不再往它的页面推事件
@@ -237,14 +253,22 @@ public final class ShellWebView: NSObject {
               new Promise((resolve) => setTimeout(() => resolve(false), 1000)),
             ]);
         """
-        while (try? await webView.callAsyncJavaScript(ready, arguments: [:], in: nil, contentWorld: .page) as? Bool) != true {
+        let webView = webView
+        // 每次探测自己也封顶（页面 JS 卡住时 callAsyncJavaScript 不回来，30 秒的总限才真能到）
+        while await firstOf(timeout: .milliseconds(1500), { (try? await webView.callAsyncJavaScript(ready, arguments: [:], in: nil, contentWorld: .page)) as? Bool }) != true {
             guard ContinuousClock.now < deadline else { throw MCPFailure("Vibepost 的页面没有在 30 秒内准备好") }
             try await Task.sleep(for: .milliseconds(100))
         }
-        let reply = try await webView.callAsyncJavaScript(
-            "return await window.MediaCraftMCP.handle(request)", arguments: ["request": request], in: nil, contentWorld: .page
-        )
-        guard let reply = reply as? String else { throw MCPFailure("页面没有回答") }
+        // 一条请求最多 5 分钟（导出几十页也够；比客户端 10 分钟的上限短，超了这条连接还能接着用）
+        let outcome: Result<Any?, Error>? = await firstOf(timeout: .seconds(300)) {
+            do {
+                return .success(try await webView.callAsyncJavaScript(
+                    "return await window.MediaCraftMCP.handle(request)", arguments: ["request": request], in: nil, contentWorld: .page
+                ))
+            } catch { return .failure(error) }
+        }
+        guard let outcome else { throw MCPFailure("Vibepost 的页面 5 分钟没有回答这条请求") }
+        guard let reply = try outcome.get() as? String else { throw MCPFailure("页面没有回答") }
         return reply
     }
 

@@ -135,15 +135,17 @@
   box-sizing: border-box;
 }
 
-/* 整个窗口就是 App：页面本身不滚动，各区域自己滚 */
+/* 整个窗口就是 App：页面本身不滚动，各区域自己滚。
+   用 clip 而不是 hidden：hidden 只是不显示滚动条，focus() / scrollIntoView() 这类程序性滚动照样能把整个文档滚上去
+   （顶栏与检查器的标签滚出窗口上沿、底下多出一条空白，2026-10-08 用户遇到过）；clip 连程序性滚动也不允许 */
 html,
 body {
   height: 100%;
   margin: 0;
+  overflow: clip;
 }
 
 body {
-  overflow: hidden;
   background: var(--ui-window);
   color: var(--ui-text);
   font: 13px/1.45 var(--font-ui);
@@ -1198,6 +1200,18 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   height: 18px;
   margin: 0 4px;
   background: var(--ui-border);
+}
+
+/* 字号的「A−」「A+」：A 正常大小，加减号小一点贴在右上，像 PPT 的那两个 */
+.format-size {
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.format-size-sign {
+  font-size: 0.72em;
+  vertical-align: 0.35em;
+  margin-left: 1px;
 }
 
 .format-button {
