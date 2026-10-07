@@ -187,18 +187,23 @@
   }
 
   // 把一段 Markdown（片段的 markdown，或 Agent 给的一段）插在 text 的 at 处：前后各隔一个空行（MediaCraftCardBlocks.insertAt）；
-  // 开头、结尾的 [[分页]] 挨着已有的分页（结尾处也算 [[结尾]]）或稿子的头尾时去掉，不叠出空页；
+  // 开头、结尾的 [[分页]] 挨着已有的分页（结尾处也算 [[结尾]]）或稿子的头尾时去掉，不叠出空页（插结尾页时原文末尾的 [[分页]] 也去掉）；
   // 含 [[结尾]] 的只能插在稿子末尾，稿子里已经有结尾页时拒绝。
   // 返回 { text 新正文, start / end 片段在新正文里的范围, change 编辑器要做的那一处改动 { from, to, insert }（没变化时 null）}
   function insert(text, at, markdown) {
     const source = String(text ?? "");
-    const { from, to } = anchor(source, at);
-    const before = source.slice(0, from);
+    let { from, to } = anchor(source, at);
+    let before = source.slice(0, from);
     const after = source.slice(to);
     let chunk = String(markdown ?? "").replace(/^(?:[ \t]*\n)+|(?:\n[ \t]*)+$/g, "");
     if (isLine(chunk, END_PAGE)) {
       if (isLine(source, END_PAGE)) throw new Error("稿子里已经有结尾页了：一篇只能有一个 [[结尾]]");
       if (after.trim()) throw new Error("结尾引导只能插在稿子末尾：把光标放到最后再插");
+      // [[结尾]] 自己就是换页：原文末尾的 [[分页]] 留着会多出一张空卡片
+      if (firstLine(chunk) === END_PAGE && lastLine(before) === PAGE_BREAK) {
+        before = before.slice(0, before.lastIndexOf(PAGE_BREAK)).replace(/\n*$/, "");
+        from = before.length;
+      }
     }
     if (!before.trim() || lastLine(before) === PAGE_BREAK) chunk = chunk.replace(LEADING_BREAK, "");
     if (!after.trim() || [PAGE_BREAK, END_PAGE].includes(firstLine(after))) chunk = chunk.replace(TRAILING_BREAK, "");

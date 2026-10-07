@@ -92,4 +92,4 @@ Claude Code ──stdio（JSON-RPC）── mediacraft-mcp ──Unix 域套接�
 
 ## 测试
 
-`macos/Tests/MediaCraftShellTests/MCPTests.swift`：测试的客户端经管道对着 `mediacraft-mcp` 的核心（`MCPServer`，可执行文件里跑的就是它）说 JSON-RPC，核心经真的套接字连到 ShellHarness 里的 App，AirDrop 是假接收端。覆盖握手与两代协议版本、工具清单、写作手册的列出 / 读取 / 提议保存（`WritingManualsTests.swift`）、新建 → 写正文 → 换主题 → 出图 → 导出 → 发送、内置说明书只读、按路径插图、⌘Z 与逐条撤销、切走稿子后不再改（重连后仍记得）、开关与复制接入命令、用户检查、两个 Vibepost 不抢套接字、App 没开时先打开它。
+`macos/Tests/MediaCraftShellTests/MCPTests.swift`：测试的客户端经管道对着 `mediacraft-mcp` 的核心（`MCPServer`，可执行文件里跑的就是它）说 JSON-RPC，核心经真的套接字连到 ShellHarness 里的 App，AirDrop 是假接收端。覆盖握手与两代协议版本、工具清单、写作手册的列出 / 读取 / 提议保存（`WritingManualsTests.swift`）、新建 → 写正文 → 换主题 → 出图 → 导出 → 发送、内置说明书只读、按路径插图、模板与片段（`list_templates`、`create_draft` 带 `template`、`insert_section` 与撤销、操作记录）、⌘Z 与逐条撤销、切走稿子后不再改（重连后仍记得）、开关与复制接入命令、用户检查、两个 Vibepost 不抢套接字、App 没开时先打开它。

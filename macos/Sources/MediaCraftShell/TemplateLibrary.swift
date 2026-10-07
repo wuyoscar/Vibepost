@@ -90,12 +90,13 @@ final class TemplateLibrary: @unchecked Sendable {
                 try image.data.write(to: staging.appendingPathComponent(image.name))
             }
             // 同名的整套换掉：原子替换（换到一半出错时旧的那套还在）；文件夹名大小写不同也算同一套（APFS 默认不分大小写）
+            // 回的名字是实际的文件夹名：只差大小写的那一套换掉之后，文件夹改不成新写法时还是原来的名字
             if let existing = try? templateLocked(name) {
-                _ = try FileManager.default.replaceItemAt(existing.folder, withItemAt: staging)
-                if existing.folder.lastPathComponent != name { try? FileManager.default.moveItem(at: existing.folder, to: target) }
-            } else {
-                try FileManager.default.moveItem(at: staging, to: target)
+                var replaced = try FileManager.default.replaceItemAt(existing.folder, withItemAt: staging) ?? existing.folder
+                if replaced.lastPathComponent != name, (try? FileManager.default.moveItem(at: replaced, to: target)) != nil { replaced = target }
+                return Template(name: replaced.lastPathComponent, folder: replaced, content: content)
             }
+            try FileManager.default.moveItem(at: staging, to: target)
             return Template(name: name, folder: target, content: content)
         }
     }
@@ -137,9 +138,10 @@ final class TemplateLibrary: @unchecked Sendable {
         .sorted { WritingManuals.ordered($0.name, $1.name) }
     }
 
-    /// 按名字找（不分大小写：APFS 默认不分，`save("foo")` 换掉的 "Foo" 读回来也得认）
+    /// 按名字找：先精确匹配（大小写敏感的卷上 Foo 与 foo 能并存，各找各的），再不分大小写（APFS 默认不分，`save("foo")` 换掉的 "Foo" 读回来也得认）
     private func templateLocked(_ name: String) throws -> Template {
-        guard let template = try templatesLocked().first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
+        let all = try templatesLocked()
+        guard let template = all.first(where: { $0.name == name }) ?? all.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
             throw Failure("没有这个模板：\(name)", status: 404)
         }
         return template

@@ -447,11 +447,11 @@
     saving = true;
     saveOk.disabled = true;
     try {
-      // 同名的会整套换掉（App API 的规矩）：先问一句
-      const taken = (await mc.drafts.templates()).find((item) => !item.builtIn && item.name === name);
+      // 同名的会整套换掉（App API 的规矩，壳比名字不分大小写）：先问一句
+      const taken = (await mc.drafts.templates()).find((item) => !item.builtIn && item.name.toLowerCase() === name.toLowerCase());
       if (taken) {
         const replace = await root.MediaCraftConfirm({
-          title: `已有模板「${name}」`,
+          title: `已有模板「${taken.name}」`,
           message: "自己存的模板里已经有一套叫这个名字。换掉它？原来那套的内容与图片会被这篇的替换。",
           okLabel: "换掉",
           danger: true,

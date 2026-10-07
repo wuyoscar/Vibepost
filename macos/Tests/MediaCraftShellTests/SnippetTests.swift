@@ -206,6 +206,29 @@ struct SnippetTests {
         #expect(harness.pageErrors == [])
     }
 
+    @Test("结尾引导插在以 [[分页]] 结尾的稿子后面：原文末尾的分页去掉，不多出一张空卡片")
+    func endingAfterTrailingPageBreak() async throws {
+        let harness = ShellHarness()
+        try await harness.load()
+        let result = try await harness.evaluate(Self.helpers + """
+            const ending = snippets.get("结尾引导").markdown;
+            const direct = snippets.insert("# T\\n\\n段落\\n\\n[[分页]]", "# T\\n\\n段落\\n\\n[[分页]]".length, ending);
+            await mc.drafts.create({ markdown: "# T\\n\\n段落\\n\\n[[分页]]" });
+            await mc.editor.select((await markdown()).length);
+            pickSnippet("结尾引导");
+            const text = await markdown();
+            const pages = (await mc.render.pages()).map((page) => page.role);
+            return { ending, direct: direct.text, text, pages };
+        """) as? [String: Any]
+        await harness.tearDown()
+
+        let ending = result?["ending"] as? String ?? ""
+        #expect(result?["direct"] as? String == "# T\n\n段落\n\n\(ending)", "原文末尾的 [[分页]] 去掉")
+        #expect(result?["text"] as? String == "# T\n\n段落\n\n\(ending)", "「插入」菜单插的也一样")
+        #expect(result?["pages"] as? [String] == ["body", "end"], "正文一页、结尾一页，没有空页：\(result?["pages"] ?? [])")
+        #expect(harness.pageErrors == [])
+    }
+
     @Test("结尾引导：只能插在稿子末尾（中间拒绝、状态栏说明、稿子不动）；插了以后排成结尾页；已有结尾页时再插也拒绝")
     func endingOnlyAtTheEnd() async throws {
         let harness = ShellHarness()

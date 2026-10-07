@@ -577,14 +577,31 @@
     if (keys.length > 1) throw new TypeError("before、after 与 position 只给一个");
     if (!keys.length || keys[0] === "position") {
       const position = keys.length ? String(args.position) : "end";
-      if (!POSITIONS[position]) throw new TypeError("position 只能是 start（稿子开头）或 end（稿子末尾）");
+      if (!Object.hasOwn(POSITIONS, position)) throw new TypeError("position 只能是 start（稿子开头）或 end（稿子末尾）");
       return { at: position === "start" ? 0 : markdown.length, text: POSITIONS[position] };
     }
     const place = placeOf(markdown, args);
     const lines = markdown.split("\n");
+    // 锚点落在组件（:::名字 … :::）里时整个组件算一单元：before 落到组件开头、after 落到组件结尾之后（和「换样式」把组件整个算一块一致），
+    // 片段不会插进组件内部
+    const box = containerAround(lines, place.key === "before" ? place.at : place.at - 1);
+    if (box) place.at = place.key === "before" ? box.start : box.end + 1;
     // placeOf 给的是行号：before 是那一单元的第一行（插在它行首），after 是最后一行的下一行（插在上一行的行尾）
     const head = lines.slice(0, place.at).join("\n").length;
     return { at: place.key === "before" && place.at > 0 ? head + 1 : head, text: where(place) };
+  }
+
+  // 第 line 行所在的组件（:::名字 开头、单独一行 ::: 结尾）的首尾行号；不在组件里为 null
+  function containerAround(lines, line) {
+    let start = -1;
+    for (let i = Math.min(line, lines.length - 1); i >= 0; i -= 1) {
+      const text = lines[i].trim();
+      if (text === ":::") return null; // 上面最近的是一个收尾：这一行在组件外面
+      if (/^:::\S/.test(text)) { start = i; break; }
+    }
+    if (start < 0) return null;
+    for (let i = Math.max(line, start) + 1; i < lines.length; i += 1) if (lines[i].trim() === ":::") return { start, end: i };
+    return null;
   }
 
   // 插一个片段或一段 Markdown：前后隔开空行、首尾多余的 [[分页]] 去掉、含 [[结尾]] 的只能在末尾（规则都在 MediaCraftSnippets.insert，

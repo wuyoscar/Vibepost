@@ -1198,6 +1198,7 @@
   font-family: var(--mc-font-display);
   font-size: 22px;
   font-weight: 600;
+  min-height: 34px; /* 名字空着时内页没有头像也保持报头的高度：双线在每一页都在同一处 */
   line-height: 34px;
   letter-spacing: 5px;
   font-variant-caps: small-caps;

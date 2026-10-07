@@ -34,7 +34,8 @@
     const { colors, tunedColors } = root.MediaCraftPalettes.complete(entry.colors, { colors: theme.colors });
     const images = {};
     for (const [imageId, path] of Object.entries(entry.images)) {
-      const src = builtIn ? path : sources[path] ?? "";
+      // 用户模板：路径是 模板.md 里写的任意字符串，只认 sources 自己的键（写成 toString / __proto__ 这类名字时不拿原型上的东西）
+      const src = builtIn ? path : (Object.hasOwn(sources, path) && typeof sources[path] === "string" ? sources[path] : "");
       if (!src) continue; // 用户模板里缺了的图：正文里的记号照旧，图片面板里没有它
       images[imageId] = { name: path.split("/").pop(), src, layout: null, crop: null };
     }
@@ -64,6 +65,9 @@
   }
 
   const builtIns = registry.map((entry) => ({ id: builtInId(entry), entry }));
+
+  // 用户模板的一项：名字永远是文件夹名（壳按它找、删、显示；模板.md 里的 name: 不作数，拷一套改个文件夹名就是新的一套）
+  const userEntry = (name, content) => ({ ...format.entry(`${name}/模板.md`, content), name });
   const builtIn = (id) => builtIns.find((item) => item.id === id) ?? null;
 
   // 全部模板的摘要：自带的按登记表顺序在前，用户的（上次 refresh 读到的）按壳给的顺序在后
@@ -101,7 +105,7 @@
           seen.add(id);
           const previous = users.get(id);
           if (previous?.content === content) continue;
-          users.set(id, { entry: format.entry(`${name}/模板.md`, content), content, record: null });
+          users.set(id, { entry: userEntry(name, content), content, record: null });
         }
         for (const id of [...users.keys()]) if (!seen.has(id)) users.delete(id);
       })().finally(() => {
@@ -112,7 +116,7 @@
     return list();
   }
 
-  // 把这份模板读成稿子记录（用户模板的图片这时才经壳读成 data URL；没见过的 id 先重读目录）；id 或名字都认，没有为 null
+  // 把这份模板读成稿子记录（用户模板每次都经壳重读：图片可能在 Finder 里换过；没见过的 id 先重读目录）；id 或名字都认，没有为 null
   async function load(key) {
     let summary = find(key);
     if (!summary && native()) {
@@ -122,11 +126,9 @@
     if (!summary) return null;
     if (summary.builtIn) return record(summary.id);
     const user = users.get(summary.id);
-    if (!user.record) {
-      const { content, images } = await native().read(summary.name);
-      const entry = user.content === content ? user.entry : format.entry(`${summary.name}/模板.md`, content);
-      Object.assign(user, { entry, content, record: recordOf(summary.id, entry, false, images ?? {}) });
-    }
+    const { content, images } = await native().read(summary.name);
+    const entry = user.content === content ? user.entry : userEntry(summary.name, content);
+    Object.assign(user, { entry, content, record: recordOf(summary.id, entry, false, images ?? {}) });
     return structuredClone(user.record);
   }
 
@@ -169,10 +171,13 @@
       images,
       markdown: fields.markdown ?? "",
     });
+    // 壳回的名字是实际的文件夹名：换掉只差大小写的那一套时文件夹名可能还是原来的
     const saved = await native().save({ name, content, images: files });
     users.delete(userId(saved.name));
     await refresh();
-    return find(userId(saved.name));
+    const summary = find(userId(saved.name));
+    if (!summary) throw new Error(`模板「${saved.name}」存好了，但重新读目录时没找到它`);
+    return summary;
   }
 
   const EXTENSIONS = { "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp" };

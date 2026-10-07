@@ -240,6 +240,44 @@ struct TemplatesTests {
         #expect(harness.pageErrors == [])
     }
 
+    @Test("用户模板的名字是文件夹名：模板.md 里的 name 不作数（拷一套改个文件夹名就是新的一套），读、新建、删都按文件夹找；存成只差大小写的名字时换掉原来那套、回的是实际的文件夹名")
+    func userTemplateNamedByFolder() async throws {
+        let harness = ShellHarness(onboarding: false)
+        let folder = harness.aiRoot.appendingPathComponent("模板")
+        let handmade = folder.appendingPathComponent("手写")
+        try FileManager.default.createDirectory(at: handmade, withIntermediateDirectories: true)
+        try "---\nname: 别的名字\ndescription: 手写的一套\ntags: 清单, 简洁\ntitle: 手写的标题\n---\n\n# 手写的标题\n\n一句话。\n"
+            .write(to: handmade.appendingPathComponent("模板.md"), atomically: true, encoding: .utf8)
+        try await harness.load()
+        let result = try await harness.evaluate(Self.helpers + """
+            const users = () => mc.drafts.templates().then((all) => all.filter((item) => !item.builtIn).map((item) => [item.id, item.name]));
+            const listed = await users();
+            const draft = await mc.drafts.create({ template: "手写" });
+            const byId = (await mc.drafts.get("user_template_手写"))?.title ?? null;
+            await mc.drafts.removeTemplate("user_template_手写");
+            const afterRemove = await users();
+            // 只差大小写的名字：换掉原来那套，回的是实际的文件夹名
+            await mc.drafts.create({ title: "食谱", markdown: "# 食谱\\n\\n一句话。" });
+            const first = await mc.drafts.saveAsTemplate({ name: "Recipe", description: "第一次", tags: ["清单", "简洁"] });
+            const second = await mc.drafts.saveAsTemplate({ name: "recipe", description: "第二次", tags: ["清单", "简洁"] });
+            const afterReplace = (await mc.drafts.templates()).filter((item) => !item.builtIn).map((item) => [item.name, item.description]);
+            return { listed, title: draft.title, byId, afterRemove, first: first.name, second: second.name, afterReplace };
+        """) as? [String: Any]
+        let onDisk = (try? FileManager.default.contentsOfDirectory(atPath: folder.path))?.filter { !$0.hasPrefix(".") }.sorted() ?? []
+        await harness.tearDown()
+
+        #expect(result?["listed"] as? [[String]] == [["user_template_手写", "手写"]], "名字是文件夹名：\(result?["listed"] ?? [])")
+        #expect(result?["title"] as? String == "手写的标题" && result?["byId"] as? String == "手写的标题", "按文件夹名读得到")
+        #expect(result?["afterRemove"] as? [[String]] == [] && !FileManager.default.fileExists(atPath: handmade.path), "删掉的是这一套")
+        #expect(result?["first"] as? String == "Recipe")
+        let second = result?["second"] as? String ?? ""
+        #expect(["Recipe", "recipe"].contains(second), "回的是实际的文件夹名：\(second)")
+        let afterReplace = result?["afterReplace"] as? [[String]] ?? []
+        #expect(afterReplace.count == 1 && afterReplace.first?.last == "第二次", "只差大小写的算同一套，整套换掉：\(afterReplace)")
+        #expect(onDisk == [second], "文件夹里只有一套：\(onDisk)")
+        #expect(harness.pageErrors == [])
+    }
+
     @Test("存为模板：写进支持目录「模板/<名字>/」（模板.md + 图片），再列出能看到、重新打开 App 也在；从它新建时图片读回来能出图、主题 / 配色 / 字体 / 封面照旧；同名整套换掉；在 Finder 中显示；只能删自己的")
     func userTemplatesRoundTrip() async throws {
         let harness = ShellHarness(onboarding: false)

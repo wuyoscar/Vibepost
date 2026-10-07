@@ -441,6 +441,34 @@ struct AIToolsTests {
         #expect(harness.pageErrors == [])
     }
 
+    @Test("insert_section 的锚点落在组件（:::提示 等）里时整个组件算一单元：after 插在组件之后、before 插在组件之前，不插进组件内部；position 只认 start / end（constructor 这类名字也拒绝）")
+    func sectionsAroundComponents() async throws {
+        let fake = try FakeClaude()
+        defer { fake.remove() }
+        let harness = ShellHarness(terminalPath: [fake.directory], onboarding: false)
+        try await harness.load()
+        try fake.script([
+            StreamJSON.initEvent(),
+            StreamJSON.toolCall("t1", "insert_section", ["markdown": "## 新节\n\n内容", "after": "要点一"]),
+            StreamJSON.toolCall("t2", "insert_section", ["markdown": "前面", "before": "要点一"]),
+            StreamJSON.toolCall("t3", "insert_section", ["snippet": "对比", "position": "constructor"]),
+        ] + Self.tail("插好了"), call: 1)
+        let result = try await harness.evaluate(Self.helpers + """
+            await mc.drafts.create({ markdown: "# T\\n\\n:::提示\\n要点一\\n:::\\n\\n段落" });
+            await openAI();
+            ask("插两段");
+            await until(() => finished(1));
+            return { markdown: (await mc.drafts.current()).markdown, actions: (await actions()).map((action) => action.text) };
+        """) as? [String: Any]
+        await harness.tearDown()
+
+        #expect(result?["markdown"] as? String == "# T\n\n前面\n\n:::提示\n要点一\n:::\n\n## 新节\n\n内容\n\n段落", "after 在组件之后、before 在组件之前：\n\(result?["markdown"] ?? "")")
+        #expect(result?["actions"] as? [String] == ["插入一段（9 字）：在「要点一」之后", "插入一段（2 字）：在「要点一」之前"])
+        #expect(Self.toolResult(fake, "t3")?["isError"] as? Bool == true)
+        #expect(Self.toolText(fake, "t3").contains("position 只能是 start"), Comment(rawValue: Self.toolText(fake, "t3")))
+        #expect(harness.pageErrors == [])
+    }
+
     @Test("片段与模板：list_templates 列出模板库；insert_section 把片段（id 或中文名）或一段 Markdown（英文记号换成中文）插在某块前后或稿子头尾，前后隔空行、同步 draft.md，每次是会话里一个可撤销的动作；[[结尾]] 不在末尾、没有的片段、两样都给、已有结尾页都说明原因；create_draft_from_template 在这个窗口里照模板新建并切过去，原来那篇留在抽屉里、这一轮仍记在它的会话里")
     func templatesAndSections() async throws {
         let fake = try FakeClaude()

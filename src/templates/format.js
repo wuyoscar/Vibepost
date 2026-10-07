@@ -12,7 +12,7 @@
 //   theme         主题 id（src/themes/themes.js；认不出按默认主题）
 //   colors        缩进的 `bg: #rrggbb` 几行：只给三色时辅助、衬底按三色规则推，给了的辅助、衬底算单独调过；没给按主题
 //   fonts         缩进的 `zh / en / code: 字体 id` 几行（src/themes/fonts.js）；没给跟随主题
-//   fontSize / lineHeight / imageMaxHeight  字号（24–40）、行距（1–2.4）、图片最大高（百分比）：一行一个数，没给用默认值
+//   fontSize / lineHeight / imageMaxHeight  字号（24–40）、行距（1–2.4）、图片最大高（220–1048，卡片上的逻辑像素）：一行一个数，没给用默认值
 //   cover         缩进的 `enabled: true`、`subtitle: …`、`image: 图片编号`
 //   caption       小红书正文：`caption: |` 后面缩进的几行，换行照原样
 //   images        缩进的 `编号: 路径` 几行：自带模板相对网页根（docs/guide-assets/…、docs/template-assets/…），
@@ -193,7 +193,8 @@
     }
     const cover = item.cover ?? {};
     if (cover.enabled || cover.subtitle || cover.image) {
-      block("cover", [["enabled", cover.enabled ? "true" : "false"], ["subtitle", cover.subtitle], ["image", cover.image]]);
+      // 副标题折成一行：带换行的会提前结束 front matter
+      block("cover", [["enabled", cover.enabled ? "true" : "false"], ["subtitle", oneLine(cover.subtitle)], ["image", cover.image]]);
     }
     if (item.caption) lines.push("caption: |", ...String(item.caption).replace(/\r\n/g, "\n").split("\n").map((row) => (row ? `  ${row}` : "")));
     block("images", Object.entries(item.images ?? {}));

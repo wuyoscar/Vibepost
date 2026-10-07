@@ -20,7 +20,7 @@
   - `ai.newSession()` 是「重新开始这篇的对话」：除了 v4 的清空，还解锁这篇的后端（有了对话后只有这样才能换后端）。
   - 用 Codex 时生图是它自带的：生成的图直接成为配图候选（会话里的 `candidates`），`history().generating` 多了 `byBackend: true`，这时 `ai.stopImages()` 停掉整轮（没法只停生图）。
   - 只加的：`ai.backends()`、`ai.setBackend()`、`ai.models()`；`status({ backend })`、`setPath(path, backend)`；`model()` / `setModel()` 返回多了 `backend`；`history()` 多了 `backend`、`locked`；`status` 事件多了 `backend`。
-  - 后来又加的（不升版本）：`ai.sessions()`（会话历史）；`AIStatus` 多了 `reason`；模板库：`drafts.templates()`、`drafts.create({ template })`、`drafts.saveAsTemplate()`、`drafts.removeTemplate()`、`drafts.revealTemplate()`，`drafts.get` / `firstPage` 认得模板的 id（见 [drafts](#drafts稿子)）。
+  - 后来又加的（不升版本）：`ai.sessions()`（会话历史）；`AIStatus` 多了 `reason`；模板库：`drafts.templates()`、`drafts.create({ template })`、`drafts.saveAsTemplate()`、`drafts.removeTemplate()`、`drafts.revealTemplate()`，`drafts.get` / `firstPage` 认得模板的 id（见 [drafts](#drafts稿子)）；主题分三组：`themes.list()` 每项多了 `group`，另有 `themes.groups()`。
 - `"4"`：小红书正文（发布时图片下面的那段）和卡片内容分开了，稿子多了 `caption` 字段（见 [drafts](#drafts稿子)）。
   - `output.sendToIPhone()` 在图文卡片模式下剪贴板放 `caption`（空着时不动剪贴板），不再是卡片内容的纯文本；长文照旧放全文的纯文本。返回值多了 `copied`。v3 里剪贴板总是 `render.plainText()`。
   - `render.plainText()` 只是卡片内容（长文是全文）的纯文本，界面上是「复制卡片文字」（长文里是「复制全文」）；小红书正文的字数按 `caption` 算。
