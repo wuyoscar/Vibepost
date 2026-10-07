@@ -8,10 +8,10 @@ import Testing
 @MainActor
 struct MCPTests {
     static let tools = [
-        "get_manual", "list_writing_manuals", "read_writing_manual", "save_writing_manual",
+        "get_manual", "list_writing_manuals", "read_writing_manual", "save_writing_manual", "list_templates",
         "list_drafts", "get_draft", "create_draft", "open_draft", "update_draft",
         "set_theme", "set_style", "set_mode", "list_palettes", "apply_palette",
-        "insert_page_break", "remove_page_break", "move_section", "restyle_block", "set_card_css",
+        "insert_page_break", "remove_page_break", "move_section", "restyle_block", "insert_section", "set_card_css",
         "import_images", "insert_image", "move_image", "resize_image", "crop_image",
         "get_pages", "render_pages", "export", "send_to_iphone",
     ]
@@ -164,6 +164,62 @@ struct MCPTests {
             "发送到 iPhone（2 页）",
         ])
         #expect(log.map { $0.last as? Bool ?? false } == [false, true, true, false, false, false, false], "改稿子的操作才能撤销")
+        #expect(harness.pageErrors == [])
+    }
+
+    @Test("模板与片段：list_templates 列出模板库；create_draft 带 template 照模板新建（卡片内容、主题照模板，其余字段之后套用），新窗口里不多出空稿子；insert_section 插片段或一段 Markdown（英文记号换成中文）到某块前后或末尾、[[结尾]] 不在末尾时拒绝，每次是可撤销的一步并列进操作记录；没有的模板报错")
+    func templatesAndSections() async throws {
+        let config = MCPConfiguration.temporary()
+        let (harness, client) = try await Self.start(config)
+        let templates = try await client.call("list_templates")
+        let created = try await client.call("create_draft", ["template": "论文解读", "title": "我的论文笔记"])
+        let draftId = (created.json as? [String: Any])?["id"] as? String ?? ""
+        let agent = try await harness.window(1)
+        let page = try await agent.evaluate("""
+            const draft = await mediacraft.drafts.current();
+            const template = window.MediaCraftTemplateRegistry.find((item) => item.name === "论文解读");
+            return {
+              id: draft.id, title: draft.title, theme: draft.theme,
+              sameMarkdown: draft.markdown === template.markdown.join("\\n"),
+              own: (await mediacraft.drafts.list()).filter((item) => !item.builtIn).length,
+            };
+        """) as? [String: Any]
+        let body = "第一段\n\n第二段"
+        _ = try await client.call("update_draft", ["markdown": body])
+        let tutorial = try await client.call("insert_section", ["snippet": "tutorial", "after": "第一段"])
+        let english = try await client.call("insert_section", ["markdown": "{{color:#d9480f|红字}}", "before": "第二段"])
+        let misplaced = try await client.call("insert_section", ["snippet": "结尾引导", "position": "start"])
+        let ending = try await client.call("insert_section", ["snippet": "结尾引导"])
+        let shape = try await agent.evaluate("""
+            return {
+              markdown: (await mediacraft.drafts.current()).markdown,
+              tutorial: window.MediaCraftSnippets.get("tutorial").markdown, ending: window.MediaCraftSnippets.get("ending").markdown,
+              log: (await mediacraft.mcp.log()).map(({ text, undoable }) => [text, undoable]),
+            };
+        """) as? [String: Any]
+        let undone = try await agent.evaluate("return (await mediacraft.drafts.undo()).markdown") as? String
+        let unknown = try await client.call("create_draft", ["template": "没有这个"])
+        await Self.finish(harness, client, config)
+
+        #expect(!templates.isError && templates.text.hasPrefix("共 ") && templates.text.contains("论文解读（") && templates.text.contains("（解读 / 有态度，主题 撞色）"), "\(templates.text.prefix(200))")
+        #expect(!created.isError && (created.json as? [String: Any])?["template"] as? String == "论文解读", "\(created.text)")
+        #expect(page?["id"] as? String == draftId && page?["title"] as? String == "我的论文笔记" && page?["theme"] as? String == "poster")
+        #expect(page?["sameMarkdown"] as? Bool == true, "卡片内容照模板")
+        #expect(page?["own"] as? Int == 1, "新窗口里启动时新建的那篇空稿子删掉了，抽屉里只有照模板新建的这篇")
+        let tutorialText = shape?["tutorial"] as? String ?? ""
+        let endingText = shape?["ending"] as? String ?? ""
+        let expected = "第一段\n\n\(tutorialText)\n\n{{字色:#d9480f|红字}}\n\n第二段\n\n\(endingText)"
+        #expect(tutorial.text == "插入片段「三步教程」：在「第一段」之后。" && english.text == "插入一段（17 字）：在「第二段」之前。", "\(tutorial.text) \(english.text)")
+        #expect(misplaced.isError && misplaced.text.contains("只能插在稿子末尾"), "\(misplaced.text)")
+        #expect(!ending.isError && shape?["markdown"] as? String == expected, "\(String(reflecting: shape?["markdown"]))")
+        #expect(undone == "第一段\n\n\(tutorialText)\n\n{{字色:#d9480f|红字}}\n\n第二段", "一次 ⌘Z 撤回最后插的结尾引导")
+        let log = shape?["log"] as? [[Any]] ?? []
+        #expect(log.map { $0.first as? String ?? "" } == [
+            "照模板「论文解读」新建稿子「我的论文笔记」", "卡片内容改写（\(body.count) 字）",
+            "插入片段「三步教程」：在「第一段」之后", "插入一段（17 字）：在「第二段」之前", "插入片段「结尾引导」：稿子末尾",
+        ])
+        #expect(log.map { $0.last as? Bool ?? false } == [false, true, true, true, true], "插片段的都能撤销")
+        #expect(unknown.isError && unknown.text == "没有模板「没有这个」（有哪些用 list_templates 看）", "\(unknown.text)")
         #expect(harness.pageErrors == [])
     }
 

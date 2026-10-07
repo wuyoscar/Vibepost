@@ -1,6 +1,6 @@
 # MCP 服务：让外部 Agent 操作 Vibepost
 
-终端里的 Claude Code（或别的 MCP 客户端）可以直接操作正在运行的 Vibepost：列出、新建、打开稿子，写卡片内容、标题与小红书正文，换主题、配色、字体与版式，从本机路径插图，出图看每一页，导出 PNG / ZIP / 长图到指定文件夹，发送到 iPhone。和 App API（[app-api.md](app-api.md)）是同一套能力与校验：工具在页面里只经 `window.mediacraft` 执行，改动马上出现在 App 里。
+终端里的 Claude Code（或别的 MCP 客户端）可以直接操作正在运行的 Vibepost：列出、新建（也能照模板）、打开稿子，写卡片内容、标题与小红书正文，插片段，换主题、配色、字体与版式，从本机路径插图，出图看每一页，导出 PNG / ZIP / 长图到指定文件夹，发送到 iPhone。和 App API（[app-api.md](app-api.md)）是同一套能力与校验：工具在页面里只经 `window.mediacraft` 执行，改动马上出现在 App 里。
 
 目标是这样的工作方式：Agent 收集信息、写稿，用 Vibepost 自动排版、看图检查；人在 App 里看一眼、改几个字，点发送。仓库里的 Claude Code 技能 [`skills/mediacraft/SKILL.md`](../skills/mediacraft/SKILL.md) 写了这套流程，装进 Claude Code：`ln -s "$PWD/skills/mediacraft" ~/.claude/skills/mediacraft`（在仓库根目录运行）。
 
@@ -65,9 +65,10 @@ Claude Code ──stdio（JSON-RPC）── mediacraft-mcp ──Unix 域套接�
 | `list_writing_manuals` | 用户的写作手册（只管写什么、什么口味）：每份一行「名字：说明」，Agent 按这篇的题材挑一份，用户点名的优先 |
 | `read_writing_manual` | 一份写作手册的全文（开头 `name` / `description`，后面是正文 Markdown）；没有这份时回错误 |
 | `save_writing_manual` ★ | 提议新建或整份改写一份写作手册（`name`、`description`、`content`）：App 弹确认框给用户看改动（新建的看开头，修改的看 +N / −M 行与前几行），用户同意才存，拒绝时回「用户没有同意保存这份写作手册」；名字不合规矩直接回错误。不用先认定稿子，列进「外部 Agent 的操作」 |
+| `list_templates` ★ | 模板库（仓库自带的整篇示范稿与用户自己存的，`drafts.templates()`）：每套一行「名字（id）— 说明（题材 / 风格，主题）」。不用先认定稿子 |
 | `list_drafts` | 全部稿子：id、标题、模式、是不是内置说明书、是不是正在编辑的那篇、最近修改时间 |
 | `get_draft` | 认定的那篇（还没新建、打开过时是正在编辑的那篇）：id、只读、标题、小红书正文 `caption`、卡片内容 Markdown、模式、主题、颜色、字体、字号行距、分页个数、图片，以及可选的主题、字体与取值范围 |
-| `create_draft` | 新建并在新窗口里打开（标题、卡片内容、小红书正文、模式、主题可一起给；卡片内容里的英文记号收下时换成中文写法） |
+| `create_draft` | 新建并在新窗口里打开（标题、卡片内容、小红书正文、模式、主题可一起给；卡片内容里的英文记号收下时换成中文写法）。`template` 给模板的 id 或名字时先照那套模板复制（`drafts.create({ template })`，连示例图一起），再套用其余字段；没有这个模板时回错误 |
 | `open_draft` | 打开一篇（之后的工具改这篇）：开着它的窗口，或一个新窗口 |
 | `update_draft` | 改标题、小红书正文和 / 或整篇卡片内容（一步可撤销；英文记号收下时换成中文写法） |
 | `set_theme` ★ | 换主题（id 或中文名） |
@@ -79,6 +80,7 @@ Claude Code ──stdio（JSON-RPC）── mediacraft-mcp ──Unix 域套接�
 | `move_section` ★ | 把一块或一整节挪到别处 |
 | `set_card_css` ★ | 这一篇自己的卡片样式（CSS）：整段换掉或接在后面 |
 | `restyle_block` ★ | 给一块换样式：组件（小标签、提示、页尾、等宽、标签列表、步骤）、对齐、标题级别 |
+| `insert_section` ★ | 插一个片段（`snippet`：登记表里的 id 或中文名，见操作手册的「片段」一节）或一段 Markdown（`markdown`，英文记号收下时换成中文写法），二选一；位置是 `before` / `after` 的原文或 `position` 的 `start` / `end`（都不给插在末尾）。规则同「插入」菜单里插片段（前后隔空行、首尾多余的 `[[分页]]` 去掉、含 `[[结尾]]` 的只能在末尾），一步可撤销。片段里没有图片，配图用 `import_images` / `insert_image` |
 | `import_images` | 按本机绝对路径插图，插在某一块之前或之后（都不给插在末尾），每张一行 |
 | `insert_image` ★ / `move_image` ★ / `resize_image` ★ / `crop_image` ★ | 把素材里的图插回正文 / 挪图 / 大小与对齐 / 裁剪 |
 | `get_pages` ★ | 每页放了哪些块、正文区用了多少、怎么换的页，以及这一页的问题（⚠ 只有标题、太空、偏挤、溢出） |

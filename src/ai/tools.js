@@ -1,4 +1,4 @@
-// App 自己的工具：AI 会话里的 Claude 直接操作 MediaCraft（换主题、调样式、分页、挪段落、摆图片、看出图、放配图候选）。
+// App 自己的工具：AI 会话里的 Claude 直接操作 MediaCraft（换主题、调样式、分页、挪段落、插片段、摆图片、看出图、放配图候选、列模板与照模板新建）。
 // 这是一个 MCP 服务（服务名 mediacraft，工具全名 mcp__mediacraft__<名字>），不另起进程：claude 经控制通道发来
 // mcp_message，src/ai/session.js 转给这里的 handle()，回答 initialize / tools/list / tools/call。
 // 工具只经 App API（window.mediacraft）读写，页面是唯一的真相。改稿子的工具每次都是一个「动作」：会话里列一行、附上撤销的办法，
@@ -549,6 +549,91 @@
     return editStructure(context, draft, `「${clip(args.block, 16)}」换成${parts.join("、")}`, op);
   }
 
+  // ===== 片段与模板（登记表 src/engine/snippets.js；模板库 src/templates/，经 drafts.templates() / drafts.create({ template })）=====
+
+  const snippets = () => root.MediaCraftSnippets;
+  const POSITIONS = { start: "稿子开头", end: "稿子末尾" };
+
+  // 要插的那段：片段（id 或中文名）或 Agent 自己写的一段 Markdown（英文记号先换成中文，和 create_draft / update_draft 收稿一样），二选一
+  function sectionOf(args) {
+    const given = ["snippet", "markdown"].filter((key) => args[key] !== undefined && args[key] !== null && args[key] !== "");
+    if (given.length !== 1) throw new TypeError("snippet（片段的 id 或中文名）与 markdown（一段 Markdown）要给、且只给一个");
+    if (given[0] === "snippet") {
+      const snippet = snippets().get(String(args.snippet).trim());
+      if (!snippet) throw new Error(`没有片段「${clip(args.snippet)}」（有这些：${snippets().list.map((item) => `${item.id} ${item.name}`).join("、")}）`);
+      return { chunk: snippet.markdown, what: `片段「${snippet.name}」` };
+    }
+    if (typeof args.markdown !== "string") throw new TypeError("markdown 要是一段 Markdown 文字");
+    const chunk = root.MediaCraftEngine.localizeMarkers(args.markdown).trim();
+    if (!chunk) throw new TypeError("markdown 空着，没有要插的内容");
+    return { chunk, what: `一段（${Array.from(chunk).length} 字）` };
+  }
+
+  // 插在哪：before / after 定位到一块（标题连同整节），或 position 是 start（稿子开头）/ end（稿子末尾）；只给一个，都不给是末尾。
+  // 返回在这份 markdown 里的字符位置（片段的插入规则按光标处理：before 落在那一单元第一行的行首，after 落在最后一行的行尾，不拆开一行）
+  // 与会话里写的位置
+  function sectionPlace(markdown, args) {
+    const keys = ["before", "after", "position"].filter((key) => args[key] !== undefined && args[key] !== null && args[key] !== "");
+    if (keys.length > 1) throw new TypeError("before、after 与 position 只给一个");
+    if (!keys.length || keys[0] === "position") {
+      const position = keys.length ? String(args.position) : "end";
+      if (!POSITIONS[position]) throw new TypeError("position 只能是 start（稿子开头）或 end（稿子末尾）");
+      return { at: position === "start" ? 0 : markdown.length, text: POSITIONS[position] };
+    }
+    const place = placeOf(markdown, args);
+    const lines = markdown.split("\n");
+    // placeOf 给的是行号：before 是那一单元的第一行（插在它行首），after 是最后一行的下一行（插在上一行的行尾）
+    const head = lines.slice(0, place.at).join("\n").length;
+    return { at: place.key === "before" && place.at > 0 ? head + 1 : head, text: where(place) };
+  }
+
+  // 插一个片段或一段 Markdown：前后隔开空行、首尾多余的 [[分页]] 去掉、含 [[结尾]] 的只能在末尾（规则都在 MediaCraftSnippets.insert，
+  // 和「插入」菜单里插片段一样）；是一步可撤销的结构改动，同样套到 draft.md
+  function insertSection(args, context, draft) {
+    const { chunk, what } = sectionOf(args);
+    const op = (markdown) => {
+      const { text, change } = snippets().insert(markdown, sectionPlace(markdown, args).at, chunk);
+      if (!change) throw new Error("没有要插的内容");
+      return text;
+    };
+    return editStructure(context, draft, `插入${what}：${sectionPlace(draft.markdown, args).text}`, op);
+  }
+
+  // 模板：id 或名字（仓库自带的与用户自己存的都认）
+  async function findTemplate(value) {
+    const wanted = String(value ?? "").trim();
+    if (!wanted) throw new TypeError("template 要给模板的 id 或名字（见 list_templates）");
+    const template = (await mc().drafts.templates()).find(({ id, name }) => id === wanted || name === wanted);
+    if (!template) throw new Error(`没有模板「${clip(wanted)}」（有哪些用 list_templates 看）`);
+    return template;
+  }
+
+  async function listTemplates(args, context) {
+    const [templates, themes] = await Promise.all([mc().drafts.templates(), mc().themes.list()]);
+    const themeName = (id) => themes.find((theme) => theme.id === id)?.name ?? id;
+    const own = templates.filter((template) => !template.builtIn).length;
+    context.line(`查看模板（共 ${templates.length} 套）`);
+    return reply([
+      `共 ${templates.length} 套模板（自带 ${templates.length - own} 套，用户自己存的 ${own} 套），每套一行「名字（id）— 说明（题材 / 风格，主题）」：`,
+      ...templates.map((template) => (
+        `- ${template.name}（${template.id}）— ${template.description || "（没有说明）"}（${template.tags.join(" / ") || "没有标签"}，主题 ${themeName(template.theme)}${template.builtIn ? "" : "，自己存的"}）`
+      )),
+    ].join("\n"));
+  }
+
+  // 照模板在这个窗口里新建一篇并切过去（和稿件抽屉里点一套模板一样）：原来那篇已经存好、留在稿件抽屉里；
+  // 这一轮仍属于原来那篇（工作副本、之后的工具都是它的），新稿子要在它自己的会话里改
+  async function createDraftFromTemplate(args, context) {
+    const template = await findTemplate(args.template);
+    const draft = await mc().drafts.create({ template: template.id });
+    const title = draft.title || (await mc().drafts.list()).find((item) => item.id === draft.id)?.title || template.name;
+    context.line(`照模板「${template.name}」新建稿子「${clip(title, 16)}」`);
+    return reply(
+      `已照模板「${template.name}」新建稿子「${title}」（id ${draft.id}，主题 ${draft.theme}）并在这个窗口里打开；原来那篇已经保存，在稿件抽屉里。`
+      + "这一轮改的仍是原来那篇（draft.md 与之后的工具都是它的），新稿子要在它自己的 AI 会话里改：告诉用户到新稿子里接着说。",
+    );
+  }
+
   // ===== 图片：挪、插、大小、裁剪、配图候选 =====
 
   async function moveImage(args, context, draft) {
@@ -945,6 +1030,27 @@
       run: restyleBlock,
     },
     {
+      name: "insert_section",
+      shared: true,
+      label: "插入片段",
+      description: `插一个写好的片段或一段 Markdown：snippet 给片段的 id 或中文名（${snippets().list.map((item) => `${item.id} ${item.name}`).join(" / ")}，各自什么时候用见操作手册的「片段」一节），`
+        + "或 markdown 给你自己写的一段（中文记号是规范写法，英文写法收下时换成中文）；两者给一个。位置：before / after 给稿子里的一段原文（标题指它连同下面的整节），"
+        + "或 position 为 start（稿子开头）/ end（稿子末尾），都不给时插在末尾。前后自动隔开空行，首尾多余的 [[分页]] 去掉；含 [[结尾]] 的（结尾引导）只能插在末尾、一篇只能有一个。"
+        + "片段里没有图片：要配图用 insert_image（素材里已有的）或",
+      app: " propose_images。马上生效，一步可撤销，改动同步到 draft.md。",
+      external: " import_images（本机图片）。马上生效，一步可撤销。",
+      inputSchema: {
+        type: "object",
+        properties: {
+          snippet: { type: "string", description: "片段的 id 或中文名" },
+          markdown: { type: "string", description: "一段 Markdown（和 snippet 二选一）" },
+          ...target,
+          position: { type: "string", enum: Object.keys(POSITIONS), description: "start 稿子开头 / end 稿子末尾（和 before / after 只给一个）" },
+        },
+      },
+      run: insertSection,
+    },
+    {
       name: "move_image",
       shared: true,
       label: "挪动图片",
@@ -1062,6 +1168,27 @@
       },
       run: saveWritingManual,
     },
+    {
+      name: "list_templates",
+      label: "查看模板",
+      shared: true,
+      // 不看、不改稿子：用户切到别的稿子也能用（外部 Agent 也不用先认定一篇）
+      free: true,
+      description: "模板库里的模板（仓库自带的整篇示范稿，与用户自己存的）：每套一行「名字（id）— 说明（题材 / 风格，主题）」。用户要从模板开始、照某种题材写一篇时先看它，",
+      app: "再用 create_draft_from_template 新建。",
+      external: "再在 create_draft 里给 template（id 或名字）新建。",
+      inputSchema: { type: "object", properties: {} },
+      run: listTemplates,
+    },
+    {
+      name: "create_draft_from_template",
+      label: "照模板新建",
+      free: true,
+      description: "照一套模板新建一篇稿子并在这个窗口里打开它（和用户在稿件抽屉里点一套模板一样）：卡片内容、标题、小红书正文、主题、配色、字体、封面与示例图都照模板，之后照常可以换主题、改字。"
+        + "template 给模板的 id 或名字（见 list_templates）。原来那篇已经保存、留在稿件抽屉里，不会丢；这一轮仍属于原来那篇（draft.md 与之后的工具都是它的），新稿子要在它自己的 AI 会话里改，告诉用户到新稿子里接着说。",
+      inputSchema: { type: "object", properties: { template: { type: "string", description: "模板的 id 或名字" } }, required: ["template"] },
+      run: createDraftFromTemplate,
+    },
   ];
 
   // 描述：共用的一段，加上只给 AI 助手（app）或只给外部 Agent（external）的那一句
@@ -1130,6 +1257,7 @@
       draftInfo,
       pagesSummary,
       findTheme,
+      findTemplate,
       placeOf,
       undoText,
       currentOf,

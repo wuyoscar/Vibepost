@@ -105,8 +105,8 @@ struct AIToolsTests {
         let tools = ((Self.answer(fake, "m3")?["mcp_response"] as? [String: Any])?["result"] as? [String: Any])?["tools"] as? [[String: Any]] ?? []
         #expect(tools.map { $0["name"] as? String ?? "" } == [
             "get_draft", "get_pages", "view_page", "set_theme", "set_style", "set_mode", "insert_page_break", "remove_page_break",
-            "move_section", "set_card_css", "restyle_block", "move_image", "insert_image", "resize_image", "crop_image", "propose_images", "generate_image",
-            "save_writing_manual",
+            "move_section", "set_card_css", "restyle_block", "insert_section", "move_image", "insert_image", "resize_image", "crop_image", "propose_images", "generate_image",
+            "save_writing_manual", "list_templates", "create_draft_from_template",
         ])
         #expect(tools.allSatisfy { ($0["inputSchema"] as? [String: Any])?["type"] as? String == "object" && !($0["description"] as? String ?? "").isEmpty })
         #expect((Self.answer(fake, "m4")?["mcp_response"] as? [String: Any])?["error"] != nil, "别的服务的消息回错误")
@@ -438,6 +438,105 @@ struct AIToolsTests {
         #expect(Self.toolText(fake, "r8") == "追加卡片样式（2 条规则）。")
         #expect(Self.toolText(fake, "r5") == "对齐只对组件有用（先用 style 换成组件）")
         #expect(result?["undone"] as? String == "# 小节\n\n:::页尾 居中\n要提醒的一段\n:::\n\n普通一段\n\n- 甲\n- 乙", "每次换样式是撤销历史里的一步")
+        #expect(harness.pageErrors == [])
+    }
+
+    @Test("片段与模板：list_templates 列出模板库；insert_section 把片段（id 或中文名）或一段 Markdown（英文记号换成中文）插在某块前后或稿子头尾，前后隔空行、同步 draft.md，每次是会话里一个可撤销的动作；[[结尾]] 不在末尾、没有的片段、两样都给、已有结尾页都说明原因；create_draft_from_template 在这个窗口里照模板新建并切过去，原来那篇留在抽屉里、这一轮仍记在它的会话里")
+    func templatesAndSections() async throws {
+        let fake = try FakeClaude()
+        defer { fake.remove() }
+        let harness = ShellHarness(terminalPath: [fake.directory], onboarding: false)
+        try await harness.load()
+        let draftId = try await harness.evaluate(Self.helpers + """
+            return (await mc.drafts.create({ markdown: "# 周末\\n\\n第一段文字。\\n\\n## 第一节\\n\\n第一节的内容。" })).id;
+        """) as? String ?? ""
+        try fake.script([
+            StreamJSON.initEvent(),
+            StreamJSON.toolCall("t1", "list_templates"),
+            StreamJSON.toolCall("t2", "insert_section", ["snippet": "三步教程", "after": "第一段文字"]),
+            StreamJSON.toolCall("t3", "insert_section", ["markdown": ":::note align=center\n要点\n:::", "position": "start"]),
+            StreamJSON.toolCall("t4", "insert_section", ["snippet": "ending", "before": "## 第一节"]),
+            StreamJSON.toolCall("t5", "insert_section", ["snippet": "没有的"]),
+            StreamJSON.toolCall("t6", "insert_section", ["snippet": "对比", "markdown": "两样都给"]),
+            StreamJSON.toolCall("t7", "insert_section", ["snippet": "结尾引导"]),
+            StreamJSON.toolCall("t8", "insert_section", ["snippet": "ending"]),
+        ] + Self.tail("插好了"), call: 1)
+        try fake.script([
+            StreamJSON.initEvent(),
+            StreamJSON.toolCall("t9", "create_draft_from_template", ["template": "没有这个"]),
+            StreamJSON.toolCall("t10", "create_draft_from_template", ["template": "干货清单"]),
+        ] + Self.tail("新建了"), call: 2)
+        let after = try await harness.evaluate("""
+            await openAI();
+            ask("插几段");
+            await until(() => finished(1));
+            return {
+              markdown: (await mc.drafts.current()).markdown, actions: await actions(), lines: lines(),
+              snippets: { tutorial: window.MediaCraftSnippets.get("tutorial").markdown, ending: window.MediaCraftSnippets.get("ending").markdown },
+            };
+        """) as? [String: Any]
+        // 下一轮开始时 App 会按编辑器重写 draft.md，所以这一轮刚说完就看
+        let workFile = try String(contentsOf: harness.aiRoot.appendingPathComponent(draftId).appendingPathComponent("draft.md"), encoding: .utf8)
+        let result = try await harness.evaluate("""
+            // ⌘Z 撤回最后一步（结尾引导）；行尾「撤销」只撤三步教程那一处，开头插的那段保留
+            const undone = (await mc.drafts.undo()).markdown;
+            ui.click("撤销：插入片段「三步教程」：在「第一段文字」之后");
+            await until(async () => (await actions()).filter((action) => action.undone).length === 1);
+            const single = (await mc.drafts.current()).markdown;
+            const created = await mc.ai.send("照模板新建一篇");
+            const current = await mc.drafts.current();
+            const template = window.MediaCraftTemplateRegistry.find((item) => item.name === "干货清单");
+            return {
+              undone, single, created: created.state,
+              current: { id: current.id, theme: current.theme, sameMarkdown: current.markdown === template.markdown.join("\\n") },
+              listed: (await mc.drafts.list()).map((item) => item.id),
+              session: (await mc.ai.history(draftId)).messages.filter((message) => message.role === "tool").map((message) => message.text),
+            };
+        """, arguments: ["draftId": draftId]) as? [String: Any]
+        await harness.tearDown()
+
+        let snippets = after?["snippets"] as? [String: String] ?? [:]
+        let tutorial = try #require(snippets["tutorial"])
+        let ending = try #require(snippets["ending"])
+        let note = ":::提示 居中\n要点\n:::"
+        let body = "# 周末\n\n第一段文字。\n\n\(tutorial)\n\n## 第一节\n\n第一节的内容。"
+        let expected = "\(note)\n\n\(body)\n\n\(ending)"
+        #expect(after?["markdown"] as? String == expected, "片段插在那一块之后、一段插在开头（英文记号换成中文）、结尾引导在末尾，前后隔开空行")
+        #expect(workFile.trimmingCharacters(in: .newlines) == expected, "每次插入都同步进了 draft.md")
+        let actionTexts = (after?["actions"] as? [[String: Any]] ?? []).map { $0["text"] as? String ?? "" }
+        #expect(actionTexts == ["插入片段「三步教程」：在「第一段文字」之后", "插入一段（15 字）：稿子开头", "插入片段「结尾引导」：稿子末尾"])
+        #expect((after?["actions"] as? [[String: Any]] ?? []).allSatisfy { $0["undoable"] as? Bool == true })
+        let lines = after?["lines"] as? [[String]] ?? []
+        #expect(lines.map { $0.first ?? "" } == ["user", "tool", "action", "action", "tool", "tool", "tool", "action", "tool", "assistant", "end"])
+        let tools = lines.filter { $0.first == "tool" }.map { $0.last ?? "" }
+        #expect(tools.first?.hasPrefix("查看模板（共 ") == true)
+        #expect(tools.dropFirst().first == "插入片段没成功：结尾引导只能插在稿子末尾：把光标放到最后再插")
+        #expect(tools.dropFirst(2).first?.hasPrefix("插入片段没成功：没有片段「没有的」（有这些：tutorial 三步教程、") == true)
+        #expect(tools.dropFirst(3).first == "插入片段没成功：snippet（片段的 id 或中文名）与 markdown（一段 Markdown）要给、且只给一个")
+        #expect(tools.last == "插入片段没成功：稿子里已经有结尾页了：一篇只能有一个 [[结尾]]")
+
+        let listing = Self.toolText(fake, "t1")
+        #expect(listing.hasPrefix("共 ") && listing.contains("干货清单（") && listing.contains("（清单 / 简洁，主题 备忘）"), "每套一行：名字（id）— 说明（题材 / 风格，主题）：\(listing.prefix(200))")
+        #expect(Self.toolText(fake, "t2") == "插入片段「三步教程」：在「第一段文字」之后。draft.md 已同步。")
+        #expect(Self.toolText(fake, "t3") == "插入一段（15 字）：稿子开头。draft.md 已同步。")
+        #expect(Self.toolResult(fake, "t4")?["isError"] as? Bool == true && Self.toolResult(fake, "t5")?["isError"] as? Bool == true)
+        #expect(Self.toolResult(fake, "t6")?["isError"] as? Bool == true && Self.toolResult(fake, "t8")?["isError"] as? Bool == true)
+        #expect(Self.toolText(fake, "t7") == "插入片段「结尾引导」：稿子末尾。draft.md 已同步。")
+
+        #expect(result?["undone"] as? String == "\(note)\n\n\(body)", "⌘Z 撤回最后插的结尾引导")
+        #expect(result?["single"] as? String == "\(note)\n\n# 周末\n\n第一段文字。\n\n## 第一节\n\n第一节的内容。", "只撤三步教程那一处，开头的一段保留")
+
+        #expect(result?["created"] as? String == "done")
+        #expect(Self.toolText(fake, call: 1, "t9") == "没有模板「没有这个」（有哪些用 list_templates 看）")
+        #expect(Self.toolResult(fake, call: 1, "t9")?["isError"] as? Bool == true)
+        let createdText = Self.toolText(fake, call: 1, "t10")
+        #expect(createdText.hasPrefix("已照模板「干货清单」新建稿子「") && createdText.contains("原来那篇已经保存"), "\(createdText)")
+        let current = result?["current"] as? [String: Any]
+        #expect(current?["id"] as? String != draftId && current?["theme"] as? String == "notes" && current?["sameMarkdown"] as? Bool == true, "这个窗口切到了照模板新建的那篇")
+        #expect((result?["listed"] as? [String] ?? []).contains(draftId), "原来那篇留在稿件抽屉里")
+        let session = result?["session"] as? [String] ?? []
+        #expect(session.contains("照模板新建没成功：没有模板「没有这个」（有哪些用 list_templates 看）"))
+        #expect(session.contains { $0.hasPrefix("照模板「干货清单」新建稿子「") }, "记在原来那篇的会话里：\(session)")
         #expect(harness.pageErrors == [])
     }
 
