@@ -52,7 +52,7 @@ struct TemplatesTests {
 
     @Test("登记表与 src/templates/*.md 一致（改了模板文件要重新运行 node scripts/build-templates.mjs）；drafts.templates() 列出自带的（名字、标签、主题、builtIn）；模板不在稿件列表与抽屉里；记号全是中文、图片都登记了")
     func registryMatchesFiles() async throws {
-        let onDisk = try FileManager.default.contentsOfDirectory(atPath: Self.files.path).filter { $0.hasSuffix(".md") }.map { "src/templates/\($0)" }
+        let onDisk = try FileManager.default.contentsOfDirectory(atPath: Self.files.path).filter { $0.hasSuffix(".md") && $0 != "README.md" }.map { "src/templates/\($0)" }
         let harness = ShellHarness(onboarding: false)
         try await harness.load()
         let result = try await harness.evaluate(Self.helpers + """
