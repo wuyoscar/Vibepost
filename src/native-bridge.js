@@ -14,13 +14,13 @@
     const progressListeners = new Map();
     base.onMotion((event) => progressListeners.get(event.job)?.(event.progress));
     const pngBlob = (data) => new Blob([Uint8Array.from(atob(data), (char) => char.charCodeAt(0))], { type: "image/png" });
-    const rasterCards = async (request) => {
+    const captureCards = async (request) => {
       // The shared frontend batches up to 40 pages; Windows keeps each IPC
       // capture bounded to 16 without changing the Mac batching contract.
       if (Array.isArray(request.pages) && request.pages.length > 16) {
         const replies = [];
         for (let start = 0; start < request.pages.length; start += 16) {
-          replies.push(await rasterCards({ ...request, pages: request.pages.slice(start, start + 16) }));
+          replies.push(await captureCards({ ...request, pages: request.pages.slice(start, start + 16) }));
         }
         return {
           ...replies.at(-1),
@@ -41,6 +41,14 @@
           strips: (page.strips ?? []).map((strip) => ({ ...strip, png: pngBlob(strip.png) })),
         })),
       };
+    };
+    // Theme choices, the filmstrip and phone views may request previews together.
+    // Apply backpressure before IPC instead of filling the bounded native queue.
+    let rasterQueue = Promise.resolve();
+    const rasterCards = (request) => {
+      const run = rasterQueue.then(() => captureCards(request));
+      rasterQueue = run.catch(() => {});
+      return run;
     };
     window.MediaCraftNative = {
       ...base,

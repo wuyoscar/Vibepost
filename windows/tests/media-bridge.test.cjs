@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const path = require('node:path');
 
-function seam() {
+function seam({ beforeRaster } = {}) {
   const calls = [];
   const boundaryCalls = [];
   const handlers = new Map();
@@ -43,6 +43,7 @@ function seam() {
       invoke: async (_channel, request) => {
         checkData(request);
         calls.push(request);
+        if (request.action === 'cards/raster' && beforeRaster) await beforeRaster(request);
         if (request.action === 'motion/render') {
           handlers.get('native:event')?.({}, { kind: 'motion', event: { job: request.params.job, progress: 0.5 } });
           return { data: Buffer.from('encoded').toString('base64'), type: request.params.format === 'gif' ? 'image/gif' : 'video/mp4' };
@@ -120,6 +121,26 @@ test('shared large-page requests use bounded Windows captures and preserve page 
   assert.equal(reply.generation, 'test-generation');
   assert.equal(reply.totalMs, 35);
   assert.equal(reply.times.length, 35);
+});
+
+test('preview bursts wait before IPC and a failed capture does not block later themes', async () => {
+  let release, count = 0;
+  const held = new Promise((resolve) => { release = resolve; });
+  const { native, calls } = seam({ beforeRaster: async () => { if (++count === 1) await held; } });
+  const request = { pages: [{ html: 'theme-preview' }], width: 864, height: 1152, scale: 2 };
+  const failure = assert.rejects(native.rasterCards({ ...request, mediaIds: ['missing'] }), (error) => {
+    assert.equal(error.status, 409);
+    assert.deepEqual(Array.from(error.missing), ['missing']);
+    return true;
+  });
+  const previews = Array.from({ length: 12 }, () => native.rasterCards(request));
+  await new Promise(setImmediate);
+  assert.equal(calls.length, 1, 'valid theme bursts must not fill the main-process queue');
+  release();
+  await failure;
+  const replies = await Promise.all(previews);
+  assert.equal(calls.length, 13);
+  assert(replies.every((reply) => reply.generation === 'test-generation'));
 });
 
 test('main-world Blob conversion cancellation prevents a later preload motion/render job', async () => {
