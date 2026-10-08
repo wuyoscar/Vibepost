@@ -51,8 +51,8 @@ async function run({ application, page, data }) {
     const draft = await call('get_draft'); assert.equal(draft.id, created.id); assert.equal(draft.markdown, markdown); assert.match(draft.caption, /真实 MCP/);
     let agent;
     for (const candidate of application.windows()) {
-      if (candidate === page) continue;
-      await candidate.waitForFunction(() => window.mediacraft && window.MediaCraftDrafts.currentId(), { timeout: 30000 });
+      if (candidate === page || !candidate.url().startsWith('mediacraft://app/index.html')) continue;
+      await candidate.waitForFunction(() => window.mediacraft && window.MediaCraftDrafts.currentId(), null, { timeout: 30000 });
       if (await candidate.evaluate(() => window.MediaCraftDrafts.currentId()) === created.id) { agent = candidate; break; }
     }
     assert.ok(agent, 'create_draft must open and bind its own actual window');

@@ -98,6 +98,14 @@ Windows 的 stdio 辅助程序为 `windows/mcp/stdio.cjs`；打包后放在资�
 
 `export` 支持 Windows 的 PNG、ZIP、长图、MP4、GIF；发送工具为 `send_to_phone`。写出目录需要本机绝对路径，导出授权只在相应工具调用期间有效。完整工具说明见 [MCP 文档](mcp.md)。
 
+## 手机预览与卡片出图
+
+Windows 的「手机预览」包含笔记轮播、发现页和主页网格。卡片通过独立的 Chromium 截图宿主页出图，保留与舞台相同的字体、布局、图片裁剪和圆角；截图为真实 2 倍像素，不随屏幕缩放比例拉伸。Mac 继续使用原来的 WKWebView 出图路径。
+
+每个编辑窗口使用独立的截图上下文与图片缓存；关窗、重新载入时释放。请求按序处理，并等待字体和图片完成加载。手机缩略图、主题缩略图及 PNG 导出共用这条出图链路。
+
+在 `windows/` 运行 `npm run test:phone-preview`，使用真实 Electron 页面检查卡片内正方形与横图的像素比例、三个手机视图、翻页、主题、图片高度、窗口大小和预览开关。`VIBEPOST_TEST_DPR=1.25` 或 `2` 可检查 Windows 屏幕缩放；`VIBEPOST_TEST_EXE` 可检查免安装程序，`VIBEPOST_TEST_DATA` 指定独立测试目录。报告和截图写入该目录，不修改正常用户草稿。
+
 ## 手机接收
 
 1. 电脑和手机连接同一个可信 Wi-Fi 或局域网，点击「发送到手机」。

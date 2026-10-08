@@ -73,6 +73,12 @@ jobs:
       - name: Run real desktop smoke test
         working-directory: windows
         run: npm run test:app
+      - name: Verify phone preview layout and rendered pixels
+        working-directory: windows
+        shell: pwsh
+        run: |
+          $env:VIBEPOST_TEST_DATA = Join-Path $env:VIBEPOST_TEST_DATA 'phone-preview'
+          npm run test:phone-preview
       - name: Upload smoke evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -177,7 +183,7 @@ jobs:
             macos/run-tests.sh 1800
           else
             failed=0
-            for method in handshakeAndToolList draftToIPhone switchedDraftIsProtected twoAgentsTwoDrafts agentsLeaveUserWindowsAlone bridgeRejectsForeignRequests draftsEventsAndGuards exportsThroughTheSavePath sendsCardsInPageOrder sendsArticleAsOneLongImage liveEditorRoundTripsItsOptions stagePreviewPlaysTheClip liveExportCancelsAndExplains sendsLivePageAsPairedPvt zipPackagesLivePagesAsPvt replacedPagesDoNotHoldDrafts oneDraftOneWindow; do
+            for method in handshakeAndToolList draftToIPhone switchedDraftIsProtected twoAgentsTwoDrafts agentsLeaveUserWindowsAlone bridgeRejectsForeignRequests draftsEventsAndGuards exportsThroughTheSavePath sendsCardsInPageOrder sendsArticleAsOneLongImage liveEditorRoundTripsItsOptions stagePreviewPlaysTheClip liveExportCancelsAndExplains sendsLivePageAsPairedPvt zipPackagesLivePagesAsPvt replacedPagesDoNotHoldDrafts oneDraftOneWindow togglesAndShowsThePost flipsWithClicksKeysAndSwipes staysInSyncWithThemeAndContent showsRecentDraftsAroundThisOne currentTileFollowsEdits thumbnailsNeverBlockTyping commandDigitsSwitchViews; do
               status=0
               timeout=180
               if [ "$method" = sendsLivePageAsPairedPvt ]; then timeout=300; fi
