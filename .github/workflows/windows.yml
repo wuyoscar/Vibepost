@@ -18,11 +18,11 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 40
     env:
-      VIBEPOST_CACHE_DIR: ${{ runner.temp }}/vibepost-cache
-      MEDIACRAFT_FONT_CACHE_DIR: ${{ runner.temp }}/vibepost-cache/fonts
-      npm_config_cache: ${{ runner.temp }}/vibepost-cache/npm
+      VIBEPOST_CACHE_DIR: ${{ github.workspace }}/.scratch/ci-windows-cache
+      MEDIACRAFT_FONT_CACHE_DIR: ${{ github.workspace }}/.scratch/ci-windows-cache/fonts
+      npm_config_cache: ${{ github.workspace }}/.scratch/ci-windows-cache/npm
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      VIBEPOST_TEST_DATA: ${{ runner.temp }}/vibepost-app-smoke
+      VIBEPOST_TEST_DATA: ${{ github.workspace }}/.scratch/ci-windows-smoke
       VIBEPOST_OUTPUT_DIR: ${{ github.workspace }}/dist/windows
       VIBEPOST_FFMPEG: ${{ github.workspace }}/windows/resources/ffmpeg/ffmpeg.exe
       VIBEPOST_FFPROBE: ${{ github.workspace }}/windows/resources/ffmpeg/ffprobe.exe
@@ -70,7 +70,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-smoke-evidence
-          path: ${{ runner.temp }}/vibepost-app-smoke
+          path: ${{ env.VIBEPOST_TEST_DATA }}
           if-no-files-found: ignore
       - name: Build unsigned Windows distribution
         if: github.event_name == 'workflow_dispatch' && inputs.build
@@ -89,7 +89,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 20
     env:
-      MEDIACRAFT_FONT_CACHE_DIR: ${{ runner.temp }}/vibepost-fonts
+      MEDIACRAFT_FONT_CACHE_DIR: ${{ github.workspace }}/.scratch/ci-macos-fonts
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

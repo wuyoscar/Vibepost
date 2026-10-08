@@ -111,7 +111,7 @@ test('real shared Windows wrapper sends base64 across preload for save, phone, M
   assert.equal(render.epoch, 1);
   assert.equal(blob.type, 'image/gif');
   assert.equal(await blob.text(), 'encoded');
-  assert.deepEqual(progress, [0.5]);
+  assert.deepEqual(progress, [0.5, 1]);
   for (const operation of ['saveFile', 'mcp.write', 'sendToPhone', 'motionRender']) assert.ok(boundaryCalls.some((item) => item.operation === operation));
   await assert.rejects(bridge.saveFile(card, 'bad.png'), /转换为 Base64/);
 });

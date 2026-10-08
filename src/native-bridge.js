@@ -28,6 +28,9 @@
         try {
           const result = await base.motionRender({ card: await bytes(card), video: await bytes(video), ...settings, job });
           signal?.throwIfAborted();
+          // IPC progress and invoke replies use separate queues; completion is
+          // authoritative even if the final progress event arrives afterward.
+          onProgress?.(1);
           return new Blob([Uint8Array.from(atob(result.data), (char) => char.charCodeAt(0))], { type: result.type });
         } finally {
           signal?.removeEventListener("abort", abort);
