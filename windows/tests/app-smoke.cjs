@@ -208,6 +208,19 @@ async function main() {
     assert.equal(restored.markdown, draft.markdown);
     checks.push("draft persistence after reload");
     await page.evaluate(() => window.MediaCraftNative.mcp.setEnabled(true));
+    // Use the keyboard path so small hosted desktops do not overlap the toolbar.
+    await page.locator("#aiButton").press("Enter");
+    await page.locator("#aiSettings > summary").press("Enter");
+    const registration = await page.evaluate(() => window.MediaCraftNative.mcp.status());
+    await page.locator("#mcpCopyBtn").press("Enter");
+    await page.waitForFunction(() => document.querySelector("#statusText").textContent.includes("已复制接入命令"));
+    assert.equal(await application.evaluate(({ clipboard }) => clipboard.readText()), registration.command);
+    await page.locator("#mcpCopyCodexBtn").press("Enter");
+    await page.waitForFunction(() => document.querySelector("#statusText").textContent.includes("已复制 Codex 配置"));
+    assert.equal(await application.evaluate(({ clipboard }) => clipboard.readText()), registration.codexConfig);
+    assert.match(registration.codexConfig, /\[mcp_servers\.mediacraft\]/);
+    assert.match(registration.codexConfig, /--data-dir/);
+    await page.locator("#aiSettings > summary").press("Enter");
     const mcpChecks = await require("./mcp-app.cjs").run({
       application,
       page,
@@ -215,7 +228,7 @@ async function main() {
     });
     assert.equal(mcpChecks.ok, true);
     checks.push(
-      "real stdio MCP create/update/bound-window/PNG/ZIP/overwrite/disable",
+      "MCP Claude/Codex clipboard registration and real stdio create/update/bound-window/PNG/ZIP/overwrite/disable",
     );
     await fs.writeFile(
       path.join(data, "mcp-report.json"),

@@ -32,7 +32,7 @@ claude mcp add mediacraft -- "/Applications/Vibepost.app/Contents/MacOS/mediacra
 
 Windows 版同样先在 AI 助手 › 设置打开「允许外部 Agent 连接」，默认关闭。点击「复制接入命令」得到按实际安装位置生成的 PowerShell 命令：它登记 bundled Electron 可执行文件与 `resources/mcp/stdio.cjs`，并为这个 MCP 进程设置 `ELECTRON_RUN_AS_NODE=1`。服务不要求另装 Node。开发环境的命令另带 `--app-arg` 指向 `windows/`，打包后的命令直接使用 `Vibepost.exe`。
 
-其他 stdio 客户端将 App 返回的 `mediacraft.mcp.status().claudeConfig` 对象复制到自己的配置；Codex 使用同一个状态里的 `codexConfig` TOML 片段。两者都包括 `--data-dir`，以便连接同一份稿件数据。App 只提供复制内容，不写入或覆盖 Claude/Codex 的全局配置。配置结构示例（路径换成 App 实际返回的值）：
+Codex 点击同一区域的「复制 Codex 配置」，将 TOML 片段合并到已有的 `config.toml`，再重启 Codex。其他 stdio 客户端可通过 App API `await mediacraft.mcp.status()` 获取 `claudeConfig` JSON 或 `codexConfig` TOML。两者都包括 `--data-dir`，以便连接同一份稿件数据。App 只复制内容，不写入或覆盖 Claude/Codex 的全局配置。配置结构示例（路径换成 App 实际返回的值）：
 
 ```json
 {

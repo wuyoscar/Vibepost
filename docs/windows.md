@@ -92,7 +92,7 @@ Codex 的模型列表来自当前已登录 CLI 的 `app-server` / `model/list`�
 
 ## 外部 MCP Agent
 
-外部连接默认关闭。在「AI 助手 › 设置」打开后，复制应用给出的接入命令或配置。应用会生成当前安装位置和数据目录对应的 Claude JSON 与 Codex TOML，不要复用 macOS 的套接字路径。
+外部连接默认关闭。在「AI 助手 › 设置」打开后，「复制接入命令」提供 Claude Code 注册命令，「复制 Codex 配置」提供 TOML 片段，合并到已有 `config.toml` 后重启 Codex。应用按当前安装位置和数据目录生成配置，不要复用 macOS 的套接字路径；应用不会覆盖已有 CLI 配置。
 
 Windows 的 stdio 辅助程序为 `windows/mcp/stdio.cjs`；打包后放在资源目录 `mcp/`。它连接当前用户受 ACL 限制的命名管道，并读取数据目录下的会话令牌。辅助进程用 `ELECTRON_RUN_AS_NODE=1` 运行，不开放手机传输的 HTTP 接口来处理 MCP 指令。关闭外部连接会断开客户端并撤销本次导出授权。
 
