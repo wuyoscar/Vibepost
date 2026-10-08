@@ -94,6 +94,7 @@ jobs:
     timeout-minutes: 20
     env:
       MEDIACRAFT_FONT_CACHE_DIR: ${{ github.workspace }}/.scratch/ci-macos-fonts
+      MEDIACRAFT_TEST_LOG: ${{ github.workspace }}/.scratch/macos-tests.log
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -108,4 +109,14 @@ jobs:
           npm run build:codemirror
           python3 scripts/fetch-fonts.py
       - name: Run native macOS regression suite
-        run: macos/run-tests.sh 900
+        run: |
+          swift --version
+          xcodebuild -version
+          macos/run-tests.sh 900
+      - name: Upload native macOS regression log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-regression-log
+          path: ${{ env.MEDIACRAFT_TEST_LOG }}
+          if-no-files-found: ignore

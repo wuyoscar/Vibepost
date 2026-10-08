@@ -2,6 +2,7 @@
 # 跑 WKWebView harness 测试，带超时看门狗，只输出结果摘要。
 #   macos/run-tests.sh                   全部测试，默认 300 秒超时
 #   macos/run-tests.sh --filter 名称 120  只跑匹配的测试，120 秒超时
+# 设置 MEDIACRAFT_TEST_LOG 为绝对路径时，完整日志写到那里并保留（CI 收集用）。
 # 超时只终止本次测试自己的进程组，不影响其他 worktree 里同时在跑的测试。
 # 串行执行：多个 WKWebView 同时解码视频会互相卡死，全量并行跑会偶发挂起。
 set -uo pipefail
@@ -25,7 +26,16 @@ descendants() {
   done
 }
 
-LOG="$(mktemp)"
+if [[ -n "${MEDIACRAFT_TEST_LOG:-}" ]]; then
+  LOG="$MEDIACRAFT_TEST_LOG"
+  if [[ "$LOG" != /* ]]; then
+    echo "MEDIACRAFT_TEST_LOG 必须是绝对路径" >&2
+    exit 64
+  fi
+  mkdir -p "$(dirname "$LOG")" || exit 1
+else
+  LOG="$(mktemp)" || exit 1
+fi
 # 用 setsid 让 swift test 自成一个进程组，超时时整组终止。
 python3 -c 'import os, sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])' \
   swift test --no-parallel "${FILTER[@]}" > "$LOG" 2>&1 &
@@ -44,5 +54,9 @@ wait "$PID"
 STATUS=$?
 
 sed 's/\x1b\[[0-9;]*m//g' "$LOG" | grep -E "error:|✘|↳|Test run with" | grep -vE "Target Platform|Testing Library Version" | sort -u
-rm -f "$LOG"
+if [[ -z "${MEDIACRAFT_TEST_LOG:-}" ]]; then
+  rm -f "$LOG"
+else
+  echo "完整测试日志：$LOG"
+fi
 exit "$STATUS"
