@@ -147,11 +147,38 @@ extension SendLivePhotoTests {
         #expect(harness.pageErrors == [])
     }
 
-    /// 测试里的窗口在屏幕外，页面处于隐藏状态，WebKit 不让隐藏的页面真的播放视频（play() 被拒）：
-    /// 这里核对预览接得对——视频挂在图片框里、按取景铺满、静音、每次播放都先对到这一段的起点、按倍速；被拒时安静地停在封面。
+    /// 测试窗口在屏幕外，可见性通知与 play() 是否拒绝都取决于 WebKit 调度；本用例明确触发翻入可见区域，模拟该视频拒播。
+    /// 视频与 seek 仍是真的：核对取景、静音、起点、倍速、hover 再次对到起点，以及拒播后停在封面。
     @Test("舞台上的实况卡片：图片框里挂着这段视频（按取景铺满、静音、角标 LIVE），翻到这张和指针停在图上时对到剪好的起点按倍速播放")
     func stagePreviewPlaysTheClip() async throws {
-        let harness = ShellHarness()
+        let visibility = """
+            const NativeObserver = window.IntersectionObserver;
+            const liveCards = new Map();
+            window.IntersectionObserver = class extends NativeObserver {
+              constructor(callback, options) {
+                super(callback, options);
+                this.callback = callback;
+              }
+              observe(target) {
+                if (target.matches(".card-frame") && target.querySelector(".stage-live")) liveCards.set(target, this);
+                else super.observe(target);
+              }
+              unobserve(target) {
+                liveCards.delete(target);
+                super.unobserve(target);
+              }
+              disconnect() {
+                for (const [target, observer] of liveCards) if (observer === this) liveCards.delete(target);
+                super.disconnect();
+              }
+            };
+            window.showLiveCard = (frame, ratio) => {
+              const observer = liveCards.get(frame);
+              if (!observer) throw new Error("实况卡片没有注册可见性观察");
+              observer.callback([{ target: frame, intersectionRatio: ratio }], observer);
+            };
+        """
+        let harness = ShellHarness(pageScripts: [visibility])
         try await harness.load()
         let result = try await harness.evaluate(Self.editorHelpers + """
             await mc.drafts.create({ markdown: "实况在下面：" });
@@ -162,10 +189,33 @@ extension SendLivePhotoTests {
             const stage = document.querySelector('[aria-label="预览"]');
             const video = () => stage.querySelector("video");
             await until(() => video()?.readyState >= 1 && video().style.width);
-            await until(() => Math.abs(video().currentTime - 1) < 0.01);
             const well = video().parentElement;
             const frame = well.closest(".card-frame");
             const hit = page.imageHits.find((item) => item.live);
+            let playCalls = 0;
+            video().play = () => {
+              playCalls += 1;
+              return Promise.reject(new DOMException("测试隐藏页面拒播", "NotAllowedError"));
+            };
+            const seekTo = async (time, trigger) => {
+              const player = video();
+              let seeked = false;
+              const onSeeked = () => { seeked = true; };
+              player.addEventListener("seeked", onSeeked);
+              try {
+                trigger();
+                await until(() => seeked && !player.seeking && Math.abs(player.currentTime - time) < 0.01);
+              } finally {
+                player.removeEventListener("seeked", onSeeked);
+              }
+            };
+            const resting = () => well.dataset.state === "resting" && video().paused;
+            // 先挪离起点，确保翻入和 hover 都确实完成了一次 seek，而不是恰好已在第 1 秒。
+            await seekTo(5, () => { video().currentTime = 5; });
+            showLiveCard(frame, 0.59);
+            const belowThreshold = playCalls;
+            await seekTo(1, () => showLiveCard(frame, 0.6));
+            await until(resting);
             const cued = {
               time: video().currentTime, rate: video().playbackRate, muted: video().muted,
               box: ["width", "height", "left", "top"].map((key) => Math.round(parseFloat(video().style[key]) * 10) / 10),
@@ -174,12 +224,14 @@ extension SendLivePhotoTests {
               badge: well.textContent.includes("LIVE"),
             };
             // 挪走以后，指针停到图上又对回起点
-            video().currentTime = 5;
-            await until(() => Math.abs(video().currentTime - 5) < 0.01);
+            await seekTo(5, () => { video().currentTime = 5; });
             const rect = well.getBoundingClientRect();
-            pointer("pointermove", frame, rect.left + rect.width / 2, rect.top + rect.height / 2);
-            await until(() => Math.abs(video().currentTime - 1) < 0.01);
-            return { cued, hitWidth: hit.width, state: well.dataset.state };
+            await seekTo(1, () => pointer("pointermove", frame, rect.left + rect.width / 2, rect.top + rect.height / 2));
+            await until(resting);
+            return {
+              cued, hitWidth: hit.width, state: well.dataset.state, belowThreshold, playCalls,
+              hovered: { time: video().currentTime, rate: video().playbackRate, muted: video().muted },
+            };
         """, arguments: ["path": Self.h264]) as? [String: Any]
         await harness.tearDown()
 
@@ -191,6 +243,11 @@ extension SendLivePhotoTests {
         #expect(cued?["square"] as? Bool == true)
         #expect(abs(Double(cued?["wellWidth"] as? Int ?? 0) - (result?["hitWidth"] as? Double ?? -99)) <= 1, "视频框和卡片上的图片框一样大")
         #expect(cued?["badge"] as? Bool == true, "角上标 LIVE")
+        #expect(result?["belowThreshold"] as? Int == 0, "卡片未露出 60% 时不播放")
+        #expect(result?["playCalls"] as? Int == 2, "翻到这张和 hover 各触发一次播放")
+        let hovered = result?["hovered"] as? [String: Any]
+        #expect(hovered?["time"] as? Double == 1, "hover 又对到这一段的起点")
+        #expect(hovered?["rate"] as? Int == 2 && hovered?["muted"] as? Bool == true, "hover 仍按倍速、静音")
         #expect(result?["state"] as? String == "resting", "放不了时停在封面")
         #expect(harness.pageErrors == [])
     }

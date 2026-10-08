@@ -48,6 +48,7 @@ struct AIPresetsTests {
             ui.click("一个人逛公园也可以很开心");
             await until(async () => (await mc.drafts.current()).title === "一个人逛公园也可以很开心");
             await until(() => optionView()[2][3]);
+            await until(() => document.getElementById("statusText").textContent.includes("⌘Z"));
             const picked = { pressed: optionView().map((option) => option[3]), status: document.getElementById("statusText").textContent };
             const undone = (await mc.drafts.undo()).title;
             await until(() => !optionView()[2][3]);

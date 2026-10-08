@@ -1,0 +1,197 @@
+name: Windows port and shared frontend
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      build:
+        description: Build unsigned Windows installer and unpacked app
+        type: boolean
+        default: false
+      full_macos:
+        description: Run the entire native macOS suite instead of focused port regressions
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-port-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      VIBEPOST_CACHE_DIR: ${{ github.workspace }}/.scratch/ci-windows-cache
+      MEDIACRAFT_FONT_CACHE_DIR: ${{ github.workspace }}/.scratch/ci-windows-cache/fonts
+      npm_config_cache: ${{ github.workspace }}/.scratch/ci-windows-cache/npm
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      VIBEPOST_TEST_DATA: ${{ github.workspace }}/.scratch/ci-windows-smoke
+      VIBEPOST_OUTPUT_DIR: ${{ github.workspace }}/dist/windows
+      VIBEPOST_FFMPEG: ${{ github.workspace }}/windows/resources/ffmpeg/ffmpeg.exe
+      VIBEPOST_FFPROBE: ${{ github.workspace }}/windows/resources/ffmpeg/ffprobe.exe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare repository dependencies and fonts
+        shell: pwsh
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run build:codemirror
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/fetch-fonts.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install Windows dependencies
+        working-directory: windows
+        run: npm ci
+      - name: Prepare verified FFmpeg, PDF.js and Electron runtime
+        working-directory: windows
+        shell: pwsh
+        run: |
+          npm run prepare:assets
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/runtime.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run service and actual FFmpeg tests
+        working-directory: windows
+        shell: pwsh
+        run: |
+          $env:TEMP = Join-Path $env:VIBEPOST_CACHE_DIR 'tmp'
+          $env:TMP = $env:TEMP
+          New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
+          npm test
+      - name: Run real desktop smoke test
+        working-directory: windows
+        run: npm run test:app
+      - name: Upload smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-smoke-evidence
+          path: ${{ env.VIBEPOST_TEST_DATA }}
+          if-no-files-found: ignore
+      - name: Build unsigned Windows distribution
+        if: github.event_name == 'workflow_dispatch' && inputs.build
+        working-directory: windows
+        run: npm run build
+      - name: Upload unsigned Windows distribution
+        if: github.event_name == 'workflow_dispatch' && inputs.build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Vibepost-Windows-unsigned
+          path: dist/windows
+          compression-level: 0
+          if-no-files-found: error
+
+  macos-shared-regression:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      MEDIACRAFT_FONT_CACHE_DIR: ${{ github.workspace }}/.scratch/ci-macos-fonts
+      MEDIACRAFT_TEST_LOG: ${{ github.workspace }}/.scratch/macos-test-logs/head-focused.log
+      MAC_BASE_REVISION: ${{ github.event.pull_request.base.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare shared frontend and bundled fonts
+        run: |
+          npm ci
+          npm run build:codemirror
+          python3 scripts/fetch-fonts.py
+      - name: Compare earlier UI failures on the upstream baseline
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          baseline="$GITHUB_WORKSPACE/.scratch/macos-baseline"
+          git worktree add --detach "$baseline" "$MAC_BASE_REVISION"
+          cp -R fonts "$baseline/fonts"
+          cp src/vendor/codemirror.js "$baseline/src/vendor/codemirror.js"
+          cp macos/run-tests.sh "$baseline/macos/run-tests.sh"
+          # Compare production revisions with the same test-only synchronization.
+          for test in AIPanelWindowTests.swift AIReviewTests.swift AIPresetsTests.swift MCPTests.swift SendToIPhoneTests.swift SendLivePhotoTests.swift LivePhotoEditorTests.swift; do
+            cp "macos/Tests/MediaCraftShellTests/$test" "$baseline/macos/Tests/MediaCraftShellTests/$test"
+          done
+          # Apply only the two compiler-neutral member qualifiers to the baseline.
+          python3 - "$baseline/macos/Sources/MediaCraftShell/ExternalAgents.swift" <<'PY'
+          import pathlib, sys
+          source = pathlib.Path(sys.argv[1])
+          text = source.read_text()
+          for member in ("sink", "enabled"):
+              old = f"let ({member}, count) = lock.withLock {{ ({member}, clients.count) }}"
+              new = f"let ({member}, count) = lock.withLock {{ (self.{member}, self.clients.count) }}"
+              if old in text:
+                  assert text.count(old) == 1
+                  text = text.replace(old, new)
+              else:
+                  assert new in text
+          source.write_text(text)
+          PY
+          for method in approvalsMapToDecisions aboutSectionChecksForUpdates coverTitlesPicker acceptSomeRejectSome twoAgentsTwoDrafts sendsCardsInPageOrder stagePreviewPlaysTheClip sendsLivePageAsPairedPvt; do
+            status=0
+            timeout=120
+            case "$method" in
+              approvalsMapToDecisions|sendsLivePageAsPairedPvt) timeout=300 ;;
+              twoAgentsTwoDrafts|sendsCardsInPageOrder|stagePreviewPlaysTheClip) timeout=180 ;;
+            esac
+            MEDIACRAFT_TEST_LOG="$GITHUB_WORKSPACE/.scratch/macos-test-logs/baseline-$method.log" \
+              "$baseline/macos/run-tests.sh" --filter "$method" "$timeout" || status=$?
+            echo "Upstream baseline $method: exit $status" >> "$GITHUB_STEP_SUMMARY"
+          done
+      - name: Verify earlier UI failures in isolated native processes
+        if: github.event_name != 'workflow_dispatch' || !inputs.full_macos
+        run: |
+          failed=0
+          for method in approvalsMapToDecisions aboutSectionChecksForUpdates coverTitlesPicker acceptSomeRejectSome; do
+            status=0
+            timeout=120
+            if [ "$method" = approvalsMapToDecisions ]; then timeout=300; fi
+            MEDIACRAFT_TEST_LOG="$GITHUB_WORKSPACE/.scratch/macos-test-logs/head-$method.log" \
+              macos/run-tests.sh --filter "$method" "$timeout" || status=$?
+            echo "Candidate $method: exit $status" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$status" -ne 0 ]; then failed=1; fi
+          done
+          exit "$failed"
+      - name: Run native macOS port regressions
+        if: success() || failure()
+        run: |
+          swift --version
+          xcodebuild -version
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.full_macos }}" = "true" ]; then
+            macos/run-tests.sh 1800
+          else
+            failed=0
+            for method in handshakeAndToolList draftToIPhone switchedDraftIsProtected twoAgentsTwoDrafts agentsLeaveUserWindowsAlone bridgeRejectsForeignRequests draftsEventsAndGuards exportsThroughTheSavePath sendsCardsInPageOrder sendsArticleAsOneLongImage liveEditorRoundTripsItsOptions stagePreviewPlaysTheClip liveExportCancelsAndExplains sendsLivePageAsPairedPvt zipPackagesLivePagesAsPvt replacedPagesDoNotHoldDrafts oneDraftOneWindow; do
+              status=0
+              timeout=180
+              if [ "$method" = sendsLivePageAsPairedPvt ]; then timeout=300; fi
+              MEDIACRAFT_TEST_LOG="$GITHUB_WORKSPACE/.scratch/macos-test-logs/head-focused-$method.log" \
+                macos/run-tests.sh --filter "$method" "$timeout" || status=$?
+              echo "Candidate port regression $method: exit $status" >> "$GITHUB_STEP_SUMMARY"
+              if [ "$status" -ne 0 ]; then failed=1; fi
+            done
+            exit "$failed"
+          fi
+      - name: Upload native macOS regression log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-regression-log
+          path: .scratch/macos-test-logs
+          if-no-files-found: ignore

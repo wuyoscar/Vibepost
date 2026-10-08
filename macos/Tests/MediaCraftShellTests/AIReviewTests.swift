@@ -140,7 +140,10 @@ struct AIReviewTests {
             ui.click("接受", { within: "第 2 处修改" });
             await until(() => ui.find("接受", { within: "第 2 处修改" })?.getAttribute("aria-pressed") === "true");
             await mc.ai.review.reject(2);
-            return await mc.ai.review.accept(3);
+            const partial = await mc.ai.review.accept(3);
+            await mc.render.pages();
+            await mc.render.thumbnails({ width: 120, height: 160 });
+            return partial;
         """, arguments: ["base": Self.base]) as? [String: Any]
         try await harness.load()
         let result = try await harness.evaluate(Self.helpers + """

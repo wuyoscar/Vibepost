@@ -14,6 +14,7 @@ import base64
 import hashlib
 import json
 import logging
+import os
 import posixpath
 import re
 import shutil
@@ -26,7 +27,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 OUTPUT = REPO / "fonts"
-CACHE = Path.home() / "Library/Caches/MediaCraft/fonts"
+CACHE = Path(os.environ.get("MEDIACRAFT_FONT_CACHE_DIR", str(Path.home() / "Library/Caches/MediaCraft/fonts")))
 FAMILY_PREFIX = "MC "
 FONTSOURCE_VERSION = "5.3.0"
 

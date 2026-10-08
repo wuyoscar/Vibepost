@@ -159,7 +159,7 @@ final class ExternalAgents: @unchecked Sendable {
     }
 
     private func announceClients() {
-        let (sink, count) = lock.withLock { (sink, clients.count) }
+        let (sink, count) = lock.withLock { (self.sink, self.clients.count) }
         sink?(Self.json(["type": "clients", "count": count]))
     }
 
@@ -268,7 +268,7 @@ final class ExternalAgents: @unchecked Sendable {
     }
 
     private func status() -> [String: Any] {
-        let (enabled, count) = lock.withLock { (enabled, clients.count) }
+        let (enabled, count) = lock.withLock { (self.enabled, self.clients.count) }
         return [
             "available": listening,
             "enabled": enabled,

@@ -1,0 +1,6 @@
+.phone-transfer-overlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgb(0 0 0 / .4);padding:24px;-webkit-app-region:no-drag}
+.phone-transfer-panel{box-sizing:border-box;width:min(560px,100%);max-height:calc(100vh - 48px);overflow:auto;background:var(--ui-panel,#fff);color:var(--ui-text,#24251f);border:1px solid var(--ui-border,#ddd);border-radius:20px;padding:24px;box-shadow:0 20px 80px rgb(0 0 0 / .24)}
+.phone-transfer-panel h2{margin:0 0 12px}.phone-transfer-panel p{line-height:1.6}.phone-transfer-qr{display:block;width:240px;height:240px;margin:16px auto;background:white;border-radius:12px}
+.phone-transfer-address{box-sizing:border-box;display:block;width:100%;padding:10px;border:1px solid var(--ui-border,#ccc);border-radius:8px;color:inherit;background:var(--ui-bg,#f7f7f4);font:12px/1.5 ui-monospace,monospace}
+.phone-transfer-status,.phone-transfer-help,.phone-transfer-alternatives{font-size:13px;color:var(--ui-muted,#676c61)}.phone-transfer-alternatives summary{cursor:pointer}.phone-transfer-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;flex-wrap:wrap}
+.phone-transfer-alternatives small{display:block;margin-top:6px}html[data-ui-theme="dark"] .phone-transfer-panel{background:var(--ui-panel,#252821);color:var(--ui-text,#eee)}

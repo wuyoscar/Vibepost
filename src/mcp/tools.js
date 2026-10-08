@@ -9,12 +9,14 @@
   const native = root.MediaCraftNative?.mcp ?? null;
   const shared = root.MediaCraftAITools.shared;
   const { reply, json, clip } = shared;
+  const capabilities = root.MediaCraftNative?.capabilities;
+  const motionFormats = (capabilities?.motionExport ?? []).filter((format) => ["mp4", "gif"].includes(format));
 
   // 出图给 Agent 看的 PNG：卡片缩到这么宽（默认 540，文字看得清），一次最多附这么多页
   const RENDER_WIDTH = [270, 864];
   const DEFAULT_RENDER_WIDTH = 540;
   const RENDER_LIMIT = 9;
-  const FORMATS = { zip: "整组卡片 ZIP", png: "单页 PNG", long: "长文长图" };
+  const FORMATS = { zip: "整组卡片 ZIP", png: "单页 PNG", long: "长文长图", ...Object.fromEntries(motionFormats.map((format) => [format, format === "mp4" ? "MP4 动效" : "GIF 动效"])) };
 
   const target = { before: shared.anchor("放在这一块之前"), after: shared.anchor("放在这一块之后（标题指它连同下面的整节）") };
 
@@ -211,7 +213,7 @@
 
   async function exportFiles(args, context) {
     if (!native || !context.exportRequest) throw new Error("导出到文件夹只能经 Vibepost 的 MCP 服务调用");
-    if (!FORMATS[args.format]) throw new TypeError("format 只能是 zip（整组卡片）、png（一页）或 long（长文长图）");
+    if (!FORMATS[args.format]) throw new TypeError(motionFormats.length ? "format 只能是 zip、png、long、mp4 或 gif" : "format 只能是 zip（整组卡片）、png（一页）或 long（长文长图）");
     const paths = [];
     const save = async (blob, filename) => {
       const { path, name } = await native.write(context.exportRequest, filename, blob);
@@ -220,6 +222,11 @@
     };
     if (args.format === "zip") await mc().output.exportZip({ save });
     else if (args.format === "long") await mc().output.exportLongImage({ save });
+    else if (motionFormats.includes(args.format)) {
+      const page = args.page === undefined ? undefined : Math.trunc(Number(args.page));
+      if (page !== undefined && !(page >= 1)) throw new RangeError("page 从 1 数");
+      await mc().output.exportMotion(args.format, page === undefined ? undefined : page - 1, { save });
+    }
     else {
       const page = Math.trunc(Number(args.page ?? 1));
       if (!(page >= 1)) throw new RangeError("page 从 1 数");
@@ -234,6 +241,12 @@
     context.record(`发送到 iPhone（${pageCount} 页）`);
     const clipboard = copied ? "小红书正文已放进剪贴板，发布时直接粘贴" : "这篇的小红书正文（caption）还空着，剪贴板没动";
     return `已在 Vibepost 里弹出隔空投送（共 ${pageCount} 张，按页序），请用户在 Mac 上选自己的 iPhone；${clipboard}。`;
+  }
+
+  async function sendToPhone(args, context) {
+    const { pageCount, url, expiresAt } = await mc().output.sendToPhone();
+    context.record(`开启手机下载（${pageCount} 页）`);
+    return reply(json({ pageCount, url, expiresAt, note: "App 已显示临时二维码。请用户用同一局域网的手机扫码，在手机网页上下载文件并复制小红书正文；是否保存进相册由手机浏览器和用户操作决定。" }));
   }
 
   // ===== 工具清单 =====
@@ -336,7 +349,9 @@
     },
     {
       name: "import_images",
-      description: "把本机的图片（PNG、JPEG、WebP、GIF、HEIC……，每张不超过 20 MB）插进这篇正文，每张一行。paths 是绝对路径；before / after 给稿子里的一段原文定位，都不给时插在正文末尾。返回新图片的 id。",
+      description: capabilities?.livePhoto === false
+        ? "把本机的图片（PNG、JPEG、WebP、GIF、BMP，每张不超过 20 MB、6400 万像素，一次最多 20 张和 60 MB）插进这篇正文，每张一行。paths 是本机磁盘绝对路径；before / after 给稿子里的一段原文定位，都不给时插在正文末尾。HEIC 请先转 PNG。返回新图片的 id。"
+        : "把本机的图片（PNG、JPEG、WebP、GIF、HEIC……，每张不超过 20 MB）插进这篇正文，每张一行。paths 是绝对路径；before / after 给稿子里的一段原文定位，都不给时插在正文末尾。返回新图片的 id。",
       inputSchema: {
         type: "object",
         properties: {
@@ -361,7 +376,9 @@
     },
     {
       name: "export",
-      description: "把这篇导出成文件，写进 directory（已经存在的文件夹的绝对路径）：format 为 zip（整组卡片打包，1728 × 2304 的 PNG，实况页是 .pvt）、png（第 page 页，从 1 数，默认 1）或 long（长文长图，不在长文模式时会先切过去）。文件名以标题开头；同名文件已经存在时报错，给 overwrite: true 才覆盖。返回写下的文件路径。",
+      description: motionFormats.length
+        ? "把这篇导出成文件，写进 directory（已经存在的本机文件夹绝对路径）：format 为 zip（整组卡片 PNG，动效页为 MP4）、png（第 page 页，从 1 数，默认 1）、long（长文长图）、mp4 或 gif（给 page 时导出该动效页，省略时导出全部动效页；仅一页直接保存，多页打包 ZIP，不含静态页）。Windows 不生成 Apple .pvt / Live Photo。同名文件给 overwrite: true 才覆盖。返回写下的文件路径。"
+        : "把这篇导出成文件，写进 directory（已经存在的文件夹的绝对路径）：format 为 zip（整组卡片打包，1728 × 2304 的 PNG，实况页是 .pvt）、png（第 page 页，从 1 数，默认 1）或 long（长文长图，不在长文模式时会先切过去）。文件名以标题开头；同名文件已经存在时报错，给 overwrite: true 才覆盖。返回写下的文件路径。",
       inputSchema: {
         type: "object",
         properties: {
@@ -381,6 +398,13 @@
       run: sendToIPhone,
     },
   ];
+
+  if (capabilities?.phoneTransfer) TOOLS.push({
+    name: "send_to_phone",
+    description: "开启临时局域网手机下载：在 App 显示二维码，由用户在同一局域网的手机扫码，按页序下载图片 / MP4 与复制小红书正文。会话可在 App 停止并自动过期；工具返回临时网址。调用前先用 render_pages 检查排版。保存到手机相册需要用户操作，Windows 不提供 AirDrop。",
+    inputSchema: { type: "object", properties: {} },
+    run: sendToPhone,
+  });
 
   root.MediaCraftMCPTools = { TOOLS };
 })(window);

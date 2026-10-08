@@ -14,6 +14,7 @@
   const settingsState = $("#mcpSettingsState");
   const command = $("#mcpCommand");
   const copyButton = $("#mcpCopyBtn");
+  let codexCopyButton;
   const logBox = $("#mcpLogBox");
   const logDot = $("#mcpLogDot");
   const logCount = $("#mcpLogCount");
@@ -44,6 +45,22 @@
     enabledInput.checked = status.enabled;
     settingsState.textContent = !status.enabled ? "已关闭：外部 Agent 连不上" : connected ? `${status.clients} 个已连接` : "没有连接";
     command.textContent = status.command ?? "";
+    // Windows also supplies Codex TOML; leave the existing Mac settings unchanged.
+    if (status.codexConfig && !codexCopyButton) {
+      codexCopyButton = copyButton.cloneNode(true);
+      codexCopyButton.id = "mcpCopyCodexBtn";
+      codexCopyButton.title = "复制 Codex MCP 配置片段，合并到现有 config.toml";
+      codexCopyButton.querySelector("span").textContent = "复制 Codex 配置";
+      codexCopyButton.addEventListener("click", () => report(async () => {
+        const { codexConfig } = await mc.mcp.status();
+        if (!codexConfig) throw new Error("没有 Codex 接入配置");
+        await root.MediaCraftNative.copyText(codexConfig);
+        appStatus.textContent = "已复制 Codex 配置，合并到现有 config.toml 后重启 Codex";
+      }));
+      copyButton.insertAdjacentElement("afterend", codexCopyButton);
+      settings.querySelector(".section-note").textContent = "Claude Code 或 Codex 能新建稿子、写正文、换主题、出图和导出；发送到手机时扫码接收。每一步都能 Ctrl+Z 撤销。";
+    }
+    if (codexCopyButton) codexCopyButton.hidden = !status.codexConfig;
 
     logBox.hidden = !connected && !log.length;
     logDot.dataset.state = connected ? "busy" : "idle";

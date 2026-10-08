@@ -16,3 +16,9 @@ fonts/
 # 只在本机：票与调研笔记、Agent 技能的仓库设置
 .scratch/
 docs/agents/
+
+# Windows generated assets and local data
+windows/resources/
+windows/.stage/
+windows/test-results/
+windows/data/

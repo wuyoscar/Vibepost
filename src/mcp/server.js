@@ -13,6 +13,7 @@
   const native = root.MediaCraftNative?.mcp ?? null;
   const shared = root.MediaCraftAITools.shared;
   const LOG_LIMIT = 50;
+  const capabilities = root.MediaCraftNative?.capabilities;
 
   // 工具在清单里的顺序：操作手册与写作手册、模板、稿子、样式、结构（含插片段）、图片、出图与导出
   const ORDER = [
@@ -21,7 +22,9 @@
     "set_theme", "set_style", "set_mode", "list_palettes", "apply_palette",
     "insert_page_break", "remove_page_break", "move_section", "restyle_block", "insert_section", "set_card_css",
     "import_images", "insert_image", "move_image", "resize_image", "crop_image",
-    "get_pages", "render_pages", "export", "send_to_iphone",
+    "get_pages", "render_pages", "export",
+    ...(capabilities?.airDrop === false ? [] : ["send_to_iphone"]),
+    ...(capabilities?.phoneTransfer ? ["send_to_phone"] : []),
   ];
   const own = new Map(root.MediaCraftMCPTools.TOOLS.map((tool) => [tool.name, tool]));
   const common = new Map(shared.definitions().map((tool) => [tool.name, tool]));
@@ -147,6 +150,8 @@
       enabled: Boolean(next.enabled),
       clients: Number(next.clients) || 0,
       command: next.command ?? null,
+      ...(next.claudeConfig ? { claudeConfig: next.claudeConfig } : {}),
+      ...(next.codexConfig ? { codexConfig: next.codexConfig } : {}),
     };
     emit();
     return { ...status };
