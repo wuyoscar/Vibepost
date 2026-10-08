@@ -28,6 +28,32 @@ claude mcp add mediacraft -- "/Applications/Vibepost.app/Contents/MacOS/mediacra
 
 开发时用 Debug 构建（`macos/build-app.sh debug`）的话，路径换成 `build.noindex/Vibepost.app/Contents/MacOS/mediacraft-mcp`。环境变量 `MEDIACRAFT_MCP_SOCKET` 可以换套接字的位置（测试用）。
 
+### Windows 接入
+
+Windows 版同样先在 AI 助手 › 设置打开「允许外部 Agent 连接」，默认关闭。点击「复制接入命令」得到按实际安装位置生成的 PowerShell 命令：它登记 bundled Electron 可执行文件与 `resources/mcp/stdio.cjs`，并为这个 MCP 进程设置 `ELECTRON_RUN_AS_NODE=1`。服务不要求另装 Node。开发环境的命令另带 `--app-arg` 指向 `windows/`，打包后的命令直接使用 `Vibepost.exe`。
+
+其他 stdio 客户端将 App 返回的 `mediacraft.mcp.status().claudeConfig` 对象复制到自己的配置；Codex 使用同一个状态里的 `codexConfig` TOML 片段。两者都包括 `--data-dir`，以便连接同一份稿件数据。App 只提供复制内容，不写入或覆盖 Claude/Codex 的全局配置。配置结构示例（路径换成 App 实际返回的值）：
+
+```json
+{
+  "mcpServers": {
+    "mediacraft": {
+      "command": "E:\\Apps\\Vibepost\\Vibepost.exe",
+      "args": ["E:\\Apps\\Vibepost\\resources\\mcp\\stdio.cjs", "--data-dir", "E:\\VibepostData", "--app", "E:\\Apps\\Vibepost\\Vibepost.exe"],
+      "env": { "ELECTRON_RUN_AS_NODE": "1" }
+    }
+  }
+}
+```
+
+Windows 的链路为 `客户端 → stdio helper → 本机 Windows 命名管道 → Electron 主进程 → 原有页面 MCP → window.mediacraft`。协议版本、错误码、取消通知与逐请求 `resultType: "complete"` 规则和上文一致。握手只尝试读取正在运行的 App 的手册，不启动 App；工具清单或工具调用连接不上时可启动 App，启动时移除继承的 `ELECTRON_RUN_AS_NODE` 并传入 `--data-dir`。已经发送的调用在断线或重启后不会重放：客户端会看到「可能没有完成」，下一次调用再重连，进程的会话编号保持不变。
+
+数据目录中的 `mcp/endpoint.json` 保存本机管道位置，`mcp/token` 为每次 App 启动生成的随机令牌；`mcp/` 与令牌使用仅当前 Windows 用户的 DACL，管道另用仅当前用户的 DACL 并明确拒绝 NETWORK 身份（远程 SMB 连接）。认证成功后才返回 `{ "ready": true }`。关闭连接开关会断开已认证客户端并使进行中的导出令牌失效。MCP 不监听 TCP 端口；手机下载是独立的临时局域网服务。第二个使用相同数据目录的 App 不抢先前实例的 endpoint。
+
+Windows 图片导入支持 PNG、JPEG、WebP、GIF、BMP，HEIC 先转换成 PNG；沿用一次 20 张、每张 20 MB、总计 60 MB、每张 6400 万像素的上限，并先检查尺寸再解码。图片与导出目录需为已经存在的本机磁盘绝对路径，`~` 可用，UNC 网络路径不接受。导出只接受当前调用的临时令牌，不接受目录分隔符、Windows 设备名或已有同名文件（显式 `overwrite: true` 才覆盖），覆盖通过临时文件替换实现。
+
+Windows 按原生能力提供 `send_to_phone`，替代不支持的 `send_to_iphone`；其他工具顺序保持不变。`export.format` 另支持 `mp4`、`gif`：给 `page` 时导出该动效页，省略时导出全部动效页（仅一页直接保存，多页打包 ZIP，静态页不加入）；`zip` 的动效页为 MP4。不会生成 Apple `.pvt` / Live Photo。`send_to_phone` 在 App 显示有过期时间的二维码，手机同一局域网打开下载页后自行下载文件、复制小红书正文，保存进相册需由用户在手机上完成。
+
 ## 怎么连
 
 ```
@@ -93,3 +119,5 @@ Claude Code ──stdio（JSON-RPC）── mediacraft-mcp ──Unix 域套接�
 ## 测试
 
 `macos/Tests/MediaCraftShellTests/MCPTests.swift`：测试的客户端经管道对着 `mediacraft-mcp` 的核心（`MCPServer`，可执行文件里跑的就是它）说 JSON-RPC，核心经真的套接字连到 ShellHarness 里的 App，AirDrop 是假接收端。覆盖握手与两代协议版本、工具清单、写作手册的列出 / 读取 / 提议保存（`WritingManualsTests.swift`）、新建 → 写正文 → 换主题 → 出图 → 导出 → 发送、内置说明书只读、按路径插图、模板与片段（`list_templates`、`create_draft` 带 `template`、`insert_section` 与撤销、操作记录）、⌘Z 与逐条撤销、切走稿子后不再改（重连后仍记得）、开关与复制接入命令、用户检查、两个 Vibepost 不抢套接字、App 没开时先打开它。
+
+Windows：`node --test windows/tests/mcp*.test.cjs` 以真实 stdio 子进程连接真实本机命名管道，验证 Swift 的全部协议版本、工具转发、令牌与管道实际 DACL、默认关闭与保存、关开关断线、导入各项上限、导出令牌与覆盖、断线不重放、取消排队调用，以及 Mac 原有 30 工具与 Windows 能力分支；另执行实际主进程的窗口路由与 IPC 处理代码，以窗口替身验证跨窗口导出令牌、页面版本、内置只读稿绑定与后台 AI 占用。Unix 环境可注入 socket 路径运行相同服务测试；测试素材与数据在仓库 `.scratch/windows-mcp-tests/` 下，结束后清理。
