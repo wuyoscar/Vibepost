@@ -21,7 +21,7 @@
     element.style.borderRadius = `${percent(hit.radius, hit.width)} / ${percent(hit.radius, hit.height)}`;
     const badge = document.createElement("span");
     badge.className = "stage-live-badge";
-    badge.textContent = "LIVE";
+    badge.textContent = window.MediaCraftNative?.capabilities?.motionExport?.includes("mp4") ? "动态" : "LIVE";
     element.append(badge);
     if (!source) return { element, playOnce() {}, setHover() {}, stop() {} };
 

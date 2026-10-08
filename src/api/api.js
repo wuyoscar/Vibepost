@@ -509,6 +509,10 @@
         exportLongImage: async (options) => exporter.exportLongImage(outputOptions(options)),
         // 整组按页序交给隔空投送，正文纯文本进剪贴板（只在 MediaCraft.app 里可用）。
         sendToIPhone: () => exporter.sendToIPhone(),
+        ...(root.MediaCraftNative?.capabilities?.phoneTransfer ? { sendToPhone: () => exporter.sendToPhone() } : {}),
+        ...(root.MediaCraftNative?.capabilities?.motionExport?.length ? {
+          exportMotion: (format, index, options) => exporter.exportMotion(format, index, outputOptions(options)),
+        } : {}),
         // 长文带格式（行内样式的 HTML）与纯文本一起进剪贴板，可直接粘进公众号编辑器。
         copyArticle: () => exporter.copyArticle(),
       },

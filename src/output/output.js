@@ -65,7 +65,7 @@
     })]);
   }
 
-  const saved = ({ filename }) => ({ title: "已存进「下载」", detail: filename });
+  const saved = ({ filename }) => ({ title: root.MediaCraftNative?.capabilities?.saveDialog ? "已保存" : "已存进「下载」", detail: filename });
   const exported = ({ filename }) => ({ title: "已导出", detail: filename });
   // 导出的选项 { save }：save(blob, filename) → 实际存下的文件名，代替存进「下载」
   const saverOf = (options = {}) => (options.save ? { store: options.save, done: exported } : { store: save, done: saved });
@@ -84,7 +84,7 @@
     // 一次只做一件：做的时候所有导出按钮都停用。
     function setRunning(task) {
       running = task;
-      for (const button of document.querySelectorAll("[data-output], [data-page-export]")) button.disabled = Boolean(task);
+      for (const button of document.querySelectorAll("[data-output], [data-page-export], [data-motion-export]")) button.disabled = Boolean(task);
     }
 
     // 出图的导出与发送（fonts 为 true）顺带看看用没用到只限个人使用的字体，有就在进度卡片上提醒；不耽误导出本身
@@ -123,6 +123,12 @@
     // <name>.pvt/<name>.MOV、<name>.JPG、metadata.plist。浏览器里没有壳，明说要到 App 里做。
     async function livePackage(card, name, task, onProgress) {
       const native = root.MediaCraftNative;
+      if (native?.capabilities?.motionExport?.includes("mp4")) {
+        return [
+          await motionFile(card, name, "mp4", task, onProgress),
+          { name: `${name}.png`, blob: await encodePng(card.canvas) },
+        ];
+      }
       if (!native?.livePhoto) throw new Error("实况要在 Vibepost App 里导出：浏览器里合成不了实况，普通卡片可以照常导出");
       const { video, ...clip } = await host.liveSource(card.live.imageId) ?? {};
       if (!video) throw new Error("实况视频找不到了，请重新插入这段视频");
@@ -142,6 +148,19 @@
       ];
     }
 
+    async function motionFile(card, name, format, task, onProgress) {
+      const native = root.MediaCraftNative;
+      if (!native?.motionVideo || !native.capabilities?.motionExport?.includes(format)) throw new Error(`当前平台不支持 ${format.toUpperCase()} 动态导出`);
+      if (!card.live) throw new Error("这张卡片没有动态视频，请选择含视频的卡片");
+      const { video, ...clip } = await host.liveSource(card.live.imageId) ?? {};
+      if (!video) throw new Error("动态视频找不到了，请重新插入这段视频");
+      const blob = await native.motionVideo({
+        card: await encodePng(card.canvas), video, ...clip, format,
+        cardWidth: CARD_WIDTH, cardHeight: CARD_HEIGHT, well: card.live,
+      }, { signal: task.signal, onProgress });
+      return { name: `${name}.${format}`, blob: blob?.blob ?? blob };
+    }
+
     // 一页的文件：普通页一张 PNG，实况页一个 .pvt 目录包。
     async function pageFiles(card, name, task, onProgress) {
       if (card.live) return livePackage(card, name, task, onProgress);
@@ -154,7 +173,8 @@
       const files = [];
       for (const [index, card] of cards.entries()) {
         task.signal.throwIfAborted();
-        const step = (done = 0) => task.step(`第 ${index + 1} 张 / 共 ${cards.length} 张${card.live ? " · 合成实况" : ""}`, (index + done) / cards.length);
+        const dynamic = root.MediaCraftNative?.capabilities?.motionExport?.includes("mp4");
+        const step = (done = 0) => task.step(`第 ${index + 1} 张 / 共 ${cards.length} 张${card.live ? dynamic ? " · 合成动态卡片" : " · 合成实况" : ""}`, (index + done) / cards.length);
         step();
         files.push(...await pageFiles(card, name(index), task, step));
       }
@@ -169,7 +189,8 @@
         const card = cardOf(canvas);
         const name = `${await stem()}-${pad(index + 1)}`;
         if (!card.live) return { filename: await store(await encodePng(card.canvas), `${name}.png`) };
-        const files = await pageFiles(card, name, task, (progress) => task.step("正在合成实况…", progress));
+        const label = root.MediaCraftNative?.capabilities?.motionExport?.includes("mp4") ? "正在合成动态卡片…" : "正在合成实况…";
+        const files = await pageFiles(card, name, task, (progress) => task.step(label, progress));
         task.signal.throwIfAborted();
         return { filename: await store(await zipBlob(files), `${name}.zip`) };
       }, { cancellable: true, fonts: true, done });
@@ -187,6 +208,31 @@
       }, { cancellable: true, fonts: true, done });
     }
 
+    function exportMotion(format, index, options) {
+      if (!["mp4", "gif"].includes(format)) return Promise.reject(new Error("动态导出格式必须为 mp4 或 gif"));
+      const { store, done } = saverOf(options);
+      return job(`导出 ${format.toUpperCase()}`, async (task) => {
+        const cards = (await host.cards()).map(cardOf);
+        const base = await stem();
+        if (index !== undefined && index !== null) {
+          if (!Number.isInteger(index) || !cards[index]) throw new RangeError(`没有第 ${Number(index) + 1} 张`);
+          const file = await motionFile(cards[index], `${base}-${pad(index + 1)}`, format, task, (progress) => task.step("正在合成动态卡片…", progress));
+          task.signal.throwIfAborted();
+          return { filename: await store(file.blob, file.name), format, pageCount: 1 };
+        }
+        const selected = cards.map((card, at) => ({ card, at })).filter(({ card }) => card.live);
+        if (!selected.length) throw new Error("这篇稿子没有动态视频，请先插入一段视频");
+        const files = [];
+        for (const [at, entry] of selected.entries()) {
+          task.signal.throwIfAborted();
+          files.push(await motionFile(entry.card, `${base}-${pad(entry.at + 1)}`, format, task, (progress) => task.step(`第 ${entry.at + 1} 张 · 合成 ${format.toUpperCase()}`, (at + progress) / selected.length)));
+        }
+        task.signal.throwIfAborted();
+        if (files.length === 1) return { filename: await store(files[0].blob, files[0].name), format, pageCount: 1 };
+        return { filename: await store(await zipBlob(files), `${base}-${format}.zip`), format, pageCount: files.length };
+      }, { cancellable: true, fonts: true, done });
+    }
+
     function exportLongImage(options) {
       const { store, done } = saverOf(options);
       return job("导出长图", async (task) => {
@@ -201,6 +247,7 @@
     // 普通页 NN.png、实况页 NN.pvt，按文件名排序就是页序；拍摄时间由壳按页序写入。
     // 剪贴板放小红书正文（图文卡片是正文栏，长文是全文的纯文本）；正文为空时不动剪贴板。
     async function sendToIPhone() {
+      if (root.MediaCraftNative?.capabilities?.phoneTransfer) return sendToPhone();
       if (!root.MediaCraftNative) throw new Error("只有在 Vibepost App 里才能发送到 iPhone");
       const { pageCount, copied } = await job("发送到 iPhone", async (task) => {
         const { mode } = await api().drafts.current();
@@ -237,6 +284,40 @@
         }),
       });
       return { pageCount, copied };
+    }
+
+    async function sendToPhone() {
+      const native = root.MediaCraftNative;
+      if (!native?.capabilities?.phoneTransfer || !native.sendToPhone) throw new Error("当前平台不支持局域网手机传输");
+      const result = await job("发送到手机", async (task) => {
+        const { mode, title, caption } = await api().drafts.current();
+        let files;
+        let pageCount;
+        if (mode === "article") {
+          task.step("正在生成长图…");
+          files = [{ name: "01.png", blob: await encodePng(await host.articleImage()) }];
+          pageCount = 1;
+        } else {
+          const prepared = await allPageFiles(task, (index) => pad(index + 1));
+          files = prepared.files;
+          pageCount = prepared.cards.length;
+        }
+        const text = mode === "article" ? await api().render.plainText() : caption;
+        const topics = await host.topics().catch(() => []);
+        task.signal.throwIfAborted();
+        task.step("正在生成手机下载链接…", 1);
+        const session = await native.sendToPhone(files, text || "", { title, topics });
+        if (task.signal.aborted) {
+          await native.stopPhoneTransfer?.(session.session);
+          task.signal.throwIfAborted();
+        }
+        return { ...session, pageCount, copied: false };
+      }, {
+        cancellable: true, fonts: true,
+        done: () => ({ title: "手机传输链接已就绪", detail: "手机扫码下载并复制文字，关闭传输窗口后链接失效" }),
+      });
+      root.MediaCraftPhoneTransfer?.open(result, { stop: () => native.stopPhoneTransfer?.(result.session) });
+      return result;
     }
 
     function sentDetail({ copied, mode }) {
@@ -310,8 +391,10 @@
     return {
       exportPng,
       exportZip,
+      exportMotion,
       exportLongImage,
       sendToIPhone,
+      sendToPhone,
       copyArticle,
       // 预览里每页的下载按钮
       exportPage: (index) => exportPng(index).catch(() => undefined),

@@ -150,7 +150,9 @@
     track.setAttribute("aria-valuetext", `从 ${seconds(current.start)} 秒起，用 ${seconds(current.span)} 秒`);
     const lead = current.short ? `视频只有 ${seconds(meta.duration)} 秒，成片 ${seconds(current.seconds)} 秒` : `成片 ${seconds(current.seconds)} 秒`;
     const range = `原视频 ${seconds(current.start)}–${seconds(current.start + current.span)} 秒`;
-    const note = window.MediaCraftNative ? "" : " · 导出实况要在 MediaCraft App 里";
+    const note = window.MediaCraftNative?.capabilities?.motionExport?.includes("mp4")
+      ? " · 可导出 MP4 / GIF，GIF 不带声音"
+      : window.MediaCraftNative ? "" : " · 导出实况要在 MediaCraft App 里";
     summary.textContent = `${lead} · ${range} · 封面在第 ${seconds(current.cover / settings.speed)} 秒${note}`;
     drawPlayhead();
   }
