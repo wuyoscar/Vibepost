@@ -124,6 +124,10 @@ jobs:
           cp -R fonts "$baseline/fonts"
           cp src/vendor/codemirror.js "$baseline/src/vendor/codemirror.js"
           cp macos/run-tests.sh "$baseline/macos/run-tests.sh"
+          # Compare production revisions with the same test-only synchronization.
+          for test in AIPanelWindowTests.swift AIReviewTests.swift AIPresetsTests.swift MCPTests.swift SendToIPhoneTests.swift SendLivePhotoTests.swift LivePhotoEditorTests.swift; do
+            cp "macos/Tests/MediaCraftShellTests/$test" "$baseline/macos/Tests/MediaCraftShellTests/$test"
+          done
           # Apply only the two compiler-neutral member qualifiers to the baseline.
           python3 - "$baseline/macos/Sources/MediaCraftShell/ExternalAgents.swift" <<'PY'
           import pathlib, sys
