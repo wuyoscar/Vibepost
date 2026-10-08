@@ -44,12 +44,14 @@ struct AIPanelWindowTests {
         let checks = CheckCounter()
         harness.shell.core.checkForUpdates = { checks.increment() }
         try await harness.load()
-        let result = try await harness.evaluate("""
+        let result = try await harness.evaluate(AISessionTests.helpers + """
             await window.mediacraft.drafts.create();
             ui.click("AI 助手");
             ui.expand("AI 设置");
-            await new Promise((resolve) => setTimeout(resolve, 300));
             const about = document.querySelector("#aboutSettings");
+            await until(() => !about.hidden
+              && document.querySelector("#aboutVersion").textContent === "Vibepost 9.9.9"
+              && ui.find("检查更新…")?.disabled === false);
             const version = document.querySelector("#aboutVersion").textContent;
             ui.click("检查更新…");
             await new Promise((resolve) => setTimeout(resolve, 300));
