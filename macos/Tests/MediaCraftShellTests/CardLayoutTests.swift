@@ -184,6 +184,8 @@ struct CardLayoutTests {
               const start = performance.now();
               pages = (await mc.render.refresh()).length;
               times.push(performance.now() - start);
+              // 出图之后胶片在后台给每页出缩略图（和下一次排版抢主线程）：等它做完再量下一次，量的只是排版与出图
+              await mc.render.thumbnails({ width: 120, height: 160 });
             }
             return { pages, median: times.sort((a, b) => a - b)[1] };
         """) as? [String: Any]
