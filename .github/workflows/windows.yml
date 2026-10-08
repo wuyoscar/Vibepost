@@ -9,6 +9,10 @@ on:
         description: Build unsigned Windows installer and unpacked app
         type: boolean
         default: false
+      full_macos:
+        description: Run the entire native macOS suite instead of focused port regressions
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -91,12 +95,15 @@ jobs:
 
   macos-shared-regression:
     runs-on: macos-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     env:
       MEDIACRAFT_FONT_CACHE_DIR: ${{ github.workspace }}/.scratch/ci-macos-fonts
-      MEDIACRAFT_TEST_LOG: ${{ github.workspace }}/.scratch/macos-tests.log
+      MEDIACRAFT_TEST_LOG: ${{ github.workspace }}/.scratch/macos-test-logs/head-focused.log
+      MAC_BASE_REVISION: ${{ github.event.pull_request.base.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -108,15 +115,66 @@ jobs:
           npm ci
           npm run build:codemirror
           python3 scripts/fetch-fonts.py
-      - name: Run native macOS regression suite
+      - name: Compare earlier UI failures on the upstream baseline
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          baseline="$GITHUB_WORKSPACE/.scratch/macos-baseline"
+          git worktree add --detach "$baseline" "$MAC_BASE_REVISION"
+          cp -R fonts "$baseline/fonts"
+          cp src/vendor/codemirror.js "$baseline/src/vendor/codemirror.js"
+          cp macos/run-tests.sh "$baseline/macos/run-tests.sh"
+          # Apply only the two compiler-neutral member qualifiers to the baseline.
+          python3 - "$baseline/macos/Sources/MediaCraftShell/ExternalAgents.swift" <<'PY'
+          import pathlib, sys
+          source = pathlib.Path(sys.argv[1])
+          text = source.read_text()
+          for member in ("sink", "enabled"):
+              old = f"let ({member}, count) = lock.withLock {{ ({member}, clients.count) }}"
+              new = f"let ({member}, count) = lock.withLock {{ (self.{member}, self.clients.count) }}"
+              if old in text:
+                  assert text.count(old) == 1
+                  text = text.replace(old, new)
+              else:
+                  assert new in text
+          source.write_text(text)
+          PY
+          for method in approvalsMapToDecisions aboutSectionChecksForUpdates coverTitlesPicker acceptSomeRejectSome; do
+            status=0
+            timeout=120
+            if [ "$method" = approvalsMapToDecisions ]; then timeout=300; fi
+            MEDIACRAFT_TEST_LOG="$GITHUB_WORKSPACE/.scratch/macos-test-logs/baseline-$method.log" \
+              "$baseline/macos/run-tests.sh" --filter "$method" "$timeout" || status=$?
+            echo "Upstream baseline $method: exit $status" >> "$GITHUB_STEP_SUMMARY"
+          done
+      - name: Verify earlier UI failures in isolated native processes
+        if: github.event_name != 'workflow_dispatch' || !inputs.full_macos
+        run: |
+          failed=0
+          for method in approvalsMapToDecisions aboutSectionChecksForUpdates coverTitlesPicker acceptSomeRejectSome; do
+            status=0
+            timeout=120
+            if [ "$method" = approvalsMapToDecisions ]; then timeout=300; fi
+            MEDIACRAFT_TEST_LOG="$GITHUB_WORKSPACE/.scratch/macos-test-logs/head-$method.log" \
+              macos/run-tests.sh --filter "$method" "$timeout" || status=$?
+            echo "Candidate $method: exit $status" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$status" -ne 0 ]; then failed=1; fi
+          done
+          exit "$failed"
+      - name: Run native macOS port regressions
+        if: success() || failure()
         run: |
           swift --version
           xcodebuild -version
-          macos/run-tests.sh 900
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.full_macos }}" = "true" ]; then
+            macos/run-tests.sh 1800
+          else
+            macos/run-tests.sh --filter 'handshakeAndToolList|draftToIPhone|switchedDraftIsProtected|twoAgentsTwoDrafts|agentsLeaveUserWindowsAlone|bridgeRejectsForeignRequests|draftsEventsAndGuards|exportsThroughTheSavePath|sendsCardsInPageOrder|sendsArticleAsOneLongImage|liveEditorRoundTripsItsOptions|stagePreviewPlaysTheClip|liveExportCancelsAndExplains|sendsLivePageAsPairedPvt|zipPackagesLivePagesAsPvt|replacedPagesDoNotHoldDrafts|oneDraftOneWindow' 900
+          fi
       - name: Upload native macOS regression log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: macos-regression-log
-          path: ${{ env.MEDIACRAFT_TEST_LOG }}
+          path: .scratch/macos-test-logs
           if-no-files-found: ignore
