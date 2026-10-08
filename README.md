@@ -4,7 +4,7 @@
 
 <h1 align="center">Vibepost</h1>
 
-<p align="center">在 Mac 上用 Markdown 写小红书：排成 3:4 图文卡片、长文长图和实况照片，按页序隔空投送到 iPhone。</p>
+<p align="center">在 Mac/Windows 上用 Markdown 写小红书：排成 3:4 图文卡片、长文长图和实况照片，Mac按页序隔空投送到 iPhone</p>
 
 <p align="center">
   <a href="https://github.com/wuyoscar/Vibepost/releases">下载</a> ·
