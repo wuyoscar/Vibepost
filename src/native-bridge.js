@@ -13,8 +13,38 @@
     };
     const progressListeners = new Map();
     base.onMotion((event) => progressListeners.get(event.job)?.(event.progress));
+    const pngBlob = (data) => new Blob([Uint8Array.from(atob(data), (char) => char.charCodeAt(0))], { type: "image/png" });
+    const rasterCards = async (request) => {
+      // The shared frontend batches up to 40 pages; Windows keeps each IPC
+      // capture bounded to 16 without changing the Mac batching contract.
+      if (Array.isArray(request.pages) && request.pages.length > 16) {
+        const replies = [];
+        for (let start = 0; start < request.pages.length; start += 16) {
+          replies.push(await rasterCards({ ...request, pages: request.pages.slice(start, start + 16) }));
+        }
+        return {
+          ...replies.at(-1),
+          pages: replies.flatMap((reply) => reply.pages),
+          times: replies.flatMap((reply) => reply.times ?? []),
+          totalMs: replies.reduce((sum, reply) => sum + (reply.totalMs ?? 0), 0),
+        };
+      }
+      const result = await base.rasterCards(request);
+      if (result?.__error) {
+        throw Object.assign(new Error(result.__error.message), result.__error);
+      }
+      return {
+        ...result,
+        pages: result.pages.map((page) => ({
+          ...page,
+          ...(page.png ? { png: pngBlob(page.png) } : {}),
+          strips: (page.strips ?? []).map((strip) => ({ ...strip, png: pngBlob(strip.png) })),
+        })),
+      };
+    };
     window.MediaCraftNative = {
       ...base,
+      rasterCards: base.rasterCards ? rasterCards : null,
       pdfToImages: (blob) => window.MediaCraftWindowsPDF(blob),
       saveFile: async (blob, name) => base.saveFile(await bytes(blob), name),
       sendToPhone: async (files, text, details = {}) => base.sendToPhone(await Promise.all(files.map(async (file) => ({ name: file.name, type: file.blob.type, data: await bytes(file.blob) }))), text, details),

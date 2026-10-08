@@ -21,6 +21,7 @@ const { AiService } = require("./lib/ai.cjs");
 const { McpService } = require("./lib/mcp.cjs");
 const { PhoneService } = require("./lib/phone.cjs");
 const { MotionService } = require("./lib/motion.cjs");
+const { CardRasterService } = require("./lib/card-raster.cjs");
 protocol.registerSchemesAsPrivileged([
   {
     scheme: "mediacraft",
@@ -63,6 +64,7 @@ let ai,
   mcp,
   phone,
   motion,
+  cardRaster,
   library,
   quitting = false,
   disposing = false;
@@ -125,6 +127,7 @@ async function persist() {
   );
 }
 async function releaseOwner(owner) {
+  await cardRaster?.release(key(owner));
   await ai?.closeOwner(owner);
   for (const [job, entry] of motion?.jobs || [])
     if (entry.owner === key(owner)) motion.cancel(job, key(owner));
@@ -331,6 +334,11 @@ ipcMain.handle(
       )
         owned(owner, params.draftId);
       switch (action) {
+        case "cards/raster": {
+          const result = await cardRaster.render(key(owner), params);
+          states.assert(owner);
+          return result;
+        }
         case "ai/status":
           return await ai.status(params.refresh, params.backend);
         case "ai/settings":
@@ -502,6 +510,9 @@ ipcMain.handle(
           name: error.name,
           message: error.message,
           status: error.status,
+          code: error.code,
+          missing: error.missing,
+          generation: error.generation,
         },
       };
     }
@@ -565,6 +576,7 @@ async function shutdown() {
     mcp?.dispose(),
     phone?.dispose(),
     motion?.dispose(),
+    cardRaster?.dispose(),
   ]);
   quitting = true;
   app.quit();
@@ -589,6 +601,7 @@ else {
     .whenReady()
     .then(async () => {
       protocol.handle("mediacraft", staticResponse);
+      cardRaster = new CardRasterService({ BrowserWindow });
       library = new Library(dataDir, webRoot);
       await library.seed();
       ai = new AiService({
