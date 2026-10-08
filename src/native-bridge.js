@@ -1,6 +1,42 @@
 // 运行在 MediaCraft.app 壳里时，暴露原生能力（保存文件、发送到 iPhone、带格式复制、合成实况）。
 // 浏览器里打开时 window.MediaCraftNative 为 null，页面走原来的浏览器路径。
 (() => {
+  // Electron supplies the contract through an isolated preload. The Swift
+  // host continues to use the scheme bridge below.
+  if (window.__electronBridge) {
+    const base = window.__electronBridge;
+    const bytes = async (blob) => {
+      const data = new Uint8Array(await blob.arrayBuffer());
+      const chunks = [];
+      for (let offset = 0; offset < data.length; offset += 8192) chunks.push(String.fromCharCode(...data.subarray(offset, offset + 8192)));
+      return btoa(chunks.join(""));
+    };
+    const progressListeners = new Map();
+    base.onMotion((event) => progressListeners.get(event.job)?.(event.progress));
+    window.MediaCraftNative = {
+      ...base,
+      pdfToImages: (blob) => window.MediaCraftWindowsPDF(blob),
+      saveFile: async (blob, name) => base.saveFile(await bytes(blob), name),
+      sendToPhone: async (files, text, details = {}) => base.sendToPhone(await Promise.all(files.map(async (file) => ({ name: file.name, type: file.blob.type, data: await bytes(file.blob) }))), text, details),
+      mcp: { ...base.mcp, write: async (request, name, blob) => base.mcp.write(request, name, await bytes(blob)) },
+      async motionVideo({ card, video, ...settings }, { signal, onProgress } = {}) {
+        const job = crypto.randomUUID();
+        const abort = () => void base.motionCancel(job);
+        signal?.throwIfAborted();
+        signal?.addEventListener("abort", abort, { once: true });
+        progressListeners.set(job, onProgress);
+        try {
+          const result = await base.motionRender({ card: await bytes(card), video: await bytes(video), ...settings, job });
+          signal?.throwIfAborted();
+          return new Blob([Uint8Array.from(atob(result.data), (char) => char.charCodeAt(0))], { type: result.type });
+        } finally {
+          signal?.removeEventListener("abort", abort);
+          progressListeners.delete(job);
+        }
+      },
+    };
+    return;
+  }
   if (window.location.protocol !== "mediacraft:") {
     window.MediaCraftNative = null;
     return;
