@@ -517,26 +517,25 @@ async function staticResponse(request) {
     return new Response("Bad request", { status: 400 });
   }
   let target;
-  if (name.startsWith("/__windows/browser/"))
-    target = path.join(__dirname, "browser", name.slice(19));
-  else if (name.startsWith("/__windows/renderer/"))
-    target = path.join(__dirname, "renderer", name.slice(20));
-  else if (name.startsWith("/__windows/vendor/pdf/"))
-    target = path.join(assets, "pdf", name.slice(22));
-  else if (
-    /^\/(src|fonts|brand)\//.test(name) ||
-    /^\/docs\/(guide-assets|template-assets)\//.test(name) ||
-    name === "/index.html" ||
-    name === "/VERSION"
-  )
-    target = path.join(webRoot, name);
-  else return new Response("Not found", { status: 404 });
-  const root = name.startsWith("/__windows/vendor/")
-    ? assets
-    : name.startsWith("/__windows/")
-      ? __dirname
-      : webRoot;
-  if (!within(root, target)) return new Response("Forbidden", { status: 403 });
+  const routes = [
+    ["/__windows/browser/", path.join(__dirname, "browser")],
+    ["/__windows/renderer/", path.join(__dirname, "renderer")],
+    ["/__windows/vendor/pdf/", path.join(assets, "pdf")],
+    ["/src/", path.join(webRoot, "src")],
+    ["/fonts/", path.join(webRoot, "fonts")],
+    ["/brand/", path.join(webRoot, "brand")],
+    ["/docs/guide-assets/", path.join(webRoot, "docs", "guide-assets")],
+    ["/docs/template-assets/", path.join(webRoot, "docs", "template-assets")],
+  ];
+  const route = routes.find(([prefix]) => name.startsWith(prefix));
+  if (route) {
+    const [prefix, directory] = route;
+    target = path.resolve(directory, name.slice(prefix.length));
+    if (!within(directory, target))
+      return new Response("Forbidden", { status: 403 });
+  } else if (name === "/index.html" || name === "/VERSION") {
+    target = path.join(webRoot, name.slice(1));
+  } else return new Response("Not found", { status: 404 });
   try {
     if (name === "/index.html") {
       let html = await fs.readFile(target, "utf8");

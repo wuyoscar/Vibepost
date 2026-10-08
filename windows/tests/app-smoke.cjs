@@ -56,6 +56,43 @@ async function main() {
       ),
     );
     checks.push("shared frontend, stable origin, version and capabilities");
+    const assetPaths = [
+      "/index.html",
+      "/VERSION",
+      "/__windows/browser/host.js",
+      "/__windows/renderer/phone-transfer.css",
+      "/__windows/vendor/pdf/pdf.mjs",
+      "/src/native-bridge.js",
+      "/fonts/fonts.css",
+      "/brand/app-icon-256.png",
+      "/docs/guide-assets/valley-morning.jpg",
+    ];
+    const traversalPaths = [
+      "/__windows/browser/%2f../main.cjs",
+      "/__windows/browser/..%2fmain.cjs",
+      "/__windows/browser/%5c..%5cmain.cjs",
+      "/__windows/renderer/%5c..%5cpreload.cjs",
+      "/__windows/vendor/pdf/%2f..%2ficon.ico",
+      "/src/%2f..%2fVERSION",
+      "/fonts/%5c..%5cVERSION",
+      "/brand/%2f..%2fVERSION",
+      "/docs/guide-assets/%5c..%5c..%5cVERSION",
+      "/docs/template-assets/%2f..%2f..%2fVERSION",
+    ];
+    const assets = await page.evaluate(async (paths) => {
+      return Promise.all(paths.map(async (asset) => {
+        const response = await fetch(asset);
+        return { asset, status: response.status, bytes: (await response.arrayBuffer()).byteLength };
+      }));
+    }, [...assetPaths, ...traversalPaths]);
+    for (const result of assets.slice(0, assetPaths.length)) {
+      assert.equal(result.status, 200, `normal asset: ${result.asset}`);
+      assert(result.bytes > 0, `empty asset: ${result.asset}`);
+    }
+    for (const result of assets.slice(assetPaths.length)) {
+      assert.equal(result.status, 403, `directory traversal: ${result.asset}`);
+    }
+    checks.push("static asset directory boundaries and encoded traversal rejection");
     const draft = await page.evaluate(async () => {
       await window.mediacraft.drafts.create({
         title: "Windows smoke",

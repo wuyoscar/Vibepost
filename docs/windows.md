@@ -27,13 +27,7 @@ Windows 的 MP4 使用完整的 1440 × 1920 卡片画面、30 fps、H.264、`yu
 默认数据目录为 `%APPDATA%\Vibepost`。要把草稿、Chromium 存储、AI 工作副本与临时导出留在指定磁盘，启动时指定绝对目录：
 
 ```powershell
-.\Vibepost.exe --data-dir 'D:\VibepostData'
-```
-
-本机 E 盘示例：
-
-```powershell
-.\Vibepost.exe --data-dir 'E:\software-package\VibepostData'
+.\Vibepost.exe --data-dir 'E:\VibepostData'
 ```
 
 相同的数据目录应持续使用；换目录后看到的是另一套本机草稿。关闭、重新载入窗口前会先保存；AI 的事件与取消请求带有窗口身份，旧页面的请求会被拒绝。
