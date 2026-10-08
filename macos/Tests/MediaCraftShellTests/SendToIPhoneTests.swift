@@ -21,8 +21,7 @@ struct SendToIPhoneTests {
         """, arguments: ["markdown": Self.markdown, "caption": Self.caption]) as? Int ?? 0
 
         _ = try await harness.evaluate("ui.click('发送到 iPhone')")
-        try await waitUntil(timeout: .seconds(20)) { !harness.sender.batches.isEmpty }
-        let files = harness.sender.batches.first ?? []
+        let files = try await Self.receivedFiles(harness)
         let captureDates = files.map(Self.captureDate)
         let sizes = files.map(Self.pixelSize)
         await harness.tearDown()
@@ -44,8 +43,7 @@ struct SendToIPhoneTests {
             await window.mediacraft.drafts.create({ markdown, mode: "article", caption: "长文里不用正文栏" });
             ui.click("发送到 iPhone");
         """, arguments: ["markdown": Self.markdown])
-        try await waitUntil(timeout: .seconds(30)) { !harness.sender.batches.isEmpty }
-        let files = harness.sender.batches.first ?? []
+        let files = try await Self.receivedFiles(harness)
         let size = files.first.map(Self.pixelDimensions) ?? (width: 0, height: 0)
         let captureDate = files.first.flatMap(Self.captureDate)
         await harness.tearDown()
@@ -55,6 +53,20 @@ struct SendToIPhoneTests {
         #expect(captureDate != nil)
         #expect(harness.clipboard.text == Self.expectedClipboard)
         #expect(harness.pageErrors == [])
+    }
+
+    /// Eight-page raster/export took 57 seconds on the hosted Mac runner.
+    /// Wait for the native receiver, which runs after the clipboard write,
+    /// within a 120-second export budget; do not treat a timeout as an empty send.
+    private static func receivedFiles(_ harness: ShellHarness) async throws -> [URL] {
+        try await waitUntil(timeout: .seconds(120)) { !harness.sender.batches.isEmpty }
+        let received = harness.sender.batches.first
+        var detail = ""
+        if received == nil {
+            detail = (try? await harness.evaluate("return document.querySelector('#outputActivity')?.textContent ?? ''")) as? String ?? ""
+            await harness.tearDown()
+        }
+        return try #require(received, "120 秒内没有收到发送批次，导出状态：\(detail)")
     }
 
     static func pixelDimensions(_ url: URL) -> (width: Int, height: Int) {

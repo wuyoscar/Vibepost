@@ -95,7 +95,7 @@ jobs:
 
   macos-shared-regression:
     runs-on: macos-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     env:
       MEDIACRAFT_FONT_CACHE_DIR: ${{ github.workspace }}/.scratch/ci-macos-fonts
       MEDIACRAFT_TEST_LOG: ${{ github.workspace }}/.scratch/macos-test-logs/head-focused.log
@@ -139,10 +139,13 @@ jobs:
                   assert new in text
           source.write_text(text)
           PY
-          for method in approvalsMapToDecisions aboutSectionChecksForUpdates coverTitlesPicker acceptSomeRejectSome; do
+          for method in approvalsMapToDecisions aboutSectionChecksForUpdates coverTitlesPicker acceptSomeRejectSome twoAgentsTwoDrafts sendsCardsInPageOrder stagePreviewPlaysTheClip sendsLivePageAsPairedPvt; do
             status=0
             timeout=120
-            if [ "$method" = approvalsMapToDecisions ]; then timeout=300; fi
+            case "$method" in
+              approvalsMapToDecisions|sendsLivePageAsPairedPvt) timeout=300 ;;
+              twoAgentsTwoDrafts|sendsCardsInPageOrder|stagePreviewPlaysTheClip) timeout=180 ;;
+            esac
             MEDIACRAFT_TEST_LOG="$GITHUB_WORKSPACE/.scratch/macos-test-logs/baseline-$method.log" \
               "$baseline/macos/run-tests.sh" --filter "$method" "$timeout" || status=$?
             echo "Upstream baseline $method: exit $status" >> "$GITHUB_STEP_SUMMARY"
@@ -169,7 +172,17 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.full_macos }}" = "true" ]; then
             macos/run-tests.sh 1800
           else
-            macos/run-tests.sh --filter 'handshakeAndToolList|draftToIPhone|switchedDraftIsProtected|twoAgentsTwoDrafts|agentsLeaveUserWindowsAlone|bridgeRejectsForeignRequests|draftsEventsAndGuards|exportsThroughTheSavePath|sendsCardsInPageOrder|sendsArticleAsOneLongImage|liveEditorRoundTripsItsOptions|stagePreviewPlaysTheClip|liveExportCancelsAndExplains|sendsLivePageAsPairedPvt|zipPackagesLivePagesAsPvt|replacedPagesDoNotHoldDrafts|oneDraftOneWindow' 900
+            failed=0
+            for method in handshakeAndToolList draftToIPhone switchedDraftIsProtected twoAgentsTwoDrafts agentsLeaveUserWindowsAlone bridgeRejectsForeignRequests draftsEventsAndGuards exportsThroughTheSavePath sendsCardsInPageOrder sendsArticleAsOneLongImage liveEditorRoundTripsItsOptions stagePreviewPlaysTheClip liveExportCancelsAndExplains sendsLivePageAsPairedPvt zipPackagesLivePagesAsPvt replacedPagesDoNotHoldDrafts oneDraftOneWindow; do
+              status=0
+              timeout=180
+              if [ "$method" = sendsLivePageAsPairedPvt ]; then timeout=300; fi
+              MEDIACRAFT_TEST_LOG="$GITHUB_WORKSPACE/.scratch/macos-test-logs/head-focused-$method.log" \
+                macos/run-tests.sh --filter "$method" "$timeout" || status=$?
+              echo "Candidate port regression $method: exit $status" >> "$GITHUB_STEP_SUMMARY"
+              if [ "$status" -ne 0 ]; then failed=1; fi
+            done
+            exit "$failed"
           fi
       - name: Upload native macOS regression log
         if: always()

@@ -378,29 +378,60 @@ struct MCPTests {
         let config = MCPConfiguration.temporary()
         let (harness, first) = try await Self.start(config)
         let second = MCPTestClient(socketPath: config.socketPath)
-        _ = try await second.initialize()
-        let a = try await first.call("create_draft", ["title": "甲 Agent", "markdown": "甲"])
-        let b = try await second.call("create_draft", ["title": "乙 Agent", "markdown": "乙"])
-        _ = try await first.call("update_draft", ["markdown": "甲改了"])
-        _ = try await second.call("update_draft", ["markdown": "乙改了"])
-        _ = try await first.call("set_theme", ["theme": "ink"])
-        let aId = (a.json as? [String: Any])?["id"] as? String ?? ""
-        let bId = (b.json as? [String: Any])?["id"] as? String ?? ""
-        let peekOther = try await first.call("open_draft", ["id": bId])
-        let windowsAfter = harness.windows.count
-        let result = try await harness.evaluate("""
-            await new Promise((resolve) => setTimeout(resolve, 300));
-            const get = async (id) => { const draft = await mediacraft.drafts.get(id); return [draft.markdown, draft.theme]; };
-            return { a: await get(a), b: await get(b) };
-        """, arguments: ["a": aId, "b": bId]) as? [String: [String]]
+        do {
+            _ = try await second.initialize()
+            let a = try await first.call("create_draft", ["title": "甲 Agent", "markdown": "甲"])
+            try #require(!a.isError, "甲 create_draft：\(a.text)")
+            let aId = try #require((a.json as? [String: Any])?["id"] as? String, "甲 create_draft 没有返回 id：\(a.text)")
+            try #require(!aId.isEmpty, "甲 create_draft 返回空 id：\(a.text)")
+            let b = try await second.call("create_draft", ["title": "乙 Agent", "markdown": "乙"])
+            try #require(!b.isError, "乙 create_draft：\(b.text)")
+            let bId = try #require((b.json as? [String: Any])?["id"] as? String, "乙 create_draft 没有返回 id：\(b.text)")
+            try #require(!bId.isEmpty && bId != aId, "两个 Agent 应新建不同的稿子：甲 \(aId)，乙 \(bId)")
+            let updatedA = try await first.call("update_draft", ["markdown": "甲改了"])
+            try #require(!updatedA.isError, "甲 update_draft：\(updatedA.text)")
+            let updatedB = try await second.call("update_draft", ["markdown": "乙改了"])
+            try #require(!updatedB.isError, "乙 update_draft：\(updatedB.text)")
+            let themed = try await first.call("set_theme", ["theme": "ink"])
+            try #require(!themed.isError, "甲 set_theme：\(themed.text)")
+
+            // 先经真实 MCP 连接读各自认定的稿子，再让甲打开乙，免得只凭原窗口的缓存判断请求归属。
+            let viewedA = try await first.call("get_draft")
+            let viewedB = try await second.call("get_draft")
+            try #require(!viewedA.isError, "甲 get_draft：\(viewedA.text)")
+            try #require(!viewedB.isError, "乙 get_draft：\(viewedB.text)")
+            let snapshotA = try #require(viewedA.json as? [String: Any], "甲 get_draft：\(viewedA.text)")
+            let snapshotB = try #require(viewedB.json as? [String: Any], "乙 get_draft：\(viewedB.text)")
+            #expect(snapshotA["id"] as? String == aId && snapshotB["id"] as? String == bId, "两个连接各读各的稿子")
+            #expect(snapshotA["markdown"] as? String == "甲改了" && snapshotA["theme"] as? String == "ink")
+            #expect(snapshotB["markdown"] as? String == "乙改了" && snapshotB["theme"] as? String != "ink", "乙没被甲的换主题改到")
+
+            let peekOther = try await first.call("open_draft", ["id": bId])
+            try #require(!peekOther.isError, "甲 open_draft 乙：\(peekOther.text)")
+            let windowsAfter = harness.windows.count
+            // 原窗口的稿件列表经 BroadcastChannel 异步刷新；等待实际内容，不能假定 300 毫秒后缓存已有两篇。
+            let result = try await harness.evaluate(AISessionTests.helpers + """
+                return await until(async () => {
+                  const aDraft = await mc.drafts.get(a);
+                  const bDraft = await mc.drafts.get(b);
+                  if (!aDraft || !bDraft || aDraft.markdown !== "甲改了" || aDraft.theme !== "ink"
+                    || bDraft.markdown !== "乙改了" || bDraft.theme === "ink") return null;
+                  return { a: [aDraft.markdown, aDraft.theme], b: [bDraft.markdown, bDraft.theme] };
+                });
+            """, arguments: ["a": aId, "b": bId]) as? [String: [String]]
+
+            #expect(windowsAfter == 2, "两个 Agent 各一个窗口，打开对方开着的不再开新窗口")
+            #expect(result?["a"]?.first == "甲改了" && result?["a"]?.last == "ink")
+            #expect(result?["b"]?.first == "乙改了" && result?["b"]?.last != "ink", "乙没被甲的换主题改到")
+            #expect(!peekOther.isError)
+            #expect(harness.pageErrors == [])
+        } catch {
+            second.close()
+            await Self.finish(harness, first, config)
+            throw error
+        }
         second.close()
         await Self.finish(harness, first, config)
-
-        #expect(windowsAfter == 2, "两个 Agent 各一个窗口，打开对方开着的不再开新窗口")
-        #expect(result?["a"]?.first == "甲改了" && result?["a"]?.last == "ink")
-        #expect(result?["b"]?.first == "乙改了" && result?["b"]?.last != "ink", "乙没被甲的换主题改到")
-        #expect(!peekOther.isError)
-        #expect(harness.pageErrors == [])
     }
 
     @Test("外部 Agent 不动用户的窗口：它新建的稿子开在新窗口、不到最前面（没认定稿子的 Agent 还是看用户正开着的那篇）；开不了新窗口时新建报错；AI 正在用户窗口里改着、没显示出来的那篇不让它打开")
