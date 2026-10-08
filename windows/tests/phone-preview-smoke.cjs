@@ -9,9 +9,9 @@ const { environment, windows, root } = require("../scripts/paths.cjs");
 
 async function main() {
   const data = path.resolve(process.env.VIBEPOST_TEST_DATA || path.join(root, ".scratch", "phone-preview-smoke"));
-  const report = { ok: false, label: process.env.VIBEPOST_TEST_LABEL || "phone-preview", checks: [], errors: [], scenarios: [] };
-  let application, page, diagnosticTimer;
-  let stage = "launch", recordingWindows = false;
+  const report = { ok: false, label: process.env.VIBEPOST_TEST_LABEL || "phone-preview", checks: [], errors: [], scenarios: [], startup: { events: [] } };
+  let application, page, diagnosticTimer, child;
+  let stage = "launch", recordingWindows = false, finishing = false;
   const windowStates = [];
   await fs.mkdir(data, { recursive: true });
   async function check(name, task) {
@@ -27,31 +27,57 @@ async function main() {
     delete env.ELECTRON_RUN_AS_NODE;
     const dpr = Number(process.env.VIBEPOST_TEST_DPR || 1);
     const executablePath = process.env.VIBEPOST_TEST_EXE || await require("../scripts/runtime.cjs").main();
+    report.startup.launchAt = new Date().toISOString();
     application = await electron.launch({ executablePath, args: [...(process.env.VIBEPOST_TEST_EXE ? [] : [windows]), "--data-dir", data, `--force-device-scale-factor=${dpr}`], env, timeout: 60000 });
+    const startupLog = (source, message) => {
+      if (report.startup.events.length < 400) report.startup.events.push({ at: new Date().toISOString(), source, message: String(message).slice(0, 4000) });
+    };
+    application.on("console", message => startupLog(`main:${message.type()}`, message.text()));
+    child = application.process();
+    child.stdout?.on("data", chunk => startupLog("stdout", chunk));
+    child.stderr?.on("data", chunk => startupLog("stderr", chunk));
+    child.once("exit", (code, signal) => startupLog("process-exit", JSON.stringify({ code, signal })));
+    application.on("window", window => startupLog("window", window.url()));
     // Read-only telemetry helps locate a stalled screenshot host without waiting
     // for another executeJavaScript call in that host's renderer.
     async function recordWindows() {
       if (recordingWindows) return;
       recordingWindows = true;
       try {
-        const state = await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map(window => ({
+        const state = await withDeadline(application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map(window => ({
           id: window.id, url: window.webContents.getURL(), loading: window.webContents.isLoading(),
           debuggerAttached: window.webContents.debugger.isAttached(), destroyed: window.isDestroyed(), visible: window.isVisible(), clientSize: window.getContentSize(),
-        })));
+        }))), 5000, "Window telemetry");
         windowStates.push({ at: new Date().toISOString(), stage, windows: state });
         await fs.writeFile(path.join(data, "raster-window-states.json"), JSON.stringify(windowStates, null, 2));
-      } catch { /* A closing application cannot supply another snapshot. */ }
+        return true;
+      } catch (error) {
+        if (!finishing) {
+          clearInterval(diagnosticTimer);
+          report.errors.push({ name: "window telemetry", stage, message: error.message });
+        }
+        return false;
+      }
       finally { recordingWindows = false; }
     }
-    diagnosticTimer = setInterval(() => void recordWindows(), 2000);
-    diagnosticTimer.unref();
-    await recordWindows();
-    const first = await application.firstWindow();
-    page = application.windows().find(window => /\/index\.html(?:\?|$)/.test(window.url())) || first;
+    // Do not evaluate the main process during initial navigation: the preload
+    // needs synchronous IPC before Playwright announces the first page. A CI
+    // failure showed an existing, blank/loading BrowserWindow until cleanup
+    // while this observer was polling the main inspector every two seconds.
+    stage = "waiting for editor window";
+    const editorDeadline = Date.now() + 60000;
+    await application.firstWindow({ timeout: 60000 });
+    page = await waitForEditorWindow(application, Math.max(1, editorDeadline - Date.now()));
+    report.startup.editorAt = new Date().toISOString();
+    report.startup.editorUrl = page.url();
     page.setDefaultTimeout(60000);
     page.on("pageerror", error => report.errors.push({ name: "renderer error", stage, at: new Date().toISOString(), message: error.message, stack: error.stack }));
     page.on("console", message => { if (message.type() === "error") console.error("renderer:", message.text().slice(0, 1000)); });
     await page.waitForFunction(() => window.mediacraft && window.MediaCraftDrafts.currentId(), null, { timeout: 60000 });
+    report.startup.readyAt = new Date().toISOString();
+    diagnosticTimer = setInterval(() => void recordWindows(), 2000);
+    diagnosticTimer.unref();
+    if (!await recordWindows()) throw new Error("Initial window telemetry failed");
     const skipTour = page.locator('[data-onboarding="skip"]');
     if (await skipTour.isVisible()) await skipTour.click();
     await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(window => /\/index\.html(?:\?|$)/.test(window.webContents.getURL())).setContentSize(1360, 920));
@@ -427,17 +453,90 @@ async function main() {
     report.errors.push({ name: "fatal", message: error.message, stack: error.stack });
     if (page && !page.isClosed()) {
       await page.screenshot({ path: path.join(data, "fatal.png"), timeout: 10000 }).catch(() => {});
-      report.fatalState = await page.evaluate(() => ({ url: location.href, counter: document.querySelector(".phone-counter")?.textContent, slides: document.querySelector(".phone-track")?.children.length, status: document.querySelector("#statusText")?.textContent, stats: window.MediaCraftCards?.stats })).catch(() => null);
+      report.fatalState = await withDeadline(page.evaluate(() => ({ url: location.href, counter: document.querySelector(".phone-counter")?.textContent, slides: document.querySelector(".phone-track")?.children.length, status: document.querySelector("#statusText")?.textContent, stats: window.MediaCraftCards?.stats })), 5000, "Failure renderer snapshot").catch(error => ({ error: error.message }));
     }
-    if (application) report.windows = application.windows().map(window => window.url());
+    if (application) {
+      report.windows = application.windows().map(window => window.url());
+      // One snapshot after failure supplies evidence without introducing a
+      // periodic inspector observer into the startup being tested.
+      report.mainWindowSnapshot = await withDeadline(application.evaluate(({ app, BrowserWindow }) => ({
+        ready: app.isReady(), windows: app.isReady() ? BrowserWindow.getAllWindows().map(window => ({ id: window.id, url: window.webContents.getURL(), loading: window.webContents.isLoading(), visible: window.isVisible(), destroyed: window.isDestroyed() })) : [],
+      })), 5000, "Failure window snapshot").catch(error => ({ error: error.message }));
+    }
   } finally {
+    finishing = true;
     clearInterval(diagnosticTimer);
-    if (application) await application.close().catch(error => report.errors.push({ name: "close", message: error.message }));
+    const forcedCleanup = application && await closeOwnedApplication(application, child, report);
     report.ok = report.errors.length === 0;
     await fs.writeFile(path.join(data, "report.json"), JSON.stringify(report, null, 2));
     console.log(JSON.stringify({ ok: report.ok, report: path.join(data, "report.json"), checks: report.checks, errors: report.errors.map(({ name, message }) => ({ name, message })) }, null, 2));
     if (!report.ok) process.exitCode = 1;
+    // A hung inspector connection can otherwise keep this test runner alive
+    // even after its owned Electron process has been killed. Evidence is saved.
+    if (forcedCleanup) process.exit(1);
   }
+}
+
+async function withDeadline(promise, timeout, label) {
+  let timer;
+  try {
+    return await Promise.race([promise, new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeout}ms`)), timeout);
+    })]);
+  } finally { clearTimeout(timer); }
+}
+
+async function closeOwnedApplication(application, child, report, timeout = 15000, killTimeout = 5000) {
+  try {
+    await withDeadline(application.close(), timeout, "Electron close");
+    return false;
+  } catch (error) {
+    report.errors.push({ name: "close", message: error.message });
+    report.cleanup = { pid: child?.pid, forcedKill: false };
+    if (child && child.exitCode === null && child.signalCode === null) {
+      let onExit;
+      const exited = new Promise(resolve => { onExit = resolve; child.once("exit", onExit); });
+      try {
+        // This handle belongs only to electron.launch above. Never kill by
+        // application name or enumerate unrelated processes.
+        report.cleanup.forcedKill = child.kill("SIGKILL");
+        await withDeadline(exited, killTimeout, "Owned Electron process exit");
+      } catch (killError) {
+        report.errors.push({ name: "owned process cleanup", message: killError.message });
+      } finally { child.off("exit", onExit); }
+    }
+    return true;
+  }
+}
+
+async function waitForEditorWindow(application, timeout) {
+  return new Promise((resolve, reject) => {
+    const pages = new Set();
+    let timer, done = false;
+    const cleanup = () => {
+      done = true;
+      clearTimeout(timer);
+      application.off("window", watch);
+      application.off("close", closed);
+      for (const page of pages) page.off("framenavigated", select);
+    };
+    const select = () => {
+      if (done) return;
+      const editor = application.windows().find(page => !page.isClosed() && /\/index\.html(?:\?|$)/.test(page.url()));
+      if (editor) { cleanup(); resolve(editor); }
+    };
+    const watch = page => {
+      if (done) return;
+      pages.add(page);
+      page.on("framenavigated", select);
+      select();
+    };
+    const closed = () => { cleanup(); reject(new Error("Electron exited before an editor window became ready")); };
+    application.on("window", watch);
+    application.on("close", closed);
+    timer = setTimeout(() => { cleanup(); reject(new Error(`Editor index.html window did not navigate within ${timeout}ms; observed: ${application.windows().map(page => page.url()).join(", ") || "none"}`)); }, timeout);
+    for (const page of application.windows()) watch(page);
+  });
 }
 
 async function settleAnimations(page) {

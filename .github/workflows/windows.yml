@@ -13,6 +13,10 @@ on:
         description: Run the entire native macOS suite instead of focused port regressions
         type: boolean
         default: false
+      macos_base_ref:
+        description: Optional upstream revision for thumbnail performance comparison
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -105,7 +109,7 @@ jobs:
     env:
       MEDIACRAFT_FONT_CACHE_DIR: ${{ github.workspace }}/.scratch/ci-macos-fonts
       MEDIACRAFT_TEST_LOG: ${{ github.workspace }}/.scratch/macos-test-logs/head-focused.log
-      MAC_BASE_REVISION: ${{ github.event.pull_request.base.sha }}
+      MAC_BASE_REVISION: ${{ github.event.pull_request.base.sha || inputs.macos_base_ref }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -160,6 +164,31 @@ jobs:
               "$baseline/macos/run-tests.sh" --filter "$method" "$timeout" || status=$?
             echo "Upstream baseline $method: exit $status" >> "$GITHUB_STEP_SUMMARY"
           done
+      - name: Compare thumbnail performance on the upstream baseline
+        if: env.MAC_BASE_REVISION != '' && (github.event_name != 'workflow_dispatch' || !inputs.full_macos)
+        continue-on-error: true
+        run: |
+          baseline="$GITHUB_WORKSPACE/.scratch/macos-baseline"
+          if [ ! -e "$baseline/.git" ]; then
+            git worktree add --detach "$baseline" "$MAC_BASE_REVISION"
+            cp -R fonts "$baseline/fonts"
+            cp src/vendor/codemirror.js "$baseline/src/vendor/codemirror.js"
+          fi
+          cp macos/run-tests.sh "$baseline/macos/run-tests.sh"
+          for test in PhoneFeedTests.swift ThemePanelTests.swift; do
+            cp "macos/Tests/MediaCraftShellTests/$test" "$baseline/macos/Tests/MediaCraftShellTests/$test"
+          done
+          failed=0
+          for suite in PhoneFeedTests ThemePanelTests; do
+            status=0
+            log="$GITHUB_WORKSPACE/.scratch/macos-test-logs/baseline-$suite-thumbnailsNeverBlockTyping.log"
+            MEDIACRAFT_TEST_LOG="$log" "$baseline/macos/run-tests.sh" --filter "$suite.*thumbnailsNeverBlockTyping" 300 || status=$?
+            if ! grep -q 'Test run with 1 test in 1 suite' "$log"; then status=1; fi
+            echo "Upstream baseline $suite/thumbnailsNeverBlockTyping: exit $status" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$status" -ne 0 ]; then failed=1; fi
+          done
+          # Baseline failures are diagnostic; candidate assertions remain strict.
+          exit "$failed"
       - name: Verify earlier UI failures in isolated native processes
         if: github.event_name != 'workflow_dispatch' || !inputs.full_macos
         run: |
@@ -183,12 +212,21 @@ jobs:
             macos/run-tests.sh 1800
           else
             failed=0
-            for method in handshakeAndToolList draftToIPhone switchedDraftIsProtected twoAgentsTwoDrafts agentsLeaveUserWindowsAlone bridgeRejectsForeignRequests draftsEventsAndGuards exportsThroughTheSavePath sendsCardsInPageOrder sendsArticleAsOneLongImage liveEditorRoundTripsItsOptions stagePreviewPlaysTheClip liveExportCancelsAndExplains sendsLivePageAsPairedPvt zipPackagesLivePagesAsPvt replacedPagesDoNotHoldDrafts oneDraftOneWindow togglesAndShowsThePost flipsWithClicksKeysAndSwipes staysInSyncWithThemeAndContent showsRecentDraftsAroundThisOne currentTileFollowsEdits thumbnailsNeverBlockTyping commandDigitsSwitchViews; do
+            for method in handshakeAndToolList draftToIPhone switchedDraftIsProtected twoAgentsTwoDrafts agentsLeaveUserWindowsAlone bridgeRejectsForeignRequests draftsEventsAndGuards exportsThroughTheSavePath sendsCardsInPageOrder sendsArticleAsOneLongImage liveEditorRoundTripsItsOptions stagePreviewPlaysTheClip liveExportCancelsAndExplains sendsLivePageAsPairedPvt zipPackagesLivePagesAsPvt replacedPagesDoNotHoldDrafts oneDraftOneWindow togglesAndShowsThePost flipsWithClicksKeysAndSwipes staysInSyncWithThemeAndContent showsRecentDraftsAroundThisOne currentTileFollowsEdits 'PhoneFeedTests.*thumbnailsNeverBlockTyping' 'ThemePanelTests.*thumbnailsNeverBlockTyping' commandDigitsSwitchViews; do
               status=0
               timeout=180
               if [ "$method" = sendsLivePageAsPairedPvt ]; then timeout=300; fi
-              MEDIACRAFT_TEST_LOG="$GITHUB_WORKSPACE/.scratch/macos-test-logs/head-focused-$method.log" \
+              label="$method"
+              case "$method" in
+                PhoneFeedTests.*|ThemePanelTests.*) label="${method%%.*}-thumbnailsNeverBlockTyping" ;;
+              esac
+              log="$GITHUB_WORKSPACE/.scratch/macos-test-logs/head-focused-$label.log"
+              MEDIACRAFT_TEST_LOG="$log" \
                 macos/run-tests.sh --filter "$method" "$timeout" || status=$?
+              case "$method" in
+                PhoneFeedTests.*|ThemePanelTests.*)
+                  if ! grep -q 'Test run with 1 test in 1 suite' "$log"; then status=1; fi ;;
+              esac
               echo "Candidate port regression $method: exit $status" >> "$GITHUB_STEP_SUMMARY"
               if [ "$status" -ne 0 ]; then failed=1; fi
             done
