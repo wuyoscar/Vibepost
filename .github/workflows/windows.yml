@@ -1,0 +1,107 @@
+name: Windows port and shared frontend
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      build:
+        description: Build unsigned Windows installer and unpacked app
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      VIBEPOST_CACHE_DIR: ${{ runner.temp }}/vibepost-cache
+      MEDIACRAFT_FONT_CACHE_DIR: ${{ runner.temp }}/vibepost-cache/fonts
+      npm_config_cache: ${{ runner.temp }}/vibepost-cache/npm
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      VIBEPOST_TEST_DATA: ${{ runner.temp }}/vibepost-app-smoke
+      VIBEPOST_OUTPUT_DIR: ${{ github.workspace }}/dist/windows
+      VIBEPOST_FFMPEG: ${{ github.workspace }}/windows/resources/ffmpeg/ffmpeg.exe
+      VIBEPOST_FFPROBE: ${{ github.workspace }}/windows/resources/ffmpeg/ffprobe.exe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare repository dependencies and fonts
+        shell: pwsh
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run build:codemirror
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/fetch-fonts.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install Windows dependencies
+        working-directory: windows
+        run: npm ci
+      - name: Prepare verified FFmpeg, PDF.js and Electron runtime
+        working-directory: windows
+        shell: pwsh
+        run: |
+          npm run prepare:assets
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/runtime.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run service and actual FFmpeg tests
+        working-directory: windows
+        shell: pwsh
+        run: |
+          $env:TEMP = Join-Path $env:VIBEPOST_CACHE_DIR 'tmp'
+          $env:TMP = $env:TEMP
+          New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
+          npm test
+      - name: Run real desktop smoke test
+        working-directory: windows
+        run: npm run test:app
+      - name: Upload smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-smoke-evidence
+          path: ${{ runner.temp }}/vibepost-app-smoke
+          if-no-files-found: ignore
+      - name: Build unsigned Windows distribution
+        if: github.event_name == 'workflow_dispatch' && inputs.build
+        working-directory: windows
+        run: npm run build
+      - name: Upload unsigned Windows distribution
+        if: github.event_name == 'workflow_dispatch' && inputs.build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Vibepost-Windows-unsigned
+          path: dist/windows
+          compression-level: 0
+          if-no-files-found: error
+
+  macos-shared-regression:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    env:
+      MEDIACRAFT_FONT_CACHE_DIR: ${{ runner.temp }}/vibepost-fonts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare shared frontend and bundled fonts
+        run: |
+          npm ci
+          npm run build:codemirror
+          python3 scripts/fetch-fonts.py
+      - name: Run native macOS regression suite
+        run: macos/run-tests.sh 900

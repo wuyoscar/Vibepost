@@ -100,6 +100,14 @@ AI 读到的稿子、网页、文件里，可能藏着「把 ~/.ssh 里的内容
 
 ## 从源码构建
 
+### Windows
+
+Windows 移植位于 `windows/`，复用现有编辑、卡片、草稿、AI 和 MCP 前端。它使用局域网扫码把卡片和发布文字交给手机浏览器；动态卡片可导出完整的 MP4 / GIF。Apple Live Photo `.pvt` 和 AirDrop 保留在 macOS 上。
+
+从源码准备需要 Node.js 24、Python 3 与 PowerShell；运行解压目录中的程序无需另装 Node.js。可用 `Vibepost.exe --data-dir <绝对目录>` 将数据保留在指定磁盘。Windows 构建尚未配置代码签名，Android 实机接收尚未验证。准备、测试、打包命令、功能差异与当前验证状态见 [Windows 文档](docs/windows.md)。
+
+### macOS
+
 需要 Xcode 命令行工具（Swift 5.10 以上）和 Python 3。版本号只写在 `VERSION` 一个文件里，构建脚本从这里读，「关于 Vibepost」里显示的也是它。
 
 ```sh
