@@ -2,7 +2,7 @@
 
 终端里的 Claude Code（或别的 MCP 客户端）可以直接操作正在运行的 Vibepost：列出、新建（也能照模板）、打开稿子，写卡片内容、标题与小红书正文，插片段，换主题、配色、字体与版式，从本机路径插图，出图看每一页，导出 PNG / ZIP / 长图到指定文件夹，发送到 iPhone。和 App API（[app-api.md](app-api.md)）是同一套能力与校验：工具在页面里只经 `window.mediacraft` 执行，改动马上出现在 App 里。
 
-目标是这样的工作方式：Agent 收集信息、写稿，用 Vibepost 自动排版、看图检查；人在 App 里看一眼、改几个字，点发送。仓库里的 Claude Code 技能 [`skills/mediacraft/SKILL.md`](../skills/mediacraft/SKILL.md) 写了这套流程，装进 Claude Code：`ln -s "$PWD/skills/mediacraft" ~/.claude/skills/mediacraft`（在仓库根目录运行）。
+目标是这样的工作方式：Agent 收集信息、写稿，用 Vibepost 自动排版、看图检查；人在 App 里看一眼、改几个字，点发送。仓库里的 Claude Code 技能 [`skills/vibepost/SKILL.md`](../skills/vibepost/SKILL.md) 写了这套流程，装进 Claude Code：`ln -s "$PWD/skills/vibepost" ~/.claude/skills/vibepost`（在仓库根目录运行）。
 
 ## 接入
 

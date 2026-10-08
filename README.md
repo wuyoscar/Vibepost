@@ -52,7 +52,7 @@
 
 - **AI 助手**：用你 Mac 上已经装好的 Codex 或 Claude Code（沿用它们自己的登录、技能、MCP 和权限规则），每篇稿子一个会话，各自选后端、模型与推理强度，聊过的稿子都在会话历史里；顶上的「+」新建一篇在新窗口里直接开聊。可以一键润色、出 5 个封面标题、写首图文案、去 AI 味、按要点重新分页、写小红书正文、换主题、找配图或生图。改动在编辑器里逐处标出，一处一处接受或拒绝；每一轮之前自动存一个版本，随时撤回；要授权的操作先在 App 里问你。
 - **两本手册交给 Agent**：操作手册（App 认哪些样式、记号，什么时候用哪种，排版经验）由代码里一张登记表生成，每轮写进 Agent 的工作副本 `AGENTS.md`，外部 Agent 握手时也拿到；写作手册（写什么内容、什么口味）是 `~/Library/Application Support/MediaCraft/写作手册/` 里的 Markdown 文件，像技能一样按篇挑，Agent 想记经验要经你确认才能改。排完版每页有自检（只有标题、太空、偏挤、溢出），Agent 在 `get_pages` 里看到，你在发布检查里看到。
-- **外部 Agent（MCP）**：终端里的 Claude Code 等 Agent 可以经 App 自带的 MCP 服务 `mediacraft-mcp` 直接操作 Vibepost：新建稿子（也能照模板新建）、写正文、插片段、换主题、出图检查、导出、发送到 iPhone。每一步都能 ⌘Z 撤销，也列在 AI 助手里。这个功能默认关，在「AI 助手 › 设置」里打开，接入方法见 [docs/mcp.md](docs/mcp.md)，配套的 Claude Code 技能在 [skills/mediacraft](skills/mediacraft/SKILL.md)。
+- **外部 Agent（MCP）**：终端里的 Claude Code 等 Agent 可以经 App 自带的 MCP 服务 `mediacraft-mcp` 直接操作 Vibepost：新建稿子（也能照模板新建）、写正文、插片段、换主题、出图检查、导出、发送到 iPhone。每一步都能 ⌘Z 撤销，也列在 AI 助手里。这个功能默认关，在「AI 助手 › 设置」里打开，接入方法见 [docs/mcp.md](docs/mcp.md)，配套的 Claude Code 技能在 [skills/vibepost](skills/vibepost/SKILL.md)。
 
 **其他**
 
@@ -144,7 +144,7 @@ index.html + src/          网页界面，原生 JavaScript，不需要构建
 macos/                     Swift 原生壳：WKWebView 与毛玻璃窗口、隔空投送、存文件、PDF 渲染、
                            卡片出图、实况合成、启动本机 Codex / Claude Code、外部 Agent 的连接；
                            mediacraft-mcp（外部 Agent 用的 stdio MCP 服务）
-skills/mediacraft/         Claude Code 技能：调研 → 写稿 → 排版 → 检查 → 发送
+skills/vibepost/           Claude Code 技能：调研 → 写稿 → 排版 → 检查 → 发送
 ```
 
 - 网页跑在原生壳里，以 `mediacraft://app/index.html` 加载；壳只提供网页做不到的事，通过一个 JS ↔ Swift 桥暴露。

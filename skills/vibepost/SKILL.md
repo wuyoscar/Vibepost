@@ -1,5 +1,5 @@
 ---
-name: mediacraft
+name: vibepost
 description: 用 Vibepost（用户 Mac 上的排版 App，经 MCP 服务 mcp__mediacraft__*）把一个选题做成小红书图文卡片或长文长图：调研 → 在 Vibepost 里写稿 → 挑主题 → 出图逐页检查 → 发送到 iPhone。用户说「做一篇小红书」「排成卡片」「用 Vibepost 排版」「写好发到我手机」「调研一下 X 然后出图」时用它。需要先登记 MCP 服务（docs/mcp.md）。
 ---
 
