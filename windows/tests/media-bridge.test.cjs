@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const path = require('node:path');
 
-function seam() {
+function seam({ beforeRaster } = {}) {
   const calls = [];
   const boundaryCalls = [];
   const handlers = new Map();
@@ -24,7 +24,14 @@ function seam() {
     if (typeof item === 'function') return [key, (...args) => {
       if (!['onMotion', 'ai.onEvent', 'mcp.onEvent'].includes(operation)) checkData(args);
       boundaryCalls.push({ operation, args });
-      return item(...args);
+      if (operation !== 'rasterCards') return item(...args);
+      const copyError = (error) => { throw new Error(error.message); };
+      // Electron copies rejected Errors without custom fields. Plain envelopes
+      // must therefore reach the main-world wrapper before errors are rebuilt.
+      try {
+        const result = item(...args);
+        return result?.then ? result.catch(copyError) : result;
+      } catch (error) { return copyError(error); }
     }];
     return [key, item && typeof item === 'object' ? proxy(item, operation) : item];
   }));
@@ -36,11 +43,24 @@ function seam() {
       invoke: async (_channel, request) => {
         checkData(request);
         calls.push(request);
+        if (request.action === 'cards/raster' && beforeRaster) await beforeRaster(request);
         if (request.action === 'motion/render') {
           handlers.get('native:event')?.({}, { kind: 'motion', event: { job: request.params.job, progress: 0.5 } });
           return { data: Buffer.from('encoded').toString('base64'), type: request.params.format === 'gif' ? 'image/gif' : 'video/mp4' };
         }
         if (request.action === 'phone/start') return { session: 'phone-session', url: 'http://localhost/t/token/' };
+        if (request.action === 'cards/raster' && request.params.mediaIds?.includes('missing')) return {
+          __error: { message: 'Missing media', status: 409, code: 'RASTER_MISSING_MEDIA', missing: ['missing'], generation: 'new-generation' },
+        };
+        if (request.action === 'cards/raster' && request.params.pages?.length > 1) return {
+          generation: 'test-generation', totalMs: request.params.pages.length,
+          times: request.params.pages.map(() => 1),
+          pages: request.params.pages.map((page) => ({ png: Buffer.from(page.html).toString('base64'), strips: [] })),
+        };
+        if (request.action === 'cards/raster') return {
+          generation: 'test-generation',
+          pages: [{ png: 'Y2FyZA==', strips: [{ x: 4, y: 8, width: 20, height: 12, png: 'c3RyaXA=' }] }, { strips: [] }],
+        };
         if (request.action === 'save') return { name: request.params.name };
         return { cancelled: true };
       },
@@ -59,6 +79,69 @@ function seam() {
   vm.runInContext(fs.readFileSync(path.resolve(__dirname, '../../src/native-bridge.js'), 'utf8'), main);
   return { native: window.MediaCraftNative, bridge, calls, boundaryCalls };
 }
+
+test('card raster PNGs and page-number strips cross the isolated bridge as data and become main-world Blobs', async () => {
+  const { native, calls, boundaryCalls } = seam();
+  const result = await native.rasterCards({ pages: [{ html: '<div>card</div>' }], width: 864, height: 1152, scale: 2 });
+  assert.equal(calls.at(-1).action, 'cards/raster');
+  assert.equal(boundaryCalls.at(-1).operation, 'rasterCards');
+  assert.equal(result.generation, 'test-generation');
+  assert.equal(result.pages[0].png.type, 'image/png');
+  assert.equal(await result.pages[0].png.text(), 'card');
+  assert.equal(await result.pages[0].strips[0].png.text(), 'strip');
+  assert.equal(result.pages[0].strips[0].x, 4);
+  assert.equal(result.pages[1].png, undefined, 'strip-only replies do not invent a body PNG');
+});
+
+test('missing-media negotiation keeps its identifiers and generation across preload', async () => {
+  const { native, bridge } = seam();
+  const reply = await bridge.rasterCards({ mediaIds: ['missing'] });
+  assert.deepEqual(Array.from(reply.__error.missing), ['missing']);
+  assert.equal(reply.__error.generation, 'new-generation');
+  await assert.rejects(native.rasterCards({ mediaIds: ['missing'] }), (error) => {
+    assert.equal(error.status, 409);
+    assert.equal(error.code, 'RASTER_MISSING_MEDIA');
+    assert.equal(error.generation, 'new-generation');
+    assert.deepEqual(Array.from(error.missing), ['missing']);
+    return true;
+  });
+});
+
+test('shared large-page requests use bounded Windows captures and preserve page order and metadata', async () => {
+  const { native, calls } = seam();
+  const pages = Array.from({ length: 35 }, (_, index) => ({ html: `page-${index}` }));
+  const reply = await native.rasterCards({ pages, width: 864, height: 1152, scale: 2, style: 'same-style', mediaIds: ['image'] });
+  assert.deepEqual(calls.map((call) => call.params.pages.length), [16, 16, 3]);
+  for (const call of calls) {
+    assert.equal(call.params.scale, 2);
+    assert.equal(call.params.style, 'same-style');
+    assert.deepEqual(Array.from(call.params.mediaIds), ['image']);
+  }
+  assert.deepEqual(await Promise.all(reply.pages.map((page) => page.png.text())), pages.map((page) => page.html));
+  assert.equal(reply.generation, 'test-generation');
+  assert.equal(reply.totalMs, 35);
+  assert.equal(reply.times.length, 35);
+});
+
+test('preview bursts wait before IPC and a failed capture does not block later themes', async () => {
+  let release, count = 0;
+  const held = new Promise((resolve) => { release = resolve; });
+  const { native, calls } = seam({ beforeRaster: async () => { if (++count === 1) await held; } });
+  const request = { pages: [{ html: 'theme-preview' }], width: 864, height: 1152, scale: 2 };
+  const failure = assert.rejects(native.rasterCards({ ...request, mediaIds: ['missing'] }), (error) => {
+    assert.equal(error.status, 409);
+    assert.deepEqual(Array.from(error.missing), ['missing']);
+    return true;
+  });
+  const previews = Array.from({ length: 12 }, () => native.rasterCards(request));
+  await new Promise(setImmediate);
+  assert.equal(calls.length, 1, 'valid theme bursts must not fill the main-process queue');
+  release();
+  await failure;
+  const replies = await Promise.all(previews);
+  assert.equal(calls.length, 13);
+  assert(replies.every((reply) => reply.generation === 'test-generation'));
+});
 
 test('main-world Blob conversion cancellation prevents a later preload motion/render job', async () => {
   const { native, bridge, calls, boundaryCalls } = seam();

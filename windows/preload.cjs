@@ -1,12 +1,14 @@
 "use strict";
 const { contextBridge, ipcRenderer } = require("electron");
 const epoch = ipcRenderer.sendSync("native:epoch");
-const call = async (action, params = {}) => {
-  const result = await ipcRenderer.invoke("native:call", {
+const invoke = (action, params = {}) =>
+  ipcRenderer.invoke("native:call", {
     epoch,
     action,
     params,
   });
+const call = async (action, params = {}) => {
+  const result = await invoke(action, params);
   if (result?.__error) {
     const error = new Error(result.__error.message);
     Object.assign(error, result.__error);
@@ -59,7 +61,9 @@ const bridge = {
   },
   windowChrome: null,
   haptic: () => {},
-  rasterCards: null,
+  // contextBridge drops custom fields on rejected Errors. Return raster errors
+  // as plain data; the main-world wrapper restores missing-media negotiation.
+  rasterCards: (request) => invoke("cards/raster", request),
   livePhoto: null,
   saveFile: async (blob, name) =>
     call("save", { name, data: await bytes(blob) }),

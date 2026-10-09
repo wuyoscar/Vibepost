@@ -182,7 +182,7 @@ async function main() {
     const opened = application.waitForEvent("window");
     await page.evaluate(() => window.MediaCraftNative.windows.open({}));
     await opened;
-    const second = application.windows().find((p) => p !== page);
+    const second = application.windows().find((p) => p !== page && p.url().startsWith("mediacraft://app/index.html"));
     await second.waitForFunction(
       () => window.mediacraft && window.MediaCraftDrafts.currentId(),
     );
