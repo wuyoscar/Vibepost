@@ -10,6 +10,7 @@ const {
   shell,
   Menu,
   nativeImage,
+  Notification,
 } = require("electron");
 const fs = require("node:fs/promises");
 const fsSync = require("node:fs");
@@ -46,6 +47,8 @@ app.setPath("userData", dataDir);
 app.setPath("sessionData", path.join(dataDir, "Chromium"));
 process.env.TEMP = process.env.TMP = path.join(dataDir, "tmp");
 app.setName("Vibepost");
+// 系统通知（notify/show）按这个 id 归到 Vibepost，与打包的 appId 一致
+app.setAppUserModelId("com.wuyoscar.mediacraft");
 const webRoot = app.isPackaged
   ? path.join(process.resourcesPath, "web")
   : path.resolve(__dirname, "..");
@@ -420,6 +423,22 @@ ipcMain.handle(
         case "clipboard/text":
           clipboard.writeText(String(params.text || ""));
           return {};
+        case "notify/show": {
+          // AI 等你确认、一轮回复说完时页面发来的系统通知；点击回到发出它的那个窗口。
+          // 系统不支持（或用户关了通知）时不算出错，页面不需要知道
+          if (!Notification.isSupported()) return { shown: false };
+          const title = String(params.title ?? "").trim().slice(0, 100);
+          const body = String(params.body ?? "").trim().slice(0, 300);
+          if (!title) throw new Error("通知需要标题");
+          const notification = new Notification({ title, body });
+          notification.on("click", () => {
+            const target = views.get(owner.id);
+            if (target && !target.isDestroyed())
+              show(target, states.windows.get(owner.id)?.current);
+          });
+          notification.show();
+          return { shown: true };
+        }
         case "clipboard/rich":
           clipboard.write({
             html: String(params.html || ""),

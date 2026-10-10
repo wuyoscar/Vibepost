@@ -726,6 +726,14 @@
                         <span>复制接入命令</span>
                       </button>
                     </div>
+                    <!-- 通知：AI 等你确认或回复完成时弹系统通知（src/ai/notify.js）；只在壳支持时（Windows）出现 -->
+                    <div id="notifySettings" class="notify-settings" role="group" aria-labelledby="notifySettingsTitle" hidden>
+                      <h2 id="notifySettingsTitle" class="section-label">通知</h2>
+                      <label class="check-row">
+                        <input id="notifyEnabledInput" type="checkbox" role="switch" />
+                        <span>AI 等你确认或回复完成时通知我<small>系统通知；窗口正在前台时不打扰，点通知回到这篇稿子</small></span>
+                      </label>
+                    </div>
                     <!-- 关于：版本号与「检查更新…」（和左上角「Vibepost › 检查更新…」一样，src/ai/panel.js）；只在 App 里有 -->
                     <div id="aboutSettings" class="about-settings" role="group" aria-labelledby="aboutSettingsTitle" hidden>
                       <h2 id="aboutSettingsTitle" class="section-label">关于</h2>
@@ -1328,6 +1336,7 @@
     <script src="src/phone-feed.js"></script>
     <script src="src/phone-preview.js"></script>
     <script src="src/ai/panel.js"></script>
+    <script src="src/ai/notify.js"></script>
     <script src="src/ai/history.js"></script>
     <script src="src/ai/manuals.js"></script>
     <script src="src/mcp/panel.js"></script>
