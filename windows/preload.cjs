@@ -68,6 +68,8 @@ const bridge = {
   saveFile: async (blob, name) =>
     call("save", { name, data: await bytes(blob) }),
   copyText: (text) => call("clipboard/text", { text: String(text || "") }),
+  // 系统通知（AI 等你确认、回复说完时，src/ai/notify.js）：{ title, body }；点击通知回到这个窗口
+  notify: (request) => call("notify/show", request),
   copyRichText: (html, text) => call("clipboard/rich", { html, text }),
   sendToPhone: (files, text, details = {}) =>
     call("phone/start", { files, text, ...details }),

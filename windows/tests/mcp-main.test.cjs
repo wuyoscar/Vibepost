@@ -12,7 +12,7 @@ const { WindowState } = require('../lib/window-state.cjs');
 async function host() {
   const handlers = new Map(), created = [], writes = []; let focused;
   const fakeElectron = {
-    app: { getPath: () => path.resolve(__dirname, '../../.scratch/mcp-main-vm'), setPath() {}, setName() {}, requestSingleInstanceLock: () => true, on() {}, whenReady: () => ({ then: () => ({ catch() {} }) }), quit() {} },
+    app: { getPath: () => path.resolve(__dirname, '../../.scratch/mcp-main-vm'), setPath() {}, setName() {}, setAppUserModelId() {}, requestSingleInstanceLock: () => true, on() {}, whenReady: () => ({ then: () => ({ catch() {} }) }), quit() {} },
     BrowserWindow: { fromWebContents: sender => sender.view, getFocusedWindow: () => focused },
     ipcMain: { on() {}, handle: (name, handler) => handlers.set(name, handler) },
     protocol: { registerSchemesAsPrivileged() {} },
