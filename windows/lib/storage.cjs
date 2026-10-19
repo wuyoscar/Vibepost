@@ -63,21 +63,7 @@ class Library {
   }
   async seed() {
     const dir = this.folder("manuals");
-    await fs.mkdir(dir, { recursive: true });
-    if (!(await fs.readdir(dir)).some((name) => name.endsWith(".md"))) {
-      const source = path.join(this.webRoot, "src", "writing-manuals");
-      for (const name of await fs.readdir(source))
-        if (name.endsWith(".md"))
-          await fs
-            .copyFile(
-              path.join(source, name),
-              path.join(dir, name),
-              require("node:fs").constants.COPYFILE_EXCL,
-            )
-            .catch((e) => {
-              if (e.code !== "EEXIST") throw e;
-            });
-    }
+    await require("./writing-manuals.cjs").seedWritingManuals(dir, path.join(this.webRoot, "src", "writing-manuals"));
     await fs.mkdir(this.folder("templates"), { recursive: true });
   }
   async manuals(action, input = {}) {

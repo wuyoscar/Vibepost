@@ -49,12 +49,13 @@ function browserFixture(settings = {}) {
           const args = JSON.parse(parsed[2]);
           this.operations.push({ name: parsed[1], args });
           if (parsed[1] === "setup") {
+            this.cardHeight = args[4];
             Object.keys(args[1]).forEach((id) => this.media.add(id));
             return { generation: `generation-${windows.indexOf(this)}`, missing: args[2].filter((id) => !this.media.has(id)) };
           }
           if (parsed[1] === "show") {
             await sleep(5);
-            return { width: 864, height: 1152 };
+            return { width: 864, height: this.cardHeight ?? 1152 };
           }
           if (parsed[1] === "chrome") return [{ x: 8, y: 1110, width: 830, height: 42 }];
         },
@@ -278,4 +279,19 @@ test("only host timeouts request a bounded media resend and a rebuilt host retur
     return true;
   });
   service.dispose();
+});
+
+test("portrait sizes flow through metrics, host setup and PNG capture", async () => {
+  const fixture = browserFixture();
+  const service = new CardRasterService(fixture);
+  try {
+    for (const height of [1152, 1222, 1536, 1728]) {
+      const reply = await service.render("sizes:0", request({ height }));
+      const bytes = Buffer.from(reply.pages[0].png, "base64");
+      assert.equal(bytes.readUInt32BE(16), 1728);
+      assert.equal(bytes.readUInt32BE(20), height * 2);
+      const metrics = fixture.windows[0].operations.filter(op => op.name === "Emulation.setDeviceMetricsOverride").at(-1);
+      assert.equal(metrics.params.height, height);
+    }
+  } finally { service.dispose(); }
 });

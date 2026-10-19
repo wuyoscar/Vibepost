@@ -4,7 +4,7 @@
 // actions：{ readOnly(), text(), apply(nextText), reveal(source), ask(source), annotate(block) }
 (() => {
   const CARD_WIDTH = 864;
-  const CARD_HEIGHT = 1152;
+  const vertical = (value) => `calc(${value} / var(--card-height, 1152) * 100%)`;
   const DRAG_THRESHOLD = 4;
   const ops = () => window.MediaCraftCardBlocks;
   const percent = (value, total) => `${(value / total) * 100}%`;
@@ -80,8 +80,8 @@
         box.setAttribute("role", "button");
         box.setAttribute("aria-label", `选择${labelOf(block)}`);
         Object.assign(box.style, {
-          left: percent(block.x, CARD_WIDTH), top: percent(block.y, CARD_HEIGHT),
-          width: percent(block.width, CARD_WIDTH), height: percent(block.height, CARD_HEIGHT),
+          left: percent(block.x, CARD_WIDTH), top: vertical(block.y),
+          width: percent(block.width, CARD_WIDTH), height: vertical(block.height),
         });
         box.addEventListener("pointerdown", (event) => startDrag(event, entry, block, box));
         box.addEventListener("dblclick", () => actions.reveal(block.source));
@@ -188,7 +188,7 @@
       const { x, y, width, height } = block;
       bar.classList.toggle("is-below", y < 64);
       bar.style.left = percent(x + width / 2, CARD_WIDTH);
-      bar.style.top = percent(y < 64 ? y + height : y, CARD_HEIGHT);
+      bar.style.top = vertical(y < 64 ? y + height : y);
       return bar;
     }
 
@@ -261,7 +261,8 @@
         if (!best || distance < best.distance) best = { entry, rect, distance };
       }
       if (!best) return null;
-      return { entry: best.entry, y: Math.min(CARD_HEIGHT, Math.max(0, ((clientY - best.rect.top) / best.rect.height) * CARD_HEIGHT)) };
+      const height = best.entry.page.height ?? 1152;
+      return { entry: best.entry, y: Math.min(height, Math.max(0, ((clientY - best.rect.top) / best.rect.height) * height)) };
     }
 
     // 落在哪两块之间：离指针最近的一块的上半截算它之前，下半截算它之后
@@ -288,7 +289,7 @@
       const { bounds } = entry.page;
       line.style.left = percent(bounds.left, CARD_WIDTH);
       line.style.width = percent(bounds.right - bounds.left, CARD_WIDTH);
-      line.style.top = percent(after ? block.y + block.height : block.y, CARD_HEIGHT);
+      line.style.top = vertical(after ? block.y + block.height : block.y);
       entry.layer.append(line);
     }
 

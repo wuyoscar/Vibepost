@@ -296,6 +296,7 @@ function showDraft(record, stored, profile) {
   styleForm.write({
     ...MediaCraftPalettes.complete(record.colors, { colors: theme.colors }, record.tunedColors ?? MediaCraftPalettes.inferTuned(record.colors)),
     fonts: { zh: fonts.zh, en: fonts.en, code: fonts.code },
+    cardHeight: record.cardHeight,
     fontSize: record.fontSize,
     lineHeight: record.lineHeight,
     imageMaxHeight: record.imageMaxHeight,

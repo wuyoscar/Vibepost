@@ -36,6 +36,7 @@
     const pad = structure.pages[first ? "first" : "inner"];
     const size = (settings.fontSize ?? 34) * structure.body.scale;
     const vars = {
+      "--mc-page-height": px(root.MediaCraftStyleForm.normalizeNumber("cardHeight", settings.cardHeight)),
       "--pad-t": px(pad.top), "--pad-r": px(pad.right), "--pad-b": px(pad.bottom), "--pad-l": px(pad.left),
       "--mc-size-body": px(size),
       "--mc-leading": String(settings.lineHeight ?? 1.85),
@@ -192,7 +193,7 @@
   // 每次排版一张自己的（分页中途会让出主线程，舞台与缩略图的排版可能交错），排完 dispose() 拆掉
   function measurer(style, context) {
     const measureCard = cardElement(style);
-    Object.assign(measureCard.host.style, { position: "fixed", left: "-20000px", top: "0", width: `${WIDTH}px`, height: `${HEIGHT}px`, pointerEvents: "none" });
+    Object.assign(measureCard.host.style, { position: "fixed", left: "-20000px", top: "0", width: `${WIDTH}px`, height: `${context.height}px`, pointerEvents: "none" });
     measureCard.host.setAttribute("aria-hidden", "true");
     document.body.append(measureCard.host);
     return {
@@ -231,6 +232,7 @@
     const setup = fonts.cardSetup(fonts.resolve(settings.fonts ?? { zh: follow, en: follow, code: follow }, theme.fonts, theme.titleFonts), structure);
     return {
       look,
+      height: root.MediaCraftStyleForm.normalizeNumber("cardHeight", settings.cardHeight),
       structure,
       setup,
       settings,
@@ -454,7 +456,7 @@
       let wanted = batchIds.filter((id) => !hostMedia.generation || !hostMedia.sent.has(id));
       let reply;
       for (let attempt = 0; ; attempt += 1) {
-        const request = { pages: batch, style: result.style, media: await payload(wanted), mediaIds: batchIds, width: WIDTH, height: HEIGHT, scale: SCALE };
+        const request = { pages: batch, style: result.style, media: await payload(wanted), mediaIds: batchIds, width: WIDTH, height: result.context.height, scale: SCALE };
         try {
           reply = await root.MediaCraftNative.rasterCards(request);
           break;
@@ -481,7 +483,7 @@
   // 把一页画进 2 倍图的画布：正文 PNG 铺满，页眉页脚的条按卡片坐标 × 倍数贴上
   async function paintPage(context, page) {
     const bitmap = await createImageBitmap(page.png);
-    context.drawImage(bitmap, 0, 0, WIDTH * SCALE, HEIGHT * SCALE);
+    context.drawImage(bitmap, 0, 0, context.canvas.width, context.canvas.height);
     bitmap.close();
     for (const strip of page.strips ?? []) {
       const piece = await createImageBitmap(strip.png);
@@ -493,7 +495,7 @@
   // 浏览器开发模式没有壳：用 html2canvas 画（只为开发时看效果，像素以壳为准）
   async function rasterizeInBrowser(result, index) {
     const host = mount(result, index);
-    Object.assign(host.style, { position: "fixed", left: "-20000px", top: "0", width: `${WIDTH}px`, height: `${HEIGHT}px` });
+    Object.assign(host.style, { position: "fixed", left: "-20000px", top: "0", width: `${WIDTH}px`, height: `${result.context.height}px` });
     document.body.append(host);
     try {
       const page = host.shadowRoot.querySelector(".mc-page");
@@ -520,7 +522,7 @@
     try {
       const hosts = result.pages.slice(0, count).map((_, index) => {
         const host = mount(result, index);
-        Object.assign(host.style, { width: `${WIDTH}px`, height: `${HEIGHT}px` });
+        Object.assign(host.style, { width: `${WIDTH}px`, height: `${result.context.height}px` });
         shelf.append(host);
         return host;
       });
@@ -529,7 +531,7 @@
       const pages = [];
       for (const [index, host] of hosts.entries()) {
         if (index) await root.MediaCraftCardPaginate.yieldToPage();
-        pages.push(root.MediaCraftCardSummary.summarize(host.shadowRoot.querySelector(".mc-page"), { index, kind: result.pages[index].kind }, result.context));
+        pages.push(root.MediaCraftCardSummary.summarize(host.shadowRoot.querySelector(".mc-page"), { index, kind: result.pages[index].kind, height: result.context.height }, result.context));
       }
       hosts.forEach((host) => {
         host.remove();
@@ -546,7 +548,7 @@
   // 画布先是空的，draw() 出图后画上（只出一次；出过的页有缓存，打字时只重出变了的页）。
   async function paint(result, { paint: count = Infinity } = {}) {
     const { pages, hosts } = await measurePages(result, count);
-    const canvases = result.pages.slice(0, count).map(() => Object.assign(document.createElement("canvas"), { width: WIDTH * SCALE, height: HEIGHT * SCALE }));
+    const canvases = result.pages.slice(0, count).map(() => Object.assign(document.createElement("canvas"), { width: WIDTH * SCALE, height: result.context.height * SCALE }));
     let drawing = null;
     const draw = () => {
       // 一页一页画，页与页之间让出主线程（一次画几十张 2 倍图会卡住界面）
@@ -580,7 +582,7 @@
         stats.thumbHits += 1;
       } else {
         stats.thumbs += 1;
-        small = await shrinkPage(page, width, height);
+        small = await shrinkPage(page, width, height, result.context.height);
         thumbCache.delete(keys[order]);
         thumbCache.set(keys[order], small);
         while (thumbCache.size > THUMB_CACHE_SIZE) thumbCache.delete(thumbCache.keys().next().value);
@@ -598,16 +600,19 @@
   // 交错着清、画会互相抹掉）；整张位图随手关掉
   let scratch = null;
   let shrinking = Promise.resolve();
-  function shrinkPage(page, width, height) {
+  function shrinkPage(page, width, height, cardHeight) {
     const run = shrinking.then(async () => {
       scratch ??= Object.assign(document.createElement("canvas"), { width: WIDTH * SCALE, height: HEIGHT * SCALE });
+      if (scratch.height !== cardHeight * SCALE) scratch.height = cardHeight * SCALE;
       const full = scratch.getContext("2d");
       full.clearRect(0, 0, scratch.width, scratch.height);
       await paintPage(full, page);
       const canvas = Object.assign(document.createElement("canvas"), { width, height });
       const context = canvas.getContext("2d");
       context.imageSmoothingQuality = "high";
-      context.drawImage(scratch, 0, 0, width, height);
+      const fit = Math.min(width / scratch.width, height / scratch.height);
+      const w = scratch.width * fit, h = scratch.height * fit;
+      context.drawImage(scratch, (width - w) / 2, (height - h) / 2, w, h);
       return canvas;
     });
     shrinking = run.catch(() => undefined);

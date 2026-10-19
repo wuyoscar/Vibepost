@@ -275,7 +275,8 @@
     const text = article.querySelector(".mc-cover-text");
     const textBox = frame.box(text.getBoundingClientRect());
     const result = {
-      index: page.index, first: true, role: "cover", structure: context.look,
+      index: page.index,
+      height: page.height ?? context.height ?? 1152, first: true, role: "cover", structure: context.look,
       bounds: { left: textBox.x, top: textBox.y, right: textBox.x + textBox.width, bottom: textBox.y + textBox.height },
       items: [], imageHits: [], dropTargets: [], blocks: [], live: false, fill: null, chars: 0,
     };
@@ -313,6 +314,7 @@
     const role = page.kind === "end" ? "end" : "body";
     const result = {
       index: page.index,
+      height: page.height ?? context.height ?? 1152,
       first: page.index === 0 && role === "body",
       role,
       structure: context.look,

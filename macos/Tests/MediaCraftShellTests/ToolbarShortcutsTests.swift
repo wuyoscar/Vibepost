@@ -34,7 +34,7 @@ struct ToolbarShortcutsTests {
           .map((button) => ui.name(button));
     """
 
-    @Test("格式条上的 A− / A+：每按一下这篇的字号 ±1（和检查器的字号滑块同一个值），到 24 / 40 按钮变灰；⇧⌘> / ⇧⌘< 在哪都能按；是撤销历史里的一步")
+    @Test("格式条上的 A− / A+：每按一下这篇的字号 ±1（和检查器的字号滑块同一个值），到 18 / 40 按钮变灰；⇧⌘> / ⇧⌘< 在哪都能按；是撤销历史里的一步")
     func fontSizeButtons() async throws {
         let harness = ShellHarness()
         try await harness.load()
@@ -64,7 +64,7 @@ struct ToolbarShortcutsTests {
             await until(async () => (await mc.drafts.current()).fontSize === 39);
             const down = (await mc.drafts.current()).fontSize;
             const undone = (await mc.drafts.undo()).fontSize;
-            await mc.drafts.update({ fontSize: 24 });
+            await mc.drafts.update({ fontSize: 18 });
             await settle();
             const atMin = [tool("字号增大").disabled, tool("字号减小").disabled];
             return { start, up, atMax, stillMax, handled, down, undone, atMin };
@@ -79,7 +79,7 @@ struct ToolbarShortcutsTests {
         #expect(result?["stillMax"] as? Int == 40 && result?["handled"] as? Bool == true)
         #expect(result?["down"] as? Int == 39, "⇧⌘< 减一")
         #expect(result?["undone"] as? Int == 40, "是撤销历史里的一步")
-        #expect(result?["atMin"] as? [Bool] == [false, true], "到 24 减小变灰")
+        #expect(result?["atMin"] as? [Bool] == [false, true], "到 18 减小变灰")
         #expect(harness.pageErrors == [])
     }
 

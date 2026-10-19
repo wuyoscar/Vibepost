@@ -31,7 +31,7 @@
     "- 稿子里的 Vibepost 自定义标记必须原样保留，不要改写、翻译、挪动或删除。写法（中文是规范写法，英文也认，App 收下时换成中文）与排版经验：",
     "{{manual}}",
     "  完整的操作手册在当前目录的 AGENTS.md，说明被压缩、记不清时回头读它。",
-    "- 写什么、什么口味（读者、语气、结构、话题）照写作手册：目录在 AGENTS.md 末尾，全文在当前目录的 写作手册/ 里。按这篇的题材自己挑一份，用户点名的优先；",
+    "- 写什么、什么口味（读者、语气、结构、话题）照写作手册：目录在 AGENTS.md 末尾，全文在当前目录的 写作手册/ 里。用户本条选了技能时按各自用途配合使用；本条没有选择时按题材挑合适的手册，不自动继承历史消息的技能选择；",
     "  用户要你把这次的经验记进写作手册时，用工具 save_writing_manual 提议（用户确认才保存，直接改 写作手册/ 里的文件不会留下）。",
     "- 其余是常见 Markdown：# 标题、**加粗**、*斜体*、~~删除线~~、`代码`、> 引用、- 列表、1. 列表、表格、---。每一行在卡片上另起一行，空行分段。",
     "- 除了改文件，你还能用 Vibepost 的工具（{{tools}}）直接操作 App，马上生效，每个动作都列在会话里、用户可以撤销：",
@@ -922,10 +922,11 @@
 
   // 在当前稿子的会话里发一句。options：kind（"chat" | "polish" | "command" | "rewrite"）、
   // label（会话里显示的字，默认就是 prompt）、context（{ start, end }：带上这段选中的文字）、
-  // preset（预设命令的名字，src/ai/presets.js 发的，记在这条消息上）。
+  // preset（预设命令名）、skills（写作手册名称数组，仅本条消息使用）。
   // 一轮说完（或停止、出错）时返回 { turnId, state, changes, reply, error? }，changes 是这一轮改了几处（等用户确认）。
   async function send(prompt, options = {}) {
     if (typeof prompt !== "string") throw new TypeError("prompt 需要是字符串");
+    const skills = root.MediaCraftWritingSkills.names(options.skills);
     const { kind = options.context ? "rewrite" : "chat", context: range } = options;
     const draft = await mc().drafts.current();
     const context = checkSendable(draft, prompt, range);
@@ -935,6 +936,7 @@
       if (running.has(draft.id)) throw new Error("这篇稿子的 AI 还在回复，先停止或等它说完");
     }
     const turn = createTurn(draft);
+    turn.skills = skills;
     running.set(draft.id, turn);
     emit({ type: "turn", draftId: draft.id, turnId: turn.id, state: "running", changes: 0 });
     const user = addMessage(turn, {
@@ -943,6 +945,7 @@
       text: options.label ?? (prompt.trim() || "改写这段"),
       ...(context ? { context } : {}),
       ...(options.preset ? { preset: String(options.preset) } : {}),
+      ...(skills.length ? { skills: skills.map((name) => ({ name })) } : {}),
       at: Date.now(),
     });
     checkpoint(turn);
@@ -997,9 +1000,19 @@
   // 交给壳起后端的进程：先把这一轮之前的样子存成版本（可以撤回）；起不来时这一轮以出错结束。
   async function launchTurn(turn, label, prompt) {
     try {
+      const skills = await root.MediaCraftWritingSkills.load(turn.skills ?? []);
+      prompt = root.MediaCraftWritingSkills.prompt(prompt, skills);
+      if (turn.cancelRequested) {
+        await finishTurn(turn, { status: null, signal: null, cancelled: true, stderr: "", markdown: null, title: null, caption: null });
+        return;
+      }
       await versions.snapshot(turn.draftId, turn.id, label);
       const found = await getStatus({ backend: turn.backend.id });
       if (!found.available) throw new Error(found.error || `没有找到本机 ${turn.backend.label}`);
+      if (turn.cancelRequested) {
+        await finishTurn(turn, { status: null, signal: null, cancelled: true, stderr: "", markdown: null, title: null, caption: null });
+        return;
+      }
       // 后端要自己发这一轮的话与说明时用（Codex 经 stdin 开线程、发 turn/start）
       turn.prompt = prompt;
       // 这一轮的推理强度（Claude Code 的 --effort，Codex 的 turn/start 的 effort）
@@ -1024,8 +1037,8 @@
     }
   }
 
-  function polish() {
-    return send(POLISH_PROMPT, { kind: "polish", label: "一键润色全文" });
+  function polish(options = {}) {
+    return send(POLISH_PROMPT, { skills: options.skills, kind: "polish", label: "一键润色全文" });
   }
 
   // 停止这篇稿子（默认当前这篇）正在跑的一轮。

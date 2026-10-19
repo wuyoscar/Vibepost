@@ -44,7 +44,7 @@
     const [draft, profile, media] = await Promise.all([mc.drafts.current(), mc.profile.get(), mc.media.list()]);
     const sources = await Promise.all(media.map((item) => mc.media.src(item.id)));
     const content = JSON.stringify([
-      draft.markdown, draft.fonts, draft.fontSize, draft.lineHeight, draft.imageMaxHeight,
+      draft.markdown, draft.fonts, draft.cardHeight, draft.fontSize, draft.lineHeight, draft.imageMaxHeight,
       profile.name, profile.handle, fingerprint(profile.avatar), profile.avatarCrop,
       media.map((item, index) => [item.id, item.kind, item.layout, item.crop, fingerprint(sources[index])]),
     ]);

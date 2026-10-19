@@ -6,7 +6,8 @@
 
   // 数值的默认值与上下限（与 index.html 里滑杆的 min / max / step 一致）；超出时截断，按 step 取整。
   const NUMBERS = Object.freeze({
-    fontSize: { input: "#fontSizeInput", fallback: 34, min: 24, max: 40, step: 1 },
+    cardHeight: { input: "#cardHeightInput", fallback: 1152, min: 1152, max: 1728, step: 1 },
+    fontSize: { input: "#fontSizeInput", fallback: 34, min: 18, max: 40, step: 1 },
     lineHeight: { input: "#lineHeightInput", fallback: 1.85, min: 1, max: 2.4, step: 0.01 },
     imageMaxHeight: { input: "#imageHeightInput", fallback: 1048, min: 220, max: 1048, step: 1 },
   });
@@ -18,6 +19,7 @@
   function normalizeNumber(field, value) {
     const { fallback, min, max, step } = NUMBERS[field];
     const number = Number(value);
+    if (field === "cardHeight") return [1152, 1222, 1536, 1728].includes(number) ? number : 1152;
     if (value === null || value === "" || !Number.isFinite(number)) return fallback;
     const stepped = Math.round(Math.min(max, Math.max(min, number)) / step) * step;
     return Number(stepped.toFixed(2));
@@ -35,7 +37,19 @@
       () => onInput(),
     );
 
-    for (const input of Object.values(numbers)) input.addEventListener("input", () => onInput());
+    const densities = { card: [34, 1.85], reading: [28, 1.65], document: [22, 1.55] };
+    const buttons = [...document.querySelectorAll('[data-density]')];
+    const syncDensity = () => buttons.forEach(button => {
+      const [size, leading] = densities[button.dataset.density];
+      button.setAttribute('aria-pressed', String(Number(numbers.fontSize.value) === size && Number(numbers.lineHeight.value) === leading));
+    });
+    for (const input of Object.values(numbers)) input.addEventListener("input", () => { syncDensity(); onInput(); });
+    buttons.forEach(button => button.addEventListener('click', async () => {
+      const [fontSize, lineHeight] = densities[button.dataset.density];
+      try { await root.mediacraft.drafts.update({fontSize, lineHeight}, {undoable: true}); }
+      catch (error) { root.alert(error.message || String(error)); }
+      syncDensity();
+    }));
 
     // 色块的名字与说明（悬停提示）
     for (const role of ROLES) {
@@ -78,6 +92,7 @@
         for (const field of Object.keys(NUMBERS)) {
           if (field in fields) numbers[field].value = String(normalizeNumber(field, fields[field]));
         }
+        syncDensity();
       },
     };
   }

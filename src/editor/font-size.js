@@ -6,7 +6,7 @@
 
   const drafts = root.MediaCraftDrafts;
   // 范围和检查器的字号滑块一样（src/workspace/style-form.js 的 NUMBERS.fontSize）
-  const [min, max] = [24, 40];
+  const [min, max] = [18, 40];
   const buttons = [...document.querySelectorAll("[data-font-step]")];
   const slider = document.querySelector("#fontSizeInput");
   const LABELS = { "-1": "字号减小", "1": "字号增大" };

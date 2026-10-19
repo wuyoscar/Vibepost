@@ -378,7 +378,7 @@
       name: "export",
       description: motionFormats.length
         ? "把这篇导出成文件，写进 directory（已经存在的本机文件夹绝对路径）：format 为 zip（整组卡片 PNG，动效页为 MP4）、png（第 page 页，从 1 数，默认 1）、long（长文长图）、mp4 或 gif（给 page 时导出该动效页，省略时导出全部动效页；仅一页直接保存，多页打包 ZIP，不含静态页）。Windows 不生成 Apple .pvt / Live Photo。同名文件给 overwrite: true 才覆盖。返回写下的文件路径。"
-        : "把这篇导出成文件，写进 directory（已经存在的文件夹的绝对路径）：format 为 zip（整组卡片打包，1728 × 2304 的 PNG，实况页是 .pvt）、png（第 page 页，从 1 数，默认 1）或 long（长文长图，不在长文模式时会先切过去）。文件名以标题开头；同名文件已经存在时报错，给 overwrite: true 才覆盖。返回写下的文件路径。",
+        : "把这篇导出成文件，写进 directory（已经存在的文件夹的绝对路径）：format 为 zip（整组卡片打包，按所选图文尺寸导出的 PNG，实况页是 .pvt）、png（第 page 页，从 1 数，默认 1）或 long（长文长图，不在长文模式时会先切过去）。文件名以标题开头；同名文件已经存在时报错，给 overwrite: true 才覆盖。返回写下的文件路径。",
       inputSchema: {
         type: "object",
         properties: {

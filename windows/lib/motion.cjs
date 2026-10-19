@@ -31,16 +31,17 @@ function normalizeRequest(request, duration) {
     span = Math.max(0.05, Math.min(span, duration - start));
   }
   const width = format === 'gif' ? 864 : 1440;
-  const height = format === 'gif' ? 1152 : 1920;
+  const height = Math.round(width * cardHeight / cardWidth / 2) * 2;
+  const composeHeight = Math.round(1440 * cardHeight / cardWidth / 2) * 2;
   // Compose at full resolution for both formats; GIF is resized after compositing.
   const sx = 1440 / cardWidth;
-  const sy = 1920 / cardHeight;
+  const sy = composeHeight / cardHeight;
   const placed = {
     x: Math.round(well.x * sx), y: Math.round(well.y * sy),
     width: Math.max(1, Math.round(well.width * sx)), height: Math.max(1, Math.round(well.height * sy)),
     radius: Math.min(well.radius * Math.min(sx, sy), well.width * sx / 2, well.height * sy / 2),
   };
-  return { format, crop, well: placed, start, span, speed, sound: request.sound !== false, duration: span / speed, width, height };
+  return { format, crop, well: placed, start, span, speed, sound: request.sound !== false, duration: span / speed, width, height, composeHeight };
 }
 
 function roundedMask({ width, height, radius }) {
@@ -74,14 +75,14 @@ function buildArgs(clip, files, hasAudio) {
   // FFmpeg applies display-matrix/rotation metadata before these filters, so the
   // normalized crop uses the same upright coordinates as the browser preview.
   const filters = [
-    '[0:v]scale=1440:1920:flags=lanczos,setsar=1,format=rgba[card]',
+    `[0:v]scale=1440:${clip.composeHeight}:flags=lanczos,setsar=1,format=rgba[card]`,
     `[1:v]trim=duration=${clip.span},setpts=(PTS-STARTPTS)/${clip.speed},format=rgba,crop=w=iw*${crop.width}:h=ih*${crop.height}:x=iw*${crop.x}:y=ih*${crop.y},scale=${well.width}:${well.height}:force_original_aspect_ratio=increase:flags=lanczos,crop=${well.width}:${well.height},setsar=1,fps=30,format=rgba[well]`,
     '[2:v]format=gray[mask]',
     '[well][mask]alphamerge=shortest=1[cut]',
     `[card][cut]overlay=x=${well.x}:y=${well.y}:shortest=1:eof_action=endall:format=auto[composed]`,
   ];
   if (clip.format === 'gif') {
-    filters.push('[composed]scale=864:1152:flags=lanczos,fps=15,split[g1][g2]', '[g1]palettegen=stats_mode=diff[palette]', '[g2][palette]paletteuse=dither=sierra2_4a[video]');
+    filters.push(`[composed]scale=${clip.width}:${clip.height}:flags=lanczos,fps=15,split[g1][g2]`, '[g1]palettegen=stats_mode=diff[palette]', '[g2][palette]paletteuse=dither=sierra2_4a[video]');
   } else filters.push('[composed]format=yuv420p[video]');
   const audio = clip.format === 'mp4' && clip.sound && hasAudio;
   if (audio) filters.push(`[1:a]atrim=duration=${clip.span},asetpts=PTS-STARTPTS,${tempo(clip.speed)},apad,atrim=duration=${clip.duration}[audio]`);

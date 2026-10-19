@@ -16,7 +16,6 @@
   "use strict";
 
   const CARD_WIDTH = 864;
-  const CARD_HEIGHT = 1152;
 
   const pad = (number) => String(number).padStart(2, "0");
 
@@ -138,7 +137,7 @@
         video,
         ...clip,
         cardWidth: CARD_WIDTH,
-        cardHeight: CARD_HEIGHT,
+        cardHeight: card.canvas.height / 2,
         well: { x, y, width, height, radius },
       }, { signal: task.signal, onProgress });
       return [
@@ -156,7 +155,7 @@
       if (!video) throw new Error("动态视频找不到了，请重新插入这段视频");
       const blob = await native.motionVideo({
         card: await encodePng(card.canvas), video, ...clip, format,
-        cardWidth: CARD_WIDTH, cardHeight: CARD_HEIGHT, well: card.live,
+        cardWidth: CARD_WIDTH, cardHeight: card.canvas.height / 2, well: card.live,
       }, { signal: task.signal, onProgress });
       return { name: `${name}.${format}`, blob: blob?.blob ?? blob };
     }

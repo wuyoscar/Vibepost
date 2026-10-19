@@ -422,6 +422,40 @@
           </div>
 
           <div id="stylePanel" class="inspector-panel" role="tabpanel" aria-labelledby="styleTab" data-guide-lock>
+            <section class="inspector-section" aria-labelledby="layoutLabel">
+              <h2 id="layoutLabel" class="section-label">版式</h2>
+              <label class="field card-only">
+                <span>图文尺寸</span>
+                <select id="cardHeightInput" aria-label="图文尺寸">
+                  <option value="1152">标准卡片 · 3:4</option>
+                  <option value="1222">文档页 · A4 比例</option>
+                  <option value="1536">竖屏 · 9:16</option>
+                  <option value="1728">长页 · 1:2</option>
+                </select>
+              </label>
+              <div class="segmented card-only" role="group" aria-label="排版密度">
+                <button type="button" data-density="card">大字卡片</button>
+                <button type="button" data-density="reading">舒适阅读</button>
+                <button type="button" data-density="document">文档排版</button>
+              </div>
+              <p class="section-note card-only">想多放内容，选文档排版或更长的页面；超出一页仍会自动分页。整篇不分页可用顶部「长文」。</p>
+              <label class="slider-row">
+                <span class="option-label">字号</span>
+                <input id="fontSizeInput" type="range" min="18" max="40" step="1" value="34" />
+                <output class="slider-value" for="fontSizeInput">34</output>
+              </label>
+              <label class="slider-row">
+                <span class="option-label">行距</span>
+                <input id="lineHeightInput" type="range" min="1" max="2.4" step="0.01" value="1.85" />
+                <output class="slider-value" for="lineHeightInput">1.85</output>
+              </label>
+              <label class="slider-row card-only">
+                <span class="option-label">图片高</span>
+                <input id="imageHeightInput" type="range" min="220" max="1048" step="1" value="1048" aria-label="图片最大高度" />
+                <output class="slider-value" for="imageHeightInput">1048</output>
+              </label>
+            </section>
+
             <section class="inspector-section" aria-labelledby="themeLabel">
               <h2 id="themeLabel" class="section-label">主题</h2>
               <div id="themeOptions" class="theme-grid" role="group" aria-label="主题"></div>
@@ -452,24 +486,7 @@
               </div>
             </section>
 
-            <section class="inspector-section" aria-labelledby="layoutLabel">
-              <h2 id="layoutLabel" class="section-label">版式</h2>
-              <label class="slider-row">
-                <span class="option-label">字号</span>
-                <input id="fontSizeInput" type="range" min="24" max="40" step="1" value="34" />
-                <output class="slider-value" for="fontSizeInput">34</output>
-              </label>
-              <label class="slider-row">
-                <span class="option-label">行距</span>
-                <input id="lineHeightInput" type="range" min="1" max="2.4" step="0.01" value="1.85" />
-                <output class="slider-value" for="lineHeightInput">1.85</output>
-              </label>
-              <label class="slider-row card-only">
-                <span class="option-label">图片高</span>
-                <input id="imageHeightInput" type="range" min="220" max="1048" step="1" value="1048" aria-label="图片最大高度" />
-                <output class="slider-value" for="imageHeightInput">1048</output>
-              </label>
-            </section>
+
 
             <!-- 封面：src/workspace/cover-form.js。标题取标题框，版式随主题；结尾页在正文里写 [[结尾]] -->
             <section id="coverPanel" class="inspector-section cover-panel card-only" aria-labelledby="coverLabel">
@@ -876,6 +893,7 @@
                   <svg class="icon icon-small" aria-hidden="true"><use href="#i-close" /></svg>
                 </button>
               </div>
+              <div id="aiSelectedSkills" class="ai-skill-tags" aria-label="下一条消息的写作技能" hidden></div>
               <div class="ai-composer-row">
                 <textarea id="aiInput" rows="2" aria-label="问 Claude" placeholder="问 Claude，或让它改稿…" title="↩ 发送，⇧↩ 换行" disabled></textarea>
                 <button id="aiSendBtn" class="send-button" type="submit" aria-label="发送" title="发送" disabled>
@@ -884,6 +902,18 @@
                 <button id="aiStopBtn" class="send-button is-stop" type="button" aria-label="停止" title="停止" hidden>
                   <svg class="icon" aria-hidden="true"><use href="#i-stop" /></svg>
                 </button>
+              </div>
+              <div id="aiWritingSkills" class="ai-writing-skills" hidden>
+                <button id="aiSkillsToggle" class="pill-button ai-skills-toggle" type="button" aria-expanded="false" aria-controls="aiSkillsPicker" title="写作技能：空输入框按 /，或 ⌘⇧K（Windows：Ctrl+Shift+K）">写作技能</button>
+                <span class="ai-skills-hint">/ 选择 · 仅下一条消息</span>
+                <div id="aiSkillsPicker" class="ai-skills-picker" role="group" aria-label="选择写作技能" hidden>
+                  <div class="ai-skills-search-row">
+                    <input id="aiSkillsSearch" type="search" aria-label="搜索写作技能" placeholder="搜索标题、文风、去 AI 味…" autocomplete="off" />
+                    <button id="aiSkillsDone" class="pill-button" type="button">完成</button>
+                  </div>
+                  <div id="aiSkillsList" class="ai-skills-list"></div>
+                  <p id="aiSkillsNote" class="ai-skills-note" role="status"></p>
+                </div>
               </div>
             </form>
           </div>
@@ -1292,6 +1322,7 @@
     <script src="src/ai/presets.js"></script>
     <script src="src/ai/backends/claude.js"></script>
     <script src="src/ai/backends/codex.js"></script>
+    <script src="src/ai/writing-skills.js"></script>
     <script src="src/ai/session.js"></script>
     <script src="src/ai/host.js"></script>
     <script src="src/mcp/tools.js"></script>

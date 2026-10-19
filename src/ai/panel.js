@@ -90,6 +90,8 @@
   let status = null;
   let draft = { id: null, readOnly: true };
   let context = null;
+  let composerRevision = 0;
+  const writingSkills = root.MediaCraftWritingSkills.mount({ composer, input, changed: () => { composerRevision++; } });
   // 上一次画出来的是哪一篇的哪些消息：同一篇里新来的那几条才浮起来（每次整段重画，旧的不再动一遍）
   let shown = { draftId: null, ids: new Set() };
 
@@ -276,6 +278,12 @@
     if (message.role === "user") {
       node = element("div", "ai-message ai-user");
       if (message.context) node.append(quoteNode(message.context));
+      if (message.skills?.length) {
+        const tags = element("div", "ai-skill-tags ai-message-skills");
+        tags.setAttribute("aria-label", "本条消息的写作技能");
+        for (const { name } of message.skills) tags.append(element("span", "ai-skill-tag", name));
+        node.append(tags);
+      }
       if (message.text) node.append(element("p", "ai-user-text", message.text));
     } else if (message.role === "assistant") {
       node = element("div", "ai-message ai-assistant");
@@ -422,6 +430,7 @@
     polishButton.disabled = !usable || busy || reviewing;
     for (const button of commandButtons) button.disabled = !usable || busy || reviewing;
     input.disabled = !usable;
+    writingSkills.disable(draft.readOnly);
     modelSelect.disabled = draft.readOnly;
     modelInput.disabled = draft.readOnly;
     backendSelect.disabled = draft.readOnly || Boolean(session?.locked);
@@ -601,6 +610,7 @@
   // ===== 选中的文字 =====
 
   function setContext(selection) {
+    composerRevision++;
     context = selection && selection.end > selection.start ? { start: selection.start, end: selection.end, text: selection.text } : null;
     contextBox.hidden = !context;
     if (context) {
@@ -631,13 +641,42 @@
     const text = input.value.trim();
     if (sendButton.hidden || sendButton.disabled) return;
     const sent = context;
+    const skills = writingSkills.get();
+    const sentDraft = draft.id;
     const options = sent ? { context: { start: sent.start, end: sent.end } } : {};
+    if (skills.length) options.skills = skills;
     input.value = "";
     setContext(null);
-    run(() => ai.api.send(text, options), () => {
+    writingSkills.set([]);
+    writingSkills.close();
+    const revision = composerRevision;
+    const restore = () => {
+      if (draft.id !== sentDraft || composerRevision !== revision || input.value || context || writingSkills.get().length) return;
       input.value = text;
+      writingSkills.set(skills);
       setContext(sent);
-    });
+    };
+    run(async () => {
+      const result = await ai.api.send(text, options);
+      if (result.state === "error") restore();
+    }, restore);
+  }
+
+  // 润色与快捷命令也是下一条消息，同样消费当前选择。
+  async function withWritingSkills(action) {
+    const skills = writingSkills.get();
+    const sentDraft = draft.id;
+    writingSkills.set([]);
+    writingSkills.close();
+    const revision = composerRevision;
+    const restore = () => {
+      if (draft.id === sentDraft && composerRevision === revision) writingSkills.set(skills);
+    };
+    try {
+      const result = await action(skills.length ? { skills } : {});
+      if (result.state === "error") restore();
+      return result;
+    } catch (error) { restore(); throw error; }
   }
 
   composer.addEventListener("submit", (event) => {
@@ -650,17 +689,17 @@
     event.preventDefault();
     submit();
   });
-  input.addEventListener("input", syncControls);
+  input.addEventListener("input", () => { composerRevision++; syncControls(); });
   stopButton.addEventListener("click", () => run(() => ai.api.cancel(draft.id)));
-  polishButton.addEventListener("click", () => run(() => ai.api.polish()));
+  polishButton.addEventListener("click", () => run(() => withWritingSkills((options) => ai.api.polish(options))));
   for (const button of commandButtons) {
     const { aiPreset: preset, aiCommand: command } = button.dataset;
     if (preset) button.textContent = ai.presets.PRESETS[preset].label;
     button.addEventListener("click", () => {
       setPresetsOpen(false);
-      run(() => (preset
-        ? ai.api.preset(preset)
-        : ai.api.send(COMMANDS[command], { kind: "command", label: button.textContent.trim() })));
+      run(() => withWritingSkills((options) => (preset
+        ? ai.api.preset(preset, options)
+        : ai.api.send(COMMANDS[command], { ...options, kind: "command", label: button.textContent.trim() }))));
     });
   }
 
@@ -992,6 +1031,8 @@
     const current = await mc.drafts.current();
     if (current.id === draft.id) return;
     draft = { id: current.id, readOnly: current.readOnly };
+    writingSkills.set([]);
+    writingSkills.close();
     setContext(null);
     showModelError(null);
     modelCustom.hidden = true;

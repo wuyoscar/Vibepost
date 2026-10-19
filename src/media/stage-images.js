@@ -3,7 +3,7 @@
 // 自己不改稿子：每个动作都交给 actions，由它变成正文（和图片属性）的一步改动。
 (() => {
   const CARD_WIDTH = 864;
-  const CARD_HEIGHT = 1152;
+  const vertical = (value) => `calc(${value} / var(--card-height, 1152) * 100%)`;
   const DRAG_THRESHOLD = 4; // 按下后挪动超过这么多像素才算拖动
   const EDGE_SCROLL = 56; // 拖到舞台上下边这么近时自动滚动
   const GHOST_SIZE = 140; // 拖动时跟着指针的小图最长边（像素）
@@ -62,9 +62,9 @@
 
     function place(element, rect) {
       element.style.left = percent(rect.x, CARD_WIDTH);
-      element.style.top = percent(rect.y, CARD_HEIGHT);
+      element.style.top = vertical(rect.y);
       element.style.width = percent(rect.width, CARD_WIDTH);
-      element.style.height = percent(rect.height, CARD_HEIGHT);
+      element.style.height = vertical(rect.height);
     }
 
     function attach(frame, page, index) {
@@ -186,7 +186,7 @@
       const { y, height } = ref.box;
       bar.classList.toggle("is-below", y < 64);
       bar.style.left = percent(ref.box.x + ref.box.width / 2, CARD_WIDTH);
-      bar.style.top = percent(y < 64 ? y + height : y, CARD_HEIGHT);
+      bar.style.top = vertical(y < 64 ? y + height : y);
       return bar;
     }
 
@@ -220,7 +220,8 @@
       if (!best) return null;
       const { entry, rect } = best;
       const x = ((clientX - rect.left) / rect.width) * CARD_WIDTH;
-      const y = Math.min(CARD_HEIGHT, Math.max(0, ((clientY - rect.top) / rect.height) * CARD_HEIGHT));
+      const height = entry.page.height ?? 1152;
+      const y = Math.min(height, Math.max(0, ((clientY - rect.top) / rect.height) * height));
       return { entry, x, y };
     }
 
@@ -258,7 +259,7 @@
       line.setAttribute("aria-hidden", "true");
       line.style.left = percent(bounds.left, CARD_WIDTH);
       line.style.width = percent(bounds.right - bounds.left, CARD_WIDTH);
-      line.style.top = percent(after ? target.y + target.height : target.y, CARD_HEIGHT);
+      line.style.top = vertical(after ? target.y + target.height : target.y);
       entry.layer.append(line);
     }
 
@@ -303,7 +304,7 @@
       const scale = CARD_WIDTH / page.width;
       const box = image.getBoundingClientRect();
       const clip = cell.getBoundingClientRect();
-      const canvas = Object.assign(document.createElement("canvas"), { width: CARD_WIDTH, height: CARD_HEIGHT });
+      const canvas = Object.assign(document.createElement("canvas"), { width: CARD_WIDTH, height: Math.round(page.height * scale) });
       const context = canvas.getContext("2d");
       context.beginPath();
       context.rect((clip.left - page.left) * scale, (clip.top - page.top) * scale, clip.width * scale, clip.height * scale);

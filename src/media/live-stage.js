@@ -4,7 +4,7 @@
 (() => {
   const live = window.MediaCraftMedia.live;
   const CARD_WIDTH = 864;
-  const CARD_HEIGHT = 1152;
+  const vertical = (value) => `calc(${value} / var(--card-height, 1152) * 100%)`;
   const VISIBLE_RATIO = 0.6; // 卡片露出这么多算翻到了这一张
 
   const percent = (value, total) => `${(value / total) * 100}%`;
@@ -15,9 +15,9 @@
     element.className = "stage-live";
     element.dataset.state = "resting";
     element.style.left = percent(hit.x, CARD_WIDTH);
-    element.style.top = percent(hit.y, CARD_HEIGHT);
+    element.style.top = vertical(hit.y);
     element.style.width = percent(hit.width, CARD_WIDTH);
-    element.style.height = percent(hit.height, CARD_HEIGHT);
+    element.style.height = vertical(hit.height);
     element.style.borderRadius = `${percent(hit.radius, hit.width)} / ${percent(hit.radius, hit.height)}`;
     const badge = document.createElement("span");
     badge.className = "stage-live-badge";

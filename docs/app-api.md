@@ -378,7 +378,7 @@ claude -p --input-format stream-json --output-format stream-json --verbose --inc
 | `backends()` | 认得的后端 | `[{ id, name, label }]` |
 | `setBackend(backend, draftId?)` | 给这篇（默认当前这篇）选后端，模型换成那个后端上次选的，同时记成新稿子的默认。这篇已经有对话（或正在跑）时换成别的后端 reject（先「重新开始这篇的对话」）；没有这个后端 `TypeError`，内置说明书 reject | `{ backend, model, used }` |
 | `models(backend?)` | 后端能选的模型：Claude Code 是三个别名；Codex 问它自己（`model/list`，问过一次就记着），不在 App 里时为 `[]`；Codex 的每个模型带它能选的推理强度与默认档 | `[{ id, name, isDefault, efforts?, defaultEffort? }]` |
-| `send(prompt, options?)` | 在**当前稿子**的会话里发一句，这一轮说完（或停止、出错）时返回（改了稿子时修改对比已经显示出来）。内置说明书、找不到这篇的后端（或 Codex 没登录）、这篇已经在跑一轮、还有待确认的修改时 reject | `TurnResult` |
+| `send(prompt, options?)` | 在**当前稿子**的会话里发一句，这一轮说完（或停止、出错）时返回（改了稿子时修改对比已经显示出来）。`options.skills` 可传最多 8 个写作手册名称，发送时读取正文，只附到本轮 prompt，历史消息记录 `skills: [{name}]`。内置说明书、参数错误、这篇已在回复或还有待确认修改时 reject；启动或技能读取失败返回 `state: "error"` | `TurnResult` |
 | `polish()` | 一键润色：固定的话（改错别字、理顺句子、不改原意和结构、保留所有自定义标记）发进同一个会话 | `TurnResult` |
 | `preset(name)` | 预设命令（`src/ai/presets.js`，AI 助手里的几个按钮）：固定的话发进同一个会话，会话里显示按钮上的字，用户消息 `kind: "command"`、带 `preset: name`。`"coverTitles"` 封面标题 5 选 1（不改稿子，回复里给 5 个候选的 JSON 数组）、`"hook"` 首图文案（正文最前面一行一级标题）、`"humanize"` 去 AI 味（换成自然的个人口吻，事实与结构不变）、`"repaginate"` 按要点重新分页（Claude 直接改 `draft.md` 里的 `[[分页]]`，不用分页工具）、`"caption"` 写小红书正文（照着卡片内容与标题写 `caption.txt`：纯文本、口语、最后一行 3–5 个 #话题，不改 `draft.md` 与 `title.txt`）；后四个改的稿子照常进修改对比。改卡片内容的提示词都要求保留自定义标记与话题标签。AI 助手里另有快捷命令「加话题标签」（5 个 #话题加到 `caption.txt` 最后，同样进修改对比）。设计方向 `"bolder"` 更醒目、`"quieter"` 更安静、`"distill"` 精简、`"colorize"` 上色、`"typeset"` 调字、`"layout"` 理版式：让 Claude 先用 `get_pages` / `view_page` 看、再用 `restyle_block`、`move_section`、`set_style`、`set_card_css`（与预览里点选一块后的操作同一套）改、改完再看；用户还在经典引擎时提示词里多一句，让 Claude 先提醒切到「HTML 试用」。没有这个名字时 `TypeError` | `TurnResult`；`coverTitles` 另有 `titles: TitleOption[]` |
 | `useTitle(title)` | 把标题换成这个（与点封面标题候选相同）：撤销历史里的一步，⌘Z 撤回。空字符串 `TypeError`，内置说明书 reject | `Draft` |
@@ -576,6 +576,8 @@ App 可以开几个窗口，每个窗口开着一篇稿子，各改各存（都�
 
 在 Finder 中显示、用默认的 App 打开经 `ShellCore.revealFile` / `openFile`（测试 harness 换成记下来）。**界面**：AI 助手 › 设置 › 写作手册（`src/ai/manuals.js`）：一句说明、每份一块（名字、说明、「打开」「在 Finder 中显示」）、「打开文件夹」；每次打开设置重新列一遍，`save_writing_manual` 存好后也刷新。
 
+写作技能入口：输入框的「写作技能」、空输入框 `/` 或输入框内 ⌘⇧K（Windows：Ctrl+Shift+K）调出可搜索列表，多选后随下一条消息发送。发送失败且用户尚未输入新内容、选择新技能或换稿时恢复选择。操作手册仍自动加载，详见 [写作技能](writing-skills.md)。
+
 ## 模板（原生桥）
 
 模板是写好的整篇稿子（卡片内容 + 主题、配色、字体、封面、小红书正文、示例图），复制一份就能改（`drafts.create({ template })`，见 [drafts](#drafts稿子)）。两处来源，页面在 `src/templates/templates.js` 把它们登记成稿子记录的形状：
@@ -599,7 +601,7 @@ colors:                             # 可省：只给 bg / text / accent 时辅�
   accent: #ffbd2e
 fonts:                              # 可省：zh / en / code 的字体 id，没给跟随主题
   zh: lxgw-wenkai
-fontSize: 30                        # 可省：字号（24–40）、行距（1–2.4）、图片最大高（220–1048）；没给用默认值 34 / 1.85 / 1048
+fontSize: 30                        # 可省：字号（18–40）、行距（1–2.4）、图片最大高（220–1048）；没给用默认值 34 / 1.85 / 1048
 lineHeight: 1.6
 cover:                              # 可省：首页做封面
   enabled: true
@@ -660,3 +662,9 @@ images:                             # 可省：图片编号 → 路径（自带�
 | `mcp/write?request=<凭据>&name=<文件名>` | 文件本体 | 外部 Agent 的导出：写进这次 `export` 调用登记的目录（凭据只在这次调用进行中有效，页面自己选不了目录），文件名只取最后一段；同名文件已经有了且没给 `overwrite: true` 时失败。返回 `{ path, name }` |
 
 壳 → 页面：外部 Agent 的每个请求，壳调用页面的 `window.MediaCraftMCP.handle(JSON 文本)`（页面还在载入时等它准备好，最多 30 秒），收到 `{ result }` 或 `{ error }`（JSON 文本）。请求是 `{ session, method: "tools/list" | "tools/call", params, files?, exportRequest? }`：`session` 是 `mediacraft-mcp` 这次会话的编号（重连不变）；`files` 是壳按 `import_images` 的路径读好、校验过的图片（`[{ path, name, type, data（base64）}]`，页面不自己读本机文件）；`exportRequest` 是 `export` 的凭据。连接数变化时派发 `window` 上的 `mediacraft:native-mcp` 事件，`detail` 是 `{ type: "clients", count }`。
+
+### 图文尺寸与排版密度
+
+`Draft.cardHeight` 为逻辑页面高度，宽度固定 864。可选 1152（3:4，旧稿默认）、1222（近似 A4）、1536（9:16）、1728（1:2）。PNG 以两倍尺寸导出。`drafts.update({ cardHeight: 1222, fontSize: 22, lineHeight: 1.55 })` 可得到紧凑的文档排版；`set_style` 同样支持。尺寸随草稿、版本和用户模板保存，`render.pages()` 返回实际高度。
+
+样式面板提供大字卡片（34 / 1.85）、舒适阅读（28 / 1.65）、文档排版（22 / 1.55）；只调整字号与行距，不删除手动分页、不修改正文或强制换主题。字号可调至 18。长文模式仍用于整篇连续长图。缩略图在固定槽位内等比完整显示，长页两侧可能留空。

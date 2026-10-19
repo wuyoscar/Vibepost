@@ -155,10 +155,10 @@
   let host = null;
 
   // 在当前稿子的会话里发一条预设命令；「封面标题 5 选 1」的结果另带读出来的候选 titles
-  async function run(name) {
+  async function run(name, options = {}) {
     const preset = Object.hasOwn(PRESETS, name) ? PRESETS[name] : null;
     if (!preset) throw new TypeError(`没有这个预设命令：${name}（可用：${Object.keys(PRESETS).join("、")}）`);
-    const result = await ai.api.send(preset.prompt, { kind: "command", label: preset.label, preset: name });
+    const result = await ai.api.send(preset.prompt, { skills: options.skills, kind: "command", label: preset.label, preset: name });
     return name === "coverTitles" ? { ...result, titles: parseTitles(result.reply) } : result;
   }
 

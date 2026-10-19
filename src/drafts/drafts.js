@@ -28,7 +28,7 @@
   const UNTITLED = "未命名稿件";
   // 每篇最多留这么多个版本（每轮 AI 之前存一个），多了删最旧的
   const VERSION_LIMIT = 50;
-  const VERSION_FIELDS = ["title", "caption", "markdown", "mode", "theme", "colors", "tunedColors", "fonts", "fontSize", "lineHeight", "imageMaxHeight", "cover", "cardCss", "images"];
+  const VERSION_FIELDS = ["title", "caption", "markdown", "mode", "theme", "colors", "tunedColors", "fonts", "fontSize", "lineHeight", "imageMaxHeight", "cardHeight", "cover", "cardCss", "images"];
 
   let host = null;
   let builtIns = [];

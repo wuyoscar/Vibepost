@@ -37,6 +37,12 @@
       card.className = "stage-card";
       const frame = document.createElement("div");
       frame.className = "card-frame";
+      const height = canvas.height / 2;
+      frame.style.setProperty('--card-height', String(height));
+      frame.style.setProperty('--card-height-px', `${height}px`);
+      frame.style.setProperty('--card-ratio', String(CARD_WIDTH / height));
+      const sizeLabel = {1152: '3:4', 1222: 'A4 比例', 1536: '9:16', 1728: '1:2'}[height];
+      document.querySelector('.stage-spec').textContent = `${canvas.width} × ${canvas.height} · ${sizeLabel ?? ''} · PNG`;
       if (view) {
         canvas.classList.add("is-raster");
         frame.append(view, canvas);

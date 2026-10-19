@@ -173,3 +173,14 @@ test('real rotated-video crop and rounded corners preserve the surrounding full 
   assert.ok(roundedCorner[0] > 220 && roundedCorner[1] > 220 && roundedCorner[2] < 30, `rounded corner ${roundedCorner}`);
   assert.ok(center[2] > 220 && center[0] < 30 && center[1] < 30, `upright crop center ${center}`);
 });
+
+test('long-card motion export preserves the selected aspect ratio', () => {
+  for (const format of ['mp4', 'gif']) {
+    const clip = normalizeRequest({ ...request(), cardHeight: 1728, format }, 10);
+    assert.equal(clip.height, clip.width * 2);
+    assert.equal(clip.composeHeight, 2880);
+    const args = buildArgs(clip, { card: 'c', video: 'v', mask: 'm', output: 'o' }, false).join(' ');
+    assert.match(args, /scale=1440:2880/);
+    if (format === 'gif') assert.match(args, /scale=864:1728/);
+  }
+});

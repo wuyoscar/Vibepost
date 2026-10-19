@@ -2679,8 +2679,8 @@ button.check-jump:hover {
 .card-frame {
   position: relative;
   grid-column: 2;
-  height: min(calc(100cqh - 20px), calc((100cqw - 128px) * 4 / 3));
-  aspect-ratio: 3 / 4;
+  height: min(calc(100cqh - 20px), calc((100cqw - 128px) / var(--card-ratio, 0.75)));
+  aspect-ratio: var(--card-ratio, 0.75);
   border-radius: 3px;
   box-shadow: var(--ui-shadow);
 }
@@ -2698,7 +2698,7 @@ button.check-jump:hover {
   top: 0;
   left: 0;
   width: 864px;
-  height: 1152px;
+  height: var(--card-height-px, 1152px);
   overflow: hidden;
   border-radius: 3px;
   transform: scale(var(--card-scale, 0.5));
@@ -5787,6 +5787,7 @@ body[data-layout-mode="article"] .card-only {
 }
 
 .ai-composer {
+  position: relative;
   display: flex;
   flex: none;
   flex-direction: column;
@@ -5799,8 +5800,60 @@ body[data-layout-mode="article"] .card-only {
 
 .ai-composer:focus-within {
   border-color: var(--ui-accent);
-  box-shadow: 0 0 0 3px var(--ui-focus);
+  box-shadow: 0 0 0 2px var(--ui-focus);
 }
+
+.ai-writing-skills {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-top: 1px solid var(--ui-border);
+  padding-top: 7px;
+}
+
+.ai-skills-toggle { font-size: 12px; }
+.ai-skills-hint, .ai-skills-note { color: var(--ui-text-3); font-size: 11px; }
+.ai-skills-note { margin: 0; }
+
+.ai-skill-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.ai-skill-tag {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  padding: 3px 7px;
+  color: var(--ui-text-2);
+  background: var(--ui-window);
+  font: 500 11px/1.5 var(--font-ui);
+  text-align: left;
+}
+button.ai-skill-tag:hover { background: var(--ui-hover); }
+.ai-message-skills { margin-bottom: 5px; }
+
+.ai-skills-picker {
+  position: absolute;
+  z-index: var(--layer-floating);
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-layer);
+  box-shadow: 0 8px 28px #0002;
+}
+.ai-skills-search-row { display: flex; align-items: center; gap: 6px; }
+.ai-skills-search-row input { min-width: 0; flex: 1; font-size: 12px; }
+.ai-skills-list { overflow-y: auto; max-height: min(300px, 34vh); overscroll-behavior: contain; }
+.ai-skill-option { display: flex; align-items: flex-start; gap: 8px; padding: 8px 4px; cursor: pointer; }
+.ai-skill-option:hover { background: var(--ui-hover); }
+.ai-skill-option input { flex: none; margin-top: 3px; accent-color: var(--ui-accent); }
+.ai-skill-option strong { display: block; font-size: 12px; font-weight: 600; }
+.ai-skill-option small { display: block; margin-top: 2px; color: var(--ui-text-3); font-size: 11px; line-height: 1.5; }
 
 .ai-context {
   display: grid;
@@ -6854,3 +6907,18 @@ body[data-layout-mode="article"] .card-only {
   border-color: var(--ui-accent);
   outline: none;
 }
+
+/* 图文尺寸与排版密度：跟随 App 的界面配色。 */
+#cardHeightInput {
+  appearance: none;
+  width: 100%;
+  min-height: 38px;
+  font: inherit;
+  padding: 8px 32px 8px 10px;
+  color: var(--ui-text);
+  background: linear-gradient(45deg, transparent 50%, var(--ui-text-2) 50%) calc(100% - 17px) 50% / 5px 5px no-repeat,
+              linear-gradient(135deg, var(--ui-text-2) 50%, transparent 50%) calc(100% - 12px) 50% / 5px 5px no-repeat, var(--ui-layer);
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+}
+[aria-label="排版密度"] { margin-top: 12px; }

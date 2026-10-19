@@ -986,7 +986,7 @@
   top: 0;
   left: 72px;
   width: 1px;
-  height: 1152px;
+  height: var(--mc-page-height, 1152px);
   box-shadow: 48px 0 var(--neon-line), 96px 0 var(--neon-line), 144px 0 var(--neon-line), 192px 0 var(--neon-line), 240px 0 var(--neon-line), 288px 0 var(--neon-line), 336px 0 var(--neon-line), 384px 0 var(--neon-line), 432px 0 var(--neon-line), 480px 0 var(--neon-line), 528px 0 var(--neon-line), 576px 0 var(--neon-line), 624px 0 var(--neon-line), 672px 0 var(--neon-line), 720px 0 var(--neon-line), 768px 0 var(--neon-line);
 }
 

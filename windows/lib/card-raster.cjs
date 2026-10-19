@@ -57,7 +57,7 @@ function imageUrl(value) {
 
 function validateRequest(input) {
   object(input, "请求", ["pages", "style", "media", "mediaIds", "width", "height", "scale", "method"]);
-  if (input.width !== WIDTH || input.height !== HEIGHT || ![1, 2].includes(input.scale)) fail("尺寸（只支持 864 × 1152 的 1 或 2 倍图）");
+  if (input.width !== WIDTH || ![1152, 1222, 1536, 1728].includes(input.height) || ![1, 2].includes(input.scale)) fail("尺寸（宽 864，高 1152 / 1222 / 1536 / 1728，1 或 2 倍图）");
   if (input.method !== undefined && input.method !== "snapshot") fail("出图方式");
   if (!Array.isArray(input.pages) || !input.pages.length || input.pages.length > LIMITS.pages) fail("页数（每批最多 16 页）");
   const style = text(input.style, "样式", LIMITS.styleBytes);
@@ -98,7 +98,7 @@ function validateRequest(input) {
   }
   const mediaIds = input.mediaIds ?? [];
   if (!Array.isArray(mediaIds) || mediaIds.length > LIMITS.mediaCount) fail("图片编号数量");
-  return { pages, style, media, mediaIds: [...new Set(mediaIds.map(mediaId))], width: WIDTH, height: HEIGHT, scale: input.scale };
+  return { pages, style, media, mediaIds: [...new Set(mediaIds.map(mediaId))], width: WIDTH, height: input.height, scale: input.scale };
 }
 
 function pngDimensions(data) {
@@ -239,24 +239,24 @@ class CardRasterService {
       const view = await this._host(context);
       const contents = view.webContents;
       await this._bounded(context, () => contents.debugger.sendCommand("Emulation.setDeviceMetricsOverride", {
-        width: WIDTH, height: HEIGHT, deviceScaleFactor: request.scale, mobile: false,
-        screenWidth: WIDTH, screenHeight: HEIGHT,
+        width: WIDTH, height: request.height, deviceScaleFactor: request.scale, mobile: false,
+        screenWidth: WIDTH, screenHeight: request.height,
       }), this.pageTimeout, "设置卡片像素比例");
-      const setup = await this._call(context, contents, "setup", [request.style, request.media, request.mediaIds, WIDTH, HEIGHT]);
+      const setup = await this._call(context, contents, "setup", [request.style, request.media, request.mediaIds, WIDTH, request.height]);
       if (!setup || typeof setup.generation !== "string" || !Array.isArray(setup.missing)) throw new CardRasterError("卡片出图页面返回了无效状态", "RASTER_HOST");
       if (setup.missing.length) throw new CardRasterError("卡片出图页面需要补发图片", "RASTER_MISSING_MEDIA", { status: 409, missing: setup.missing, generation: setup.generation });
       const pages = [], times = [];
       for (const page of request.pages) {
         const pageStarted = performance.now();
         const shown = await this._call(context, contents, "show", [page.html]);
-        if (shown?.width !== WIDTH || shown?.height !== HEIGHT) throw new CardRasterError("卡片排版尺寸不正确", "RASTER_HOST");
+        if (shown?.width !== WIDTH || shown?.height !== request.height) throw new CardRasterError("卡片排版尺寸不正确", "RASTER_HOST");
         const rendered = { strips: [] };
-        if (page.full) rendered.png = await this._capture(context, contents, { x: 0, y: 0, width: WIDTH, height: HEIGHT }, request.scale);
+        if (page.full) rendered.png = await this._capture(context, contents, { x: 0, y: 0, width: WIDTH, height: request.height }, request.scale);
         if (page.chrome) {
           const rects = await this._call(context, contents, "chrome", [page.chrome.head ?? "", page.chrome.foot ?? ""]);
           if (!Array.isArray(rects) || rects.length > 2) throw new CardRasterError("页眉页脚截图区域不正确", "RASTER_HOST");
           for (const rect of rects) {
-            if (!rect || !["x", "y", "width", "height"].every((key) => Number.isInteger(rect[key])) || rect.x < 0 || rect.y < 0 || rect.width <= 0 || rect.height <= 0 || rect.x + rect.width > WIDTH || rect.y + rect.height > HEIGHT) throw new CardRasterError("页眉页脚截图区域不正确", "RASTER_HOST");
+            if (!rect || !["x", "y", "width", "height"].every((key) => Number.isInteger(rect[key])) || rect.x < 0 || rect.y < 0 || rect.width <= 0 || rect.height <= 0 || rect.x + rect.width > WIDTH || rect.y + rect.height > request.height) throw new CardRasterError("页眉页脚截图区域不正确", "RASTER_HOST");
             const { x, y, width, height } = rect;
             rendered.strips.push({ x, y, width, height, png: await this._capture(context, contents, { x, y, width, height }, request.scale) });
           }

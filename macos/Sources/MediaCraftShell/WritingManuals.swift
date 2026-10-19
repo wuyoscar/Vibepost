@@ -3,7 +3,7 @@ import Foundation
 /// 写作手册：只管写什么、什么口味（题材、读者、语气、结构），和管排版写法的操作手册（src/engine/manual.js）分开。
 /// 像技能一样每份一个 Markdown 文件：开头两行 `---` 之间是 `name:`（手册名）与 `description:`（一句话说明它管什么），后面是正文。
 /// 放在支持目录的「写作手册」文件夹（`AIConfiguration.writingManuals`），用户用任何编辑器改，App 每次都读最新的；
-/// 文件夹不在时用 App 自带的示例（网页根目录的 `src/writing-manuals/`）建好，已经在了就不动（删掉的示例不会回来），App 从不删它。
+/// 首次用自带手册建好；升级只补入从未安装的新增手册，同名文件不覆盖，用户删掉的手册不补回。
 /// Agent 只看目录（名字 + 说明）自己挑：App 里的 AI 每轮在工作副本里拿到一份拷贝（`写作手册/`）与 AGENTS.md 末尾的目录，
 /// 外部 Agent 经 MCP 列出、读取；新建、修改经原生桥 `manuals/save`（页面先弹确认框问过用户）。
 /// 几个窗口、AI 的几轮、外部 Agent 共用这一份，读写排在一把锁里。
@@ -122,6 +122,7 @@ final class WritingManuals: @unchecked Sendable {
         var isDirectory: ObjCBool = false
         if FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDirectory) {
             guard isDirectory.boolValue else { throw Failure("「\(folder.path)」不是文件夹", status: 500) }
+            try installNewExamplesLocked()
             return
         }
         // 先在旁边的临时文件夹里放好示例再整个挪过去：中途出错不会留下半个文件夹（下次还会再建）
@@ -135,12 +136,45 @@ final class WritingManuals: @unchecked Sendable {
             guard let data = Self.readData(sample) else { continue }
             try data.write(to: staging.appendingPathComponent(sample.lastPathComponent))
         }
+        let installed = samples.filter { $0.pathExtension.lowercased() == "md" }.map(\.lastPathComponent).sorted()
+        try JSONEncoder().encode(installed).write(to: staging.appendingPathComponent(Self.installedFile), options: .atomic)
         do {
             try FileManager.default.moveItem(at: staging, to: folder)
         } catch {
             // 同时开着的另一个 Vibepost 先建好了：用它的
             guard !FileManager.default.fileExists(atPath: folder.path) else { return }
             throw error
+        }
+    }
+
+    private static let installedFile = ".bundled-writing-manuals.json"
+    private static let legacyExamples = ["小红书图文.md", "国际新闻.md", "代码库解读.md"]
+
+    /// 老用户可能改过、删过示例；只增加本版新引入的文件，并记住安装过的名字。
+    private func installNewExamplesLocked() throws {
+        let record = folder.appendingPathComponent(Self.installedFile)
+        let previous: [String]
+        if FileManager.default.fileExists(atPath: record.path) {
+            previous = try JSONDecoder().decode([String].self, from: Data(contentsOf: record))
+        } else {
+            previous = Self.legacyExamples
+        }
+        var installed = Set(previous)
+        let samples = (try? FileManager.default.contentsOfDirectory(at: examples, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])) ?? []
+        for sample in samples where sample.pathExtension.lowercased() == "md" && !installed.contains(sample.lastPathComponent) {
+            let target = folder.appendingPathComponent(sample.lastPathComponent)
+            if !FileManager.default.fileExists(atPath: target.path) {
+                guard let data = Self.readData(sample) else { continue }
+                do {
+                    try data.write(to: target, options: .withoutOverwriting)
+                } catch CocoaError.fileWriteFileExists {
+                    // 另一个窗口或用户刚放进了同名手册，保留它。
+                }
+            }
+            installed.insert(sample.lastPathComponent)
+        }
+        if installed != Set(previous) || !FileManager.default.fileExists(atPath: record.path) {
+            try JSONEncoder().encode(installed.sorted()).write(to: record, options: .atomic)
         }
     }
 

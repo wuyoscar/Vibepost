@@ -159,6 +159,7 @@
       theme: text(fields.theme).trim(),
       colors,
       fonts,
+      ...(number("cardHeight") !== null ? { cardHeight: number("cardHeight") } : {}),
       fontSize: number("fontSize"),
       lineHeight: number("lineHeight"),
       imageMaxHeight: number("imageMaxHeight"),
@@ -188,7 +189,7 @@
     };
     block("colors", COLOR_ROLES.map((role) => [role, item.colors?.[role]]));
     block("fonts", FONT_SCRIPTS.map((script) => [script, item.fonts?.[script]]));
-    for (const key of ["fontSize", "lineHeight", "imageMaxHeight"]) {
+    for (const key of ["fontSize", "lineHeight", "imageMaxHeight", "cardHeight"]) {
       if (Number.isFinite(item[key])) lines.push(`${key}: ${item[key]}`);
     }
     const cover = item.cover ?? {};

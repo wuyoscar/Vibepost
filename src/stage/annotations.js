@@ -5,7 +5,7 @@
 // host：{ viewport（提示条放这里）, pagesRoot（放卡片的容器）, text(), readOnly(), send(prompt, label), openAI() }
 (() => {
   const CARD_WIDTH = 864;
-  const CARD_HEIGHT = 1152;
+  const vertical = (value) => `calc(${value} / var(--card-height, 1152) * 100%)`;
   const NOTE_LIMIT = 200;
   const EXCERPT = 24;
   const percent = (value, total) => `${(value / total) * 100}%`;
@@ -83,7 +83,7 @@
         pin.title = note.note;
         pin.setAttribute("aria-label", `批注 ${order + 1}：${note.note}`);
         pin.style.left = percent(spot.block.x + spot.block.width, CARD_WIDTH);
-        pin.style.top = percent(spot.block.y, CARD_HEIGHT);
+        pin.style.top = vertical(spot.block.y);
         pin.addEventListener("click", (event) => {
           event.stopPropagation();
           editor(spot.entry, spot.block, note);
@@ -101,7 +101,7 @@
       box.className = "stage-note-editor";
       box.setAttribute("aria-label", note ? "改批注" : "写批注");
       box.style.left = percent(block.x, CARD_WIDTH);
-      box.style.top = percent(block.y + block.height, CARD_HEIGHT);
+      box.style.top = vertical(block.y + block.height);
       const input = document.createElement("textarea");
       input.rows = 2;
       input.maxLength = NOTE_LIMIT;

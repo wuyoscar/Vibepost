@@ -26,7 +26,7 @@
   const CLIP = 24;
   // 看一页时给 Claude 的图：864 × 1152 的卡片缩到这么宽（文字仍看得清）
   const VIEW_WIDTH = 540;
-  const RANGES = { fontSize: [24, 40], lineHeight: [1, 2.4], imageMaxHeight: [220, 1048] };
+  const RANGES = { fontSize: [18, 40], lineHeight: [1, 2.4], imageMaxHeight: [220, 1048], cardHeight: [1152, 1728] };
   const WIDTH_PERCENT = [25, 100];
   const FIXED_WIDTH = [80, 780];
   const FIXED_HEIGHT = [80, 1048];
@@ -294,6 +294,7 @@
       colors: draft.colors,
       tunedColors: draft.tunedColors,
       fonts: draft.fonts,
+      cardHeight: draft.cardHeight,
       fontSize: draft.fontSize,
       lineHeight: draft.lineHeight,
       imageMaxHeight: draft.imageMaxHeight,
@@ -329,7 +330,7 @@
     const doc = parseMarkdown(draft.markdown);
     const blockOf = (offset) => doc.blocks.findIndex((block) => offset >= block.source[0] && offset < Math.max(block.source[1], block.source[0] + 1));
     const onPage = pages.map((page) => [...new Set(page.items.filter((item) => item.source).map((item) => blockOf(item.source[0])).filter((index) => index >= 0))]);
-    const lines = [`共 ${pages.length} 页（卡片结构 ${pages[0]?.structure ?? "—"}，每页 864 × 1152）`];
+    const lines = [`共 ${pages.length} 页（卡片结构 ${pages[0]?.structure ?? "—"}，每页 864 × ${pages[0]?.height ?? 1152}）`];
     pages.forEach((page, number) => {
       if (page.role === "cover") {
         lines.push("", `第 ${number + 1} 页 · 封面（标题取自标题框，稿子设置 cover）`);
@@ -416,7 +417,7 @@
       }
       if (entries.length) patch.fonts = Object.fromEntries(entries);
     }
-    for (const [key, label] of [["fontSize", "字号"], ["lineHeight", "行距"], ["imageMaxHeight", "图片最大高"]]) {
+    for (const [key, label] of [["fontSize", "字号"], ["lineHeight", "行距"], ["imageMaxHeight", "图片最大高"], ["cardHeight", "页面高度"]]) {
       if (args[key] === undefined) continue;
       patch[key] = inRange(args[key], RANGES[key], label);
       parts.push(`${label} ${patch[key]}`);
@@ -961,7 +962,7 @@
       name: "set_style",
       shared: true,
       label: "调整样式",
-      description: `在主题上微调这篇的样式，只改给了的项：colors（${ROLES.map((role) => `${role} ${ROLE_INFO[role].name}：${ROLE_INFO[role].use}`).join(" / ")}，#rrggbb；只给 bg、text、accent 三色时辅助与衬底按三色规则推出；没单独调过的辅助、衬底跟着背景与文字走）、fonts（zh / en / code 字体 id，"theme" 为跟随主题）、fontSize（24–40）、lineHeight（1–2.4）、imageMaxHeight（220–1048）。`,
+      description: `在主题上微调这篇的样式，只改给了的项：colors（${ROLES.map((role) => `${role} ${ROLE_INFO[role].name}：${ROLE_INFO[role].use}`).join(" / ")}，#rrggbb；只给 bg、text、accent 三色时辅助与衬底按三色规则推出；没单独调过的辅助、衬底跟着背景与文字走）、fonts（zh / en / code 字体 id，"theme" 为跟随主题）、cardHeight（1152 标准3:4 / 1222 A4比例 / 1536 9:16 / 1728 1:2）、fontSize（18–40）、lineHeight（1–2.4）、imageMaxHeight（220–1048）。`,
       inputSchema: {
         type: "object",
         properties: {
@@ -971,6 +972,7 @@
             additionalProperties: false,
           },
           fonts: { type: "object", properties: { zh: { type: "string" }, en: { type: "string" }, code: { type: "string" } }, additionalProperties: false },
+          cardHeight: { type: "number", enum: [1152, 1222, 1536, 1728] },
           fontSize: { type: "number", minimum: RANGES.fontSize[0], maximum: RANGES.fontSize[1] },
           lineHeight: { type: "number", minimum: RANGES.lineHeight[0], maximum: RANGES.lineHeight[1] },
           imageMaxHeight: { type: "number", minimum: RANGES.imageMaxHeight[0], maximum: RANGES.imageMaxHeight[1] },

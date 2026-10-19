@@ -10,7 +10,7 @@ import Testing
 @MainActor
 struct WritingManualsTests {
     static let examples = ShellHarness.repoRoot.appendingPathComponent("src/writing-manuals")
-    static let names = ["代码库解读", "国际新闻", "小红书图文"]
+    static let names = ["保留原意去AI味", "标题打磨", "代码库解读", "观点长文", "国际新闻", "小红书图文", "英文简明表达"].sorted(by: WritingManuals.ordered)
 
     /// 自带的示例：文件名 → 内容
     static func exampleFiles() throws -> [String: String] {
@@ -23,7 +23,7 @@ struct WritingManualsTests {
     }
 
     static func files(in folder: URL) -> [String: String] {
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        let names = ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []).filter { $0.hasSuffix(".md") }
         return Dictionary(uniqueKeysWithValues: names.compactMap { name in
             (try? String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)).map { (name, $0) }
         })
@@ -63,7 +63,7 @@ struct WritingManualsTests {
             await mc.drafts.create();
             ui.click("AI 助手");
             ui.expand("AI 设置");
-            await until(() => rows().length === 3);
+            await until(() => rows().length === 7);
             const shown = { rows: rows(), visible: !document.getElementById("writingManuals").hidden };
             ui.click("打开", { within: "小红书图文" });
             ui.click("在 Finder 中显示", { within: "代码库解读" });
@@ -99,11 +99,13 @@ struct WritingManualsTests {
         #expect(first?["visible"] as? Bool == true)
         let listed = first?["rows"] as? [[String]] ?? []
         #expect(listed.map { $0.first ?? "" } == Self.names, "按名字排：\(listed)")
-        #expect(listed.last?.last == (try Self.example("小红书图文")).description, "说明取自开头的 description")
+        #expect(listed.first(where: { $0.first == "小红书图文" })?.last == (try Self.example("小红书图文")).description, "说明取自开头的 description")
         #expect(opened == expectedOpened, "「打开」用默认的 App 打开那份")
         #expect(revealed.sorted() == expectedRevealed.sorted(), "「在 Finder 中显示」那份，「打开文件夹」打开文件夹（两个请求各自回来，先后不一定）")
-        #expect(second == [["代码库解读", (try Self.example("代码库解读")).description], ["我的手册", "（没有说明）"], ["小红书图文", (try Self.example("小红书图文")).description]],
-                "\(second ?? [])")
+        let expectedSecond = try (Self.names.filter { $0 != "国际新闻" } + ["我的手册"]).sorted(by: WritingManuals.ordered).map { name in
+            [name, name == "我的手册" ? "（没有说明）" : try Self.example(name).description]
+        }
+        #expect(second == expectedSecond, "\(second ?? [])")
         #expect(harness.pageErrors == [])
     }
 
@@ -145,7 +147,7 @@ struct WritingManualsTests {
         let examples = try Self.exampleFiles()
         let manual = first?["manual"] as? String ?? "(没有)"
         #expect(copiesAfterFirst["小红书图文.md"] == "被 Agent 改坏了\n", "这一轮里 Agent 改的是工作副本里的拷贝")
-        #expect(copiesAfterFirst["代码库解读.md"] == examples["代码库解读.md"] && copiesAfterFirst.count == 3)
+        #expect(copiesAfterFirst["代码库解读.md"] == examples["代码库解读.md"] && copiesAfterFirst.count == Self.names.count)
         #expect(userFolder["小红书图文.md"] == examples["小红书图文.md"], "用户的写作手册没被 Agent 改到")
         #expect(agentsAfterFirst.hasPrefix(manual), "AGENTS.md 先是操作手册全文")
         let xhs = try Self.example("小红书图文")
@@ -219,7 +221,7 @@ struct WritingManualsTests {
         #expect(text("w3") == ("已修改写作手册「小红书图文」并保存，下一轮起生效。", false))
         #expect(saved["菜谱.md"] == "---\nname: 菜谱\ndescription: 家常菜谱：用料、步骤、火候\n---\n\n# 菜谱\n\n先写用料，再写步骤。\n", "\(saved["菜谱.md"] ?? "(没有)")")
         #expect(saved["小红书图文.md"] == WritingManuals.compose(name: "小红书图文", description: xhs.description, body: edited), "修改的写回原来的文件")
-        #expect(saved.count == 4)
+        #expect(saved.count == Self.names.count + 1)
         let lines = result?["lines"] as? [String] ?? []
         #expect(lines.contains("新建写作手册「菜谱」") && lines.contains("修改写作手册「小红书图文」"), "会话里记一行：\(lines)")
         #expect(harness.pageErrors == [])
@@ -249,7 +251,7 @@ struct WritingManualsTests {
 
         let code = try Self.example("代码库解读")
         let xhs = try Self.example("小红书图文")
-        #expect(!list.isError && list.text.hasPrefix("共 3 份写作手册"), "\(list.text)")
+        #expect(!list.isError && list.text.hasPrefix("共 \(Self.names.count) 份写作手册"), "\(list.text)")
         #expect(list.text.contains("- 代码库解读：\(code.description)") && list.text.contains("- 小红书图文：\(xhs.description)") && list.text.contains("- 国际新闻："))
         #expect(!read.isError && read.text == "---\nname: 代码库解读\ndescription: \(code.description)\n---\n\n\(code.body)", "\(read.text.prefix(120))")
         #expect(missing.isError && missing.text.contains("没有这份写作手册"), "\(missing.text)")
@@ -257,6 +259,112 @@ struct WritingManualsTests {
         #expect(!saved.isError && saved.text.contains("已新建写作手册「菜谱」"), "\(saved.text)")
         #expect(file == "---\nname: 菜谱\ndescription: 家常菜谱\n---\n\n先写用料。\n")
         #expect(log == ["新建写作手册「菜谱」"], "列进「外部 Agent 的操作」：\(log ?? [])")
+        #expect(harness.pageErrors == [])
+    }
+
+    @Test("老用户补入新技能，不覆盖同名手册，不复活删除的旧示例或已安装新技能")
+    func upgradePreservesUserLibrary() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let custom = "---\nname: 标题打磨\ndescription: 我的写法\n---\n用户改过的正文"
+        try custom.write(to: folder.appendingPathComponent("标题打磨.md"), atomically: true, encoding: .utf8)
+        let manuals = WritingManuals(folder: folder, examples: Self.examples)
+        let installed = try manuals.list().map(\.name)
+        #expect(installed.contains("保留原意去AI味") && installed.contains("英文简明表达"))
+        #expect(!installed.contains("国际新闻"), "旧示例可能被用户删除，不能补回")
+        #expect(try String(contentsOf: folder.appendingPathComponent("标题打磨.md"), encoding: .utf8) == custom)
+        try FileManager.default.removeItem(at: folder.appendingPathComponent("观点长文.md"))
+        #expect(try !manuals.list().contains(where: { $0.name == "观点长文" }))
+    }
+
+    @Test("写作技能：斜杠打开、多选不发送，正文随下一条注入且历史留标签，之后不继承")
+    func selectedSkillsReachNextTurn() async throws {
+        let fake = try FakeClaude(script: StreamJSON.reply(["收到。"]))
+        defer { fake.remove() }
+        let harness = ShellHarness(terminalPath: [fake.directory], onboarding: false)
+        try await harness.load()
+        _ = try await harness.evaluate(AISessionTests.helpers + """
+            await mc.drafts.create({ markdown: "测试稿件。" });
+            await openAI();
+            const input = document.getElementById('aiInput');
+            input.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true, cancelable: true }));
+            await until(() => document.querySelectorAll('#aiSkillsList input').length === 7);
+            for (const name of ['标题打磨', '保留原意去AI味']) {
+              [...document.querySelectorAll('#aiSkillsList input')].find(node => node.value === name).click();
+            }
+            if ((await mc.ai.history()).messages.length) throw new Error('选择技能不应发送消息');
+        """)
+        try await harness.screenshot("writing-skills-picker", of: "#aiPanel")
+        let result = try await harness.evaluate(AISessionTests.helpers + """
+            document.getElementById('aiSkillsDone').click();
+            ask('给我五个标题');
+            await until(() => finished(1));
+            const first = (await mc.ai.history()).messages.find(m => m.role === 'user');
+            const tags = [...document.querySelectorAll('.ai-message-skills .ai-skill-tag')].map(n => n.textContent);
+            const selected = document.querySelectorAll('#aiSelectedSkills button').length;
+            ask('解释一下');
+            await until(() => finished(2));
+            document.getElementById('aiInput').dispatchEvent(new KeyboardEvent('keydown', { key: 'K', metaKey: true, shiftKey: true, bubbles: true, cancelable: true }));
+            await until(() => !document.getElementById('aiSkillsPicker').hidden && document.querySelectorAll('#aiSkillsList input').length === 7);
+            [...document.querySelectorAll('#aiSkillsList input')].find(n => n.value === '标题打磨').click();
+            document.getElementById('aiSkillsDone').click();
+            preset('封面标题 5 选 1');
+            await until(() => finished(3));
+            return { skills: first.skills.map(s => s.name), tags, selected, text: first.text };
+        """) as? [String: Any]
+        let prompt = fake.prompt(0)
+        await harness.tearDown()
+        #expect((result?["skills"] as? [String]) == ["标题打磨", "保留原意去AI味"])
+        #expect((result?["tags"] as? [String]) == ["标题打磨", "保留原意去AI味"])
+        #expect(result?["selected"] as? Int == 0)
+        #expect(result?["text"] as? String == "给我五个标题")
+        #expect(prompt.contains("【技能：标题打磨】") && prompt.contains("【技能：保留原意去AI味】"))
+        #expect(prompt.contains("力度可以变，事实不能变") && !prompt.contains("# 英文简明表达"))
+        #expect(prompt.hasSuffix("给我五个标题"))
+        #expect(fake.prompt(1) == "解释一下", "后一轮不携带前一轮技能正文")
+        #expect(fake.prompt(2).contains("【技能：标题打磨】"), "快捷命令同样携带下一条消息的技能")
+        #expect(harness.pageErrors == [])
+    }
+
+    @Test("选中的技能被删除后发送失败，恢复输入与技能，未启动 agent")
+    func missingSelectedSkillRestoresComposer() async throws {
+        let fake = try FakeClaude(script: StreamJSON.reply(["不应启动"]))
+        defer { fake.remove() }
+        let harness = ShellHarness(terminalPath: [fake.directory], onboarding: false)
+        try await harness.load()
+        _ = try await harness.evaluate(AISessionTests.helpers + """
+            await mc.drafts.create({ markdown: "正文" });
+            await openAI();
+            document.getElementById('aiSkillsToggle').click();
+            await until(() => document.querySelectorAll('#aiSkillsList input').length === 7);
+            [...document.querySelectorAll('#aiSkillsList input')].find(n => n.value === '标题打磨').click();
+            document.getElementById('aiSkillsDone').click();
+        """)
+        try FileManager.default.removeItem(at: harness.aiRoot.appendingPathComponent("写作手册/标题打磨.md"))
+        let result = try await harness.evaluate(AISessionTests.helpers + """
+            ask('重新起标题');
+            await until(() => finished(1));
+            await until(() => document.getElementById('aiInput').value === '重新起标题');
+            return { text: document.getElementById('aiInput').value,
+              tags: [...document.querySelectorAll('#aiSelectedSkills button')].map(n => n.textContent),
+              state: (await ends((await mc.drafts.current()).id))[0].state };
+        """) as? [String: Any]
+        let subsequent = try await harness.evaluate(AISessionTests.helpers + """
+            ask('再试一次');
+            const input = document.getElementById('aiInput');
+            input.value = '我正在准备另一条消息';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            await until(() => finished(2));
+            await wait(50);
+            return input.value;
+        """) as? String
+        await harness.tearDown()
+        #expect(result?["text"] as? String == "重新起标题")
+        #expect(result?["state"] as? String == "error")
+        #expect((result?["tags"] as? [String]) == ["标题打磨 ×"])
+        #expect(fake.calls().isEmpty)
+        #expect(subsequent == "我正在准备另一条消息", "迟到的失败不能覆盖新输入")
         #expect(harness.pageErrors == [])
     }
 
