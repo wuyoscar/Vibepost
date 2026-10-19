@@ -40,6 +40,8 @@
       "--pad-t": px(pad.top), "--pad-r": px(pad.right), "--pad-b": px(pad.bottom), "--pad-l": px(pad.left),
       "--mc-size-body": px(size),
       "--mc-leading": String(settings.lineHeight ?? 1.85),
+      // 段距：块与块之间按行高的几倍（structures.css 的 --mc-gap）
+      "--mc-gap-ratio": String(root.MediaCraftStyleForm.normalizeNumber("blockGap", settings.blockGap)),
       "--mc-radius": px(structure.imageRadius),
       "--mc-img-max": px(settings.imageMaxHeight ?? IMAGE_MAX_HEIGHT),
     };

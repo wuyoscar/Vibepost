@@ -1,4 +1,4 @@
-// 检查器「样式」里跟着稿子走的几项：字体、字号、行距、图片最大高、配色的五个色块
+// 检查器「样式」里跟着稿子走的几项：字体、字号、行距、段距、图片最大高、配色的五个色块
 // （主题区在 src/theme-panel.js，配色库与色轮在 src/workspace/palette-panel.js）。
 // 这里只管界面与取值范围；改了什么由 onInput() 告诉应用，应用再 read() 出图、存盘。
 (function (root) {
@@ -10,6 +10,8 @@
     fontSize: { input: "#fontSizeInput", fallback: 34, min: 18, max: 40, step: 1 },
     lineHeight: { input: "#lineHeightInput", fallback: 1.85, min: 1, max: 2.4, step: 0.01 },
     imageMaxHeight: { input: "#imageHeightInput", fallback: 1048, min: 220, max: 1048, step: 1 },
+    // 段距：块与块之间的距离，按「一行有多高」的几倍（0.55 行是一直以来的默认）
+    blockGap: { input: "#blockGapInput", fallback: 0.55, min: 0.1, max: 1.5, step: 0.05 },
   });
   // 五个色块：角色 → 色块的 <input id>；名字与说明取自 src/engine/colors.js 的 ROLE_INFO
   const { ROLES, ROLE_INFO } = root.MediaCraftEngine.colors;

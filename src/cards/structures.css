@@ -4,7 +4,7 @@
    正文区与页眉页脚都按卡片坐标绝对定位。 */
 
 .mc-page[data-structure] {
-  --mc-gap: calc(var(--mc-size-body) * var(--mc-leading) * 0.55);
+  --mc-gap: calc(var(--mc-size-body) * var(--mc-leading) * var(--mc-gap-ratio, 0.55));
 
   display: block;
   padding: 0;

@@ -1,11 +1,13 @@
-// 工作区的面板宽度：编辑区右边的分隔条拖动（或聚焦后按 ← →）改编辑区宽度，拖到默认宽度附近会吸住，双击恢复默认；宽度记在本机，下次打开还是它。
-// 宽度写成 .workspace 上的 CSS 变量 --editor-width，列宽的最终上下限由 styles.css 按窗口宽度再收一次。
+// 工作区的面板宽度：编辑区右边、检查器左边各一道分隔条，拖动（或聚焦后按 ← →）改宽度，拖到默认宽度附近会吸住，双击恢复默认；
+// 宽度记在本机，下次打开还是它。宽度写成 .workspace 上的 CSS 变量 --editor-width / --inspector-width，
+// 列宽的最终上下限由 styles.css 按窗口宽度再收一次。检查器的分隔条在它左边：往左拖是变宽（side: -1）。
 (function (root) {
   "use strict";
 
   const STORAGE_KEY = "mediacraft.panels.v1";
   const PANELS = Object.freeze({
-    editor: { variable: "--editor-width", fallback: 500, min: 360, max: 760 },
+    editor: { variable: "--editor-width", fallback: 500, min: 360, max: 760, side: 1 },
+    inspector: { variable: "--inspector-width", fallback: 340, min: 300, max: 560, side: -1 },
   });
   const KEY_STEP = 16;
   const KEY_STEP_LARGE = 64;
@@ -57,7 +59,7 @@
     handle.classList.add("is-dragging");
     document.body.classList.add("is-resizing-editor");
     const move = (moveEvent) => {
-      const wanted = startWidth + moveEvent.clientX - startX;
+      const wanted = startWidth + (moveEvent.clientX - startX) * PANELS[panel].side;
       const snapped = Math.abs(wanted - fallback) <= SNAP_DISTANCE;
       if (snapped && widths[panel] !== fallback) root.MediaCraftNative?.haptic("alignment");
       set(panel, snapped ? fallback : wanted);
@@ -88,7 +90,7 @@
       const direction = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
       if (!direction) return;
       event.preventDefault();
-      set(panel, widths[panel] + direction * (event.shiftKey ? KEY_STEP_LARGE : KEY_STEP));
+      set(panel, widths[panel] + direction * PANELS[panel].side * (event.shiftKey ? KEY_STEP_LARGE : KEY_STEP));
       save();
     });
     handle.addEventListener("dblclick", () => {

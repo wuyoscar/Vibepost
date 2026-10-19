@@ -943,14 +943,16 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 
 .workspace {
   --editor-column: minmax(340px, min(var(--editor-width, 500px), 38vw));
+  /* 检查器：拖它左边的分隔条改宽度（src/workspace/panels.js），窗口窄时最多占三成 */
+  --inspector-column: clamp(296px, var(--inspector-width, 340px), 32vw);
   display: grid;
-  grid-template-columns: var(--editor-column) minmax(0, 1fr) 320px;
+  grid-template-columns: var(--editor-column) minmax(0, 1fr) var(--inspector-column);
   min-height: 0;
 }
 
 .workspace.is-drawer-open {
   --editor-column: minmax(320px, min(calc(var(--editor-width, 500px) - 20px), 34vw));
-  grid-template-columns: 240px var(--editor-column) minmax(0, 1fr) 320px;
+  grid-template-columns: 240px var(--editor-column) minmax(0, 1fr) var(--inspector-column);
 }
 
 /* ===== 稿件抽屉 ===== */
@@ -1204,8 +1206,20 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 
 /* 字号的「A−」「A+」：A 正常大小，加减号小一点贴在右上，像 PPT 的那两个 */
 .format-size {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-weight: 600;
   letter-spacing: 0;
+}
+
+/* A− 与 A+ 中间的字号读数，像 PPT 字号框里的数 */
+.format-size-value {
+  min-width: 22px;
+  color: var(--ui-text-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .format-size-sign {
@@ -1454,17 +1468,115 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   padding: 4px 10px;
 }
 
-/* 「插入」菜单：最后一组片段每项带一句说明，整个菜单长了就在里面滚 */
+/* 「插入」菜单：两栏（左边图片、实况、分割线这几项与组件，右边是带一句说明的片段）；窗口矮时在里面滚 */
 .insert-menu-panel {
-  max-height: min(calc(100vh - 120px), 760px);
+  width: auto;
+  max-height: min(calc(100vh - 120px), 640px);
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.insert-menu-panel > [data-insert-items] {
+  display: grid;
+  grid-template-columns: 184px 248px;
+  align-items: start;
+  gap: 0 4px;
+}
+
+.insert-menu-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.insert-menu-snippets {
+  padding-left: 4px;
+  border-left: 1px solid var(--ui-border);
 }
 
 .insert-menu-panel .menu-item:has(.menu-hint) {
   height: auto;
   min-height: 38px;
   padding: 4px 10px;
+}
+
+/* 「表情」面板：上面一排分类，下面八列的格子；在里面滚，不长过窗口 */
+.emoji-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 296px;
+  padding: 6px;
+}
+
+.emoji-tabs {
+  display: flex;
+  gap: 2px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.emoji-tab {
+  flex: 1;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.emoji-tab:hover {
+  background: var(--ui-hover);
+}
+
+.emoji-tab[aria-selected="true"] {
+  background: var(--ui-accent-tint);
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 1px;
+  max-height: min(calc(100vh - 220px), 248px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.emoji-item {
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.emoji-item:hover,
+.emoji-item:focus-visible {
+  background: var(--ui-hover);
+}
+
+.emoji-item:active {
+  background: var(--ui-pressed);
+  scale: 0.92;
+}
+
+.emoji-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 18px 0;
+  color: var(--ui-text-3);
+  font-size: 12px;
+  text-align: center;
+}
+
+.emoji-button {
+  width: 30px;
+  padding: 0;
+  justify-content: center;
 }
 
 .style-menu-aligns {
@@ -1612,10 +1724,13 @@ body[data-layout-mode="article"] .caption-field {
 }
 
 .source-toggle {
+  display: inline-grid;
   flex: none;
+  place-items: center;
+  width: 30px;
   height: 26px;
   margin-left: auto;
-  padding: 0 10px;
+  padding: 0;
   border: 1px solid var(--ui-border);
   border-radius: 6px;
   background: transparent;
@@ -2609,6 +2724,11 @@ button.check-jump:hover {
   background: var(--ui-accent);
 }
 
+/* 检查器的分隔条贴在它左边 */
+.inspector-divider {
+  inset: 0 auto auto -4px;
+}
+
 /* 拖的时候那道线加粗一点 */
 .editor-divider.is-dragging::after {
   scale: 1.5 1;
@@ -3432,6 +3552,7 @@ body[data-layout-mode="article"] .stage-scroller {
 
 /* ===== 检查器 ===== */
 .inspector {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -3449,7 +3570,7 @@ body[data-layout-mode="article"] .stage-scroller {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 22px;
+  gap: 18px;
   min-height: 0;
   padding: 16px 16px 24px;
   overflow-y: auto;
@@ -3517,7 +3638,7 @@ body[data-layout-mode="article"] .card-only {
 .theme-group-tiles {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px 6px;
+  gap: 4px 4px;
 }
 
 /* 选中主题的底色：src/theme-panel.js 用 motion.track() 量出选中格子的位置，底色滑过去（格子一样大，clip-path 裁出） */
@@ -3583,7 +3704,7 @@ body[data-layout-mode="article"] .card-only {
 .theme-thumb {
   position: relative;
   width: 100%;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 1;
   margin-bottom: 3px;
   overflow: hidden;
   border-radius: 4px;
@@ -3599,9 +3720,10 @@ body[data-layout-mode="article"] .card-only {
 
 .theme-thumb canvas {
   position: absolute;
-  inset: 0;
+  inset: 0 0 auto;
   width: 100%;
-  height: 100%;
+  height: auto;
+  aspect-ratio: 3 / 4;
   opacity: 0;
   transition: opacity var(--motion-moderate) var(--ease-standard);
 }
@@ -3814,6 +3936,138 @@ body[data-layout-mode="article"] .card-only {
   color: var(--ui-text);
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
+
+/* 滑杆旁的数值框（src/workspace/steppers.js）：− 数值 ＋，像 PPT 的字号框；能直接输入，↑ ↓ 按一档 */
+.stepper {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 24px;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: var(--ui-window);
+  overflow: hidden;
+}
+
+.stepper:focus-within {
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 2px var(--ui-accent-tint);
+}
+
+.stepper-button {
+  width: 18px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-text-3);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.stepper-button:hover:not(:disabled) {
+  background: var(--ui-hover);
+  color: var(--ui-text);
+}
+
+.stepper-button:active:not(:disabled) {
+  background: var(--ui-pressed);
+}
+
+.stepper-field {
+  width: 38px;
+  height: 100%;
+  padding: 0 2px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.stepper-field:disabled,
+.stepper-button:disabled {
+  opacity: 0.5;
+}
+
+/* ===== 检查器各节的收起（src/workspace/sections.js）：节名是按钮，收起时只留节名与一行摘要 ===== */
+.section-fold {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  margin: -4px -6px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.section-head .section-fold {
+  width: auto;
+  flex: 1;
+}
+
+.section-fold:hover {
+  background: var(--ui-hover);
+}
+
+.section-fold-chevron {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  color: var(--ui-text-3);
+  rotate: 90deg;
+  transition: rotate var(--motion-moderate) var(--ease-spring);
+}
+
+.is-folded .section-fold-chevron {
+  rotate: 0deg;
+}
+
+.section-fold-name {
+  flex: none;
+}
+
+.section-peek {
+  display: none;
+  flex: 1;
+  min-width: 0;
+  margin-left: 6px;
+  overflow: hidden;
+  color: var(--ui-text-3);
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-folded .section-peek {
+  display: block;
+}
+
+.section-peek-dots {
+  display: inline-flex;
+  gap: 3px;
+  vertical-align: -1px;
+}
+
+.section-peek-dots > span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--ui-border);
+}
+
+.inspector-section.is-folded > :not(.section-label, .section-head),
+.inspector-section.is-folded > .section-head > :not(.section-label) {
+  display: none;
 }
 
 /* 配色的五个色块：一行排开，色块在上、名字与色值在下 */
@@ -4369,9 +4623,15 @@ body[data-layout-mode="article"] .card-only {
 /* 后端与模型：两个小药丸，后端在前（带一颗状态点，有对话后换成一把锁），模型占剩下的宽 */
 .ai-session-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   min-width: 0;
+}
+
+/* 每个药丸按里面的字宽，放不下就折到下一行，不截断「默认模型」这类字 */
+.ai-session-bar > .ai-picker {
+  flex: 0 1 auto;
 }
 
 .ai-picker {
@@ -4727,6 +4987,32 @@ body[data-layout-mode="article"] .card-only {
 
 .ai-presets-bar > .ai-polish {
   flex: 1;
+}
+
+/* 润色全文：主按钮旁边的次要按钮 */
+.ai-polish-text {
+  flex: none;
+  height: 36px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.ai-presets.is-compact .ai-polish-text {
+  height: 30px;
+}
+
+/* 快捷命令的小药丸：按字的长短排开、折行，不占整齐的格子 */
+.chip-flow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip-flow > .chip {
+  flex: 0 1 auto;
+  height: 28px;
+  padding: 0 11px;
+  font-size: 12px;
 }
 
 .ai-presets-toggle {
@@ -5791,11 +6077,13 @@ body[data-layout-mode="article"] .card-only {
   display: flex;
   flex: none;
   flex-direction: column;
-  gap: 8px;
-  padding: 8px 8px 8px 12px;
+  gap: 6px;
+  padding: 10px 8px 8px 12px;
   border: 1px solid var(--ui-border);
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--ui-layer);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ui-text) 6%, transparent);
+  cursor: text;
 }
 
 .ai-composer:focus-within {
@@ -5803,16 +6091,34 @@ body[data-layout-mode="article"] .card-only {
   box-shadow: 0 0 0 2px var(--ui-focus);
 }
 
+/* 输入框的底栏：写作技能在左，提示与发送在右 */
+.ai-composer-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+}
+
+.ai-composer-hint {
+  margin-left: auto;
+  color: var(--ui-text-3);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.ai-composer:not(:focus-within) .ai-composer-hint {
+  visibility: hidden;
+}
+
 .ai-writing-skills {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  border-top: 1px solid var(--ui-border);
-  padding-top: 7px;
+  min-width: 0;
 }
 
-.ai-skills-toggle { font-size: 12px; }
+.ai-skills-toggle { height: 26px; font-size: 12px; cursor: default; }
 .ai-skills-hint, .ai-skills-note { color: var(--ui-text-3); font-size: 11px; }
 .ai-skills-note { margin: 0; }
 
@@ -5881,26 +6187,19 @@ button.ai-skill-tag:hover { background: var(--ui-hover); }
   height: 24px;
 }
 
-.ai-composer-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-}
-
+/* 跟着内容长高（src/ai/panel.js 的 fitInput 按 scrollHeight 设高，最多约十行，再多在框里滚） */
 .ai-composer textarea {
-  flex: 1;
   min-width: 0;
-  max-height: 160px;
-  padding: 0;
+  min-height: 42px;
+  max-height: 220px;
+  padding: 0 4px 0 0;
   border: 0;
   outline: none;
   background: transparent;
   color: var(--ui-text);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   resize: none;
-  /* 跟着内容长高；WebKit 26.2 之前不认，输入框停在两行、多了在框里滚动 */
-  field-sizing: content;
 }
 
 .ai-composer textarea::placeholder {
@@ -5911,11 +6210,11 @@ button.ai-skill-tag:hover { background: var(--ui-hover); }
   display: grid;
   flex: none;
   place-items: center;
-  width: var(--control-size);
-  height: var(--control-size);
+  width: 30px;
+  height: 30px;
   padding: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: 50%;
   background: var(--ui-accent);
   color: var(--ui-on-accent);
 }
@@ -6399,11 +6698,11 @@ button.ai-skill-tag:hover { background: var(--ui-hover); }
   }
 
   .workspace {
-    grid-template-columns: var(--editor-column) minmax(0, 1fr) 296px;
+    --inspector-column: clamp(280px, var(--inspector-width, 340px), 30vw);
   }
 
   .workspace.is-drawer-open {
-    grid-template-columns: 228px var(--editor-column) minmax(0, 1fr) 280px;
+    grid-template-columns: 228px var(--editor-column) minmax(0, 1fr) var(--inspector-column);
   }
 }
 

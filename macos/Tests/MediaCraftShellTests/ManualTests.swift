@@ -130,7 +130,13 @@ struct ManualTests {
             ui.expand("段落样式");
             const alignOnHeading = ui.find("居中", { within: stylePanel() }).disabled;
             ui.expand("段落样式");
-            return { onParagraph, kicker, onKicker, alignEnabled, centered, quoted, undone, onHeading, alignOnHeading };
+            // 换成大标题后右边马上重出（以前要切一下长文 / 图文才刷新），而且稿子记下了改动
+            await mc.editor.select(text.indexOf("第三段"));
+            const before = (await mc.drafts.saveState()).savedAt;
+            await pickStyle("大标题");
+            const rendered = await until(async () => (await mc.render.pages()).flatMap((page) => page.items).find((item) => item.blockType === "h1" && item.text?.includes("第三段")) ? true : null, 3000).catch(() => false);
+            const saved = await until(async () => (await mc.drafts.saveState()).savedAt !== before, 3000).catch(() => false);
+            return { onParagraph, kicker, onKicker, alignEnabled, centered, quoted, undone, onHeading, alignOnHeading, rendered, saved };
         """) as? [String: Any]
         _ = try await harness.evaluate("const menu = document.querySelector('#styleMenu'); menu.open = true; await new Promise((resolve) => setTimeout(resolve, 400));")
         try await harness.screenshot("style-menu", of: ".editor-pane")
@@ -145,6 +151,8 @@ struct ManualTests {
         #expect(result?["undone"] as? String == "# 标题\n\n:::小标签 居中\n第一段\n:::\n\n第二段\n\n第三段", "⌘Z 一步撤回")
         #expect(result?["onHeading"] as? String == "大标题")
         #expect(result?["alignOnHeading"] as? Bool == true, "不是组件时对齐按钮不能点")
+        #expect(result?["rendered"] as? Bool == true, "换了样式右边马上重出，不用切长文 / 图文")
+        #expect(result?["saved"] as? Bool == true, "换样式和打字一样记进稿子")
         #expect(harness.pageErrors == [])
     }
 

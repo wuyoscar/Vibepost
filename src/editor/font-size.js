@@ -1,4 +1,4 @@
-// 格式条上的「A−」「A+」：像 PPT 的「减小 / 增大字号」，每按一下这篇的字号 ±1（24–40，和检查器「版式 › 字号」是同一个值，
+// 格式条上的「A−」「A+」：像 PPT 的「减小 / 增大字号」，每按一下这篇的字号 ±1（18–40，和检查器「版式 › 字号」是同一个值，
 // 走 App API 的 drafts.update({ fontSize }, { undoable: true })，所以滑块跟着动、⌘Z 能撤回、也会存进本机）。
 // 快捷键 ⇧⌘> / ⇧⌘<（按键位置认，不分键盘布局），在哪都能按（捕获阶段先于编辑器）。到了上下限按钮变灰。
 (function (root) {
@@ -8,6 +8,7 @@
   // 范围和检查器的字号滑块一样（src/workspace/style-form.js 的 NUMBERS.fontSize）
   const [min, max] = [18, 40];
   const buttons = [...document.querySelectorAll("[data-font-step]")];
+  const readout = document.querySelector("[data-font-size-value]");
   const slider = document.querySelector("#fontSizeInput");
   const LABELS = { "-1": "字号减小", "1": "字号增大" };
   const KEYS = { "-1": "⇧⌘<", "1": "⇧⌘>" };
@@ -16,9 +17,10 @@
   const mc = () => root.mediacraft;
   const current = () => Number(slider?.value) || root.MediaCraftStyleForm.DEFAULTS.fontSize;
 
-  // 按钮的灰与提示：到了 24 / 40 那一头按不动；提示里写着现在的字号
+  // 按钮的灰与提示：到了 18 / 40 那一头按不动；中间的读数与提示里写着现在的字号
   function refresh() {
     const size = current();
+    if (readout) readout.textContent = String(size);
     for (const button of buttons) {
       const step = Number(button.dataset.fontStep);
       const next = size + step;

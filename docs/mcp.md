@@ -98,7 +98,7 @@ Claude Code ──stdio（JSON-RPC）── mediacraft-mcp ──Unix 域套接�
 | `open_draft` | 打开一篇（之后的工具改这篇）：开着它的窗口，或一个新窗口 |
 | `update_draft` | 改标题、小红书正文和 / 或整篇卡片内容（一步可撤销；英文记号收下时换成中文写法） |
 | `set_theme` ★ | 换主题（id 或中文名） |
-| `set_style` ★ | 颜色、字体、字号、行距、图片最大高，只改给了的项 |
+| `set_style` ★ | 颜色、字体、页面尺寸、字号、行距、段距（blockGap）、图片最大高，只改给了的项 |
 | `set_mode` ★ | 图文卡片 `cards` / 长文 `article` |
 | `list_palettes` | 配色库（内置 48 组与我的配色），可只列浅色或深色 |
 | `apply_palette` | 套一组配色（配色 id 或一串色值） |

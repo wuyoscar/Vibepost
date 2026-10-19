@@ -67,7 +67,18 @@
       return button;
     });
     const heading = Object.assign(document.createElement("p"), { className: "menu-heading", textContent: "片段" });
-    container.replaceChildren(...others, rule(), ...components, rule(), heading, ...snippets);
+    // 两栏：左边是图片、实况（页面里写好的两项挪进来）、分割线这几项与组件，右边是片段，菜单不会长过窗口
+    const column = (className, children) => {
+      const element = document.createElement("div");
+      element.className = `insert-menu-column ${className}`;
+      element.append(...children);
+      return element;
+    };
+    const files = [...(container.closest(".insert-menu-panel")?.querySelectorAll(":scope > label.menu-item") ?? [])];
+    container.replaceChildren(
+      column("insert-menu-basics", [...files, rule(), ...others, rule(), ...components]),
+      column("insert-menu-snippets", [heading, ...snippets]),
+    );
   }
 
   // 「样式」：段落类、列表类两组，每项带一句说明；最后是组件的对齐
@@ -113,7 +124,7 @@
         ? cardBlocks().restyleRange(text, range(), control.dataset.style)
         : cardBlocks().alignRange(text, range(), control.dataset.align);
       menu.open = false;
-      if (next !== null) editor.edit({ text: next });
+      if (next !== null) editor.apply(next);
       editor.focus();
     });
     // 光标所在的那几块：正文没变时不重新解析

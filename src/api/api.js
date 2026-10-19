@@ -3,8 +3,8 @@
 (function (root) {
   "use strict";
 
-  const DRAFT_FIELDS = ["title", "caption", "markdown", "mode", "theme", "colors", "tunedColors", "fonts", "fontSize", "lineHeight", "imageMaxHeight", "cardHeight", "cover", "cardCss"];
-  const NUMBER_FIELDS = ["fontSize", "lineHeight", "imageMaxHeight", "cardHeight"];
+  const DRAFT_FIELDS = ["title", "caption", "markdown", "mode", "theme", "colors", "tunedColors", "fonts", "fontSize", "lineHeight", "blockGap", "imageMaxHeight", "cardHeight", "cover", "cardCss"];
+  const NUMBER_FIELDS = ["fontSize", "lineHeight", "blockGap", "imageMaxHeight", "cardHeight"];
   // update(patch, { undoable: true }) 时随正文一起进撤销历史的字段
   const HISTORY_FIELDS = ["title", "caption", "mode", "theme", "colors", "tunedColors", "fonts", "cardCss", ...NUMBER_FIELDS];
   const HEX_COLOR = /^#[0-9a-f]{6}$/i;

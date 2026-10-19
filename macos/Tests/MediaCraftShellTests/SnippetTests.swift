@@ -32,15 +32,17 @@ struct SnippetTests {
             const panel = insertPanel();
             const items = [...panel.querySelectorAll('[data-insert^="snippet-"]')]
               .map((item) => [ui.name(item), item.querySelector(".menu-hint")?.textContent ?? "", item.title, item.dataset.insert]);
-            // 「片段」小标题在第二条线之后、第一个片段之前，片段是菜单的最后一组
-            const children = [...panel.children];
-            const headingAt = children.findIndex((node) => node.classList.contains("menu-heading"));
+            // 两栏：左边图片、实况、分割线这几项与组件（两条线隔开），右边一栏是「片段」小标题与全部片段
+            const columns = [...panel.querySelectorAll(".insert-menu-column")];
+            const right = [...(columns[1]?.children ?? [])];
+            const left = [...(columns[0]?.children ?? [])];
             const structure = {
-              heading: children[headingAt]?.textContent ?? "",
-              ruleBefore: children[headingAt - 1]?.classList.contains("menu-rule") ?? false,
-              firstAfter: children[headingAt + 1]?.dataset.insert ?? "",
-              last: children.at(-1)?.dataset.insert ?? "",
-              rules: children.filter((node) => node.classList.contains("menu-rule")).length,
+              columns: columns.length,
+              heading: right[0]?.textContent ?? "",
+              firstAfter: right[1]?.dataset.insert ?? "",
+              last: right.at(-1)?.dataset.insert ?? "",
+              rules: left.filter((node) => node.classList.contains("menu-rule")).length,
+              snippetsLeft: left.filter((node) => node.dataset.insert?.startsWith("snippet-")).length,
             };
             insertMenu().open = false;
 
@@ -76,11 +78,12 @@ struct SnippetTests {
         #expect(zip(items, result?["summaries"] as? [String] ?? []).allSatisfy { $0[2].hasPrefix($1) }, "悬停也是那句说明")
         #expect(items.map { $0[3] } == (result?["ids"] as? [String] ?? []).map { "snippet-\($0)" })
         let structure = result?["structure"] as? [String: Any]
-        #expect(structure?["heading"] as? String == "片段")
-        #expect(structure?["ruleBefore"] as? Bool == true, "片段一组前面一条线")
+        #expect(structure?["columns"] as? Int == 2, "「插入」分两栏，不长过窗口")
+        #expect(structure?["heading"] as? String == "片段", "右边一栏是片段")
         #expect(structure?["firstAfter"] as? String == "snippet-tutorial")
-        #expect(structure?["last"] as? String == "snippet-ending", "片段是最后一组")
-        #expect(structure?["rules"] as? Int == 2, "组件、片段各一条线隔开")
+        #expect(structure?["last"] as? String == "snippet-ending")
+        #expect(structure?["rules"] as? Int == 2, "左边：图片与实况、插入项、组件之间各一条线")
+        #expect(structure?["snippetsLeft"] as? Int == 0, "片段都在右边")
         #expect(result?["all"] as? [String] == result?["expectedAll"] as? [String], "「/」菜单：插入项、组件之后是片段")
         #expect(result?["titles"] as? [String] == result?["summaries"] as? [String], "「/」菜单里悬停是那句说明")
         #expect(result?["filtered"] as? [String] == ["数据卡"], "拼音缩写 sjk 筛出「数据卡」")

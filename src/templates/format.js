@@ -12,7 +12,7 @@
 //   theme         主题 id（src/themes/themes.js；认不出按默认主题）
 //   colors        缩进的 `bg: #rrggbb` 几行：只给三色时辅助、衬底按三色规则推，给了的辅助、衬底算单独调过；没给按主题
 //   fonts         缩进的 `zh / en / code: 字体 id` 几行（src/themes/fonts.js）；没给跟随主题
-//   fontSize / lineHeight / imageMaxHeight  字号（24–40）、行距（1–2.4）、图片最大高（220–1048，卡片上的逻辑像素）：一行一个数，没给用默认值
+//   fontSize / lineHeight / blockGap / imageMaxHeight  字号（18–40）、行距（1–2.4）、段距（0.1–1.5 行）、图片最大高（220–1048，卡片上的逻辑像素）：一行一个数，没给用默认值
 //   cover         缩进的 `enabled: true`、`subtitle: …`、`image: 图片编号`
 //   caption       小红书正文：`caption: |` 后面缩进的几行，换行照原样
 //   images        缩进的 `编号: 路径` 几行：自带模板相对网页根（docs/guide-assets/…、docs/template-assets/…），
@@ -162,6 +162,7 @@
       ...(number("cardHeight") !== null ? { cardHeight: number("cardHeight") } : {}),
       fontSize: number("fontSize"),
       lineHeight: number("lineHeight"),
+      ...(number("blockGap") !== null ? { blockGap: number("blockGap") } : {}),
       imageMaxHeight: number("imageMaxHeight"),
       cover: {
         enabled: truthy(cover.enabled),
@@ -189,7 +190,7 @@
     };
     block("colors", COLOR_ROLES.map((role) => [role, item.colors?.[role]]));
     block("fonts", FONT_SCRIPTS.map((script) => [script, item.fonts?.[script]]));
-    for (const key of ["fontSize", "lineHeight", "imageMaxHeight", "cardHeight"]) {
+    for (const key of ["fontSize", "lineHeight", "blockGap", "imageMaxHeight", "cardHeight"]) {
       if (Number.isFinite(item[key])) lines.push(`${key}: ${item[key]}`);
     }
     const cover = item.cover ?? {};

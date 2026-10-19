@@ -26,7 +26,7 @@
   const CLIP = 24;
   // 看一页时给 Claude 的图：864 × 1152 的卡片缩到这么宽（文字仍看得清）
   const VIEW_WIDTH = 540;
-  const RANGES = { fontSize: [18, 40], lineHeight: [1, 2.4], imageMaxHeight: [220, 1048], cardHeight: [1152, 1728] };
+  const RANGES = { fontSize: [18, 40], lineHeight: [1, 2.4], blockGap: [0.1, 1.5], imageMaxHeight: [220, 1048], cardHeight: [1152, 1728] };
   const WIDTH_PERCENT = [25, 100];
   const FIXED_WIDTH = [80, 780];
   const FIXED_HEIGHT = [80, 1048];
@@ -297,6 +297,7 @@
       cardHeight: draft.cardHeight,
       fontSize: draft.fontSize,
       lineHeight: draft.lineHeight,
+      blockGap: draft.blockGap,
       imageMaxHeight: draft.imageMaxHeight,
       cover: draft.cover,
       pageBreaks: doc.blocks.filter((block) => block.type === "pageBreak").length,
@@ -417,7 +418,7 @@
       }
       if (entries.length) patch.fonts = Object.fromEntries(entries);
     }
-    for (const [key, label] of [["fontSize", "字号"], ["lineHeight", "行距"], ["imageMaxHeight", "图片最大高"], ["cardHeight", "页面高度"]]) {
+    for (const [key, label] of [["fontSize", "字号"], ["lineHeight", "行距"], ["blockGap", "段距"], ["imageMaxHeight", "图片最大高"], ["cardHeight", "页面高度"]]) {
       if (args[key] === undefined) continue;
       patch[key] = inRange(args[key], RANGES[key], label);
       parts.push(`${label} ${patch[key]}`);
@@ -962,7 +963,7 @@
       name: "set_style",
       shared: true,
       label: "调整样式",
-      description: `在主题上微调这篇的样式，只改给了的项：colors（${ROLES.map((role) => `${role} ${ROLE_INFO[role].name}：${ROLE_INFO[role].use}`).join(" / ")}，#rrggbb；只给 bg、text、accent 三色时辅助与衬底按三色规则推出；没单独调过的辅助、衬底跟着背景与文字走）、fonts（zh / en / code 字体 id，"theme" 为跟随主题）、cardHeight（1152 标准3:4 / 1222 A4比例 / 1536 9:16 / 1728 1:2）、fontSize（18–40）、lineHeight（1–2.4）、imageMaxHeight（220–1048）。`,
+      description: `在主题上微调这篇的样式，只改给了的项：colors（${ROLES.map((role) => `${role} ${ROLE_INFO[role].name}：${ROLE_INFO[role].use}`).join(" / ")}，#rrggbb；只给 bg、text、accent 三色时辅助与衬底按三色规则推出；没单独调过的辅助、衬底跟着背景与文字走）、fonts（zh / en / code 字体 id，"theme" 为跟随主题）、cardHeight（1152 标准3:4 / 1222 A4比例 / 1536 9:16 / 1728 1:2）、fontSize（18–40）、lineHeight（1–2.4）、blockGap（段距：块与块之间按行高的几倍，0.1–1.5，默认 0.55；块之间空得太开时调小，不要靠空行或分页撑开）、imageMaxHeight（220–1048）。`,
       inputSchema: {
         type: "object",
         properties: {
@@ -975,6 +976,7 @@
           cardHeight: { type: "number", enum: [1152, 1222, 1536, 1728] },
           fontSize: { type: "number", minimum: RANGES.fontSize[0], maximum: RANGES.fontSize[1] },
           lineHeight: { type: "number", minimum: RANGES.lineHeight[0], maximum: RANGES.lineHeight[1] },
+          blockGap: { type: "number", minimum: RANGES.blockGap[0], maximum: RANGES.blockGap[1] },
           imageMaxHeight: { type: "number", minimum: RANGES.imageMaxHeight[0], maximum: RANGES.imageMaxHeight[1] },
         },
       },

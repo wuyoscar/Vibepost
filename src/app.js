@@ -131,6 +131,11 @@ const toolbars = MediaCraftEditor.bindToolbars(editor, {
   swatches: () => MediaCraftPalettes.inlineSwatches(styleForm.read().colors),
 });
 MediaCraftEditor.bindFind(editor, { bar: $("#findBar"), toggle: $("#findToggleBtn") }, notify);
+// 格式条上的「表情」（src/editor/emoji.js）：插到光标所在处，标题框与小红书正文里也行
+MediaCraftEmoji.bind(editor, $("#emojiMenu"), {
+  fields: [$("#titleInput"), $("#captionInput")],
+  readOnly: () => MediaCraftGuides.isGuide(draft.id) || ai.preview() !== null,
+});
 // 发布检查在正文里的标注（由下面的发布助手更新）
 const checkHints = MediaCraftEditor.bindHints(editor);
 MediaCraftEditor.bindUndoKeys(editor);
@@ -299,6 +304,7 @@ function showDraft(record, stored, profile) {
     cardHeight: record.cardHeight,
     fontSize: record.fontSize,
     lineHeight: record.lineHeight,
+    blockGap: record.blockGap,
     imageMaxHeight: record.imageMaxHeight,
   });
   draft.article = record.article ?? {};

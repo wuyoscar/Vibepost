@@ -46,6 +46,7 @@
       width.value = String(value);
       widthValue.textContent = `${value}%`;
       width.style.setProperty("--fill", `${((value - Number(width.min)) / (Number(width.max) - Number(width.min))) * 100}%`);
+      window.MediaCraftSteppers?.sync();
     }
 
     function show(ref) {

@@ -40,7 +40,6 @@
 | 无前缀 `backdrop-filter` | 18.0（15.0） | 实况角标、胶片页码的底（`media/media.css`） | 同时写 `-webkit-backdrop-filter`（Safari 9 起就有） | [WebKit 18.0](https://webkit.org/blog/15865/webkit-features-in-safari-18-0/) |
 | `scrollbar-width` | 18.2 | 舞台、胶片不显示滚动条 | `::-webkit-scrollbar { display: none }` | [WebKit 18.2](https://webkit.org/blog/16301/webkit-features-in-safari-18-2/) |
 | canvas `letterSpacing` | 18.4（15.4） | 卡片装饰标签的字距（`engine/paint.js`，已做特性检测） | 标签照常画，只是不加字距 | [MDN](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/letterSpacing) |
-| `field-sizing: content` | 26.2 | AI 输入框跟着内容长高 | 输入框停在两行，写多了在框里滚动 | [WebKit 26.2](https://webkit.org/blog/17640/webkit-features-for-safari-26-2/) |
 | 无前缀 `user-select` | **任何正式版 Safari 都不支持** | 6 处：拖编辑区宽度时、编辑器里的媒体块、检查器的图片框、AI 会话的文字 | 只有带前缀的 `-webkit-user-select` 生效。本机 macOS 26.6 的 WKWebView 实测 `CSS.supports("user-select", "none")` 为 `false`，所以这 6 处在所有版本上都不起作用。这是已有的问题，跟最低版本无关，另外处理 | [MDN](https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/user-select) |
 
 ### 原生壳（macOS）

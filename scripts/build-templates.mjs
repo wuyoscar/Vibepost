@@ -10,7 +10,7 @@ vm.runInContext(readFileSync(new URL("src/templates/format.js", root), "utf8"), 
 const { entry } = context.MediaCraftTemplateFormat;
 
 // 画廊里的顺序：先按题材的固定顺序（spec 定的），不在表里的按文件名排（固定的区域，不跟着这台机器的语言设置变）
-const ORDER = ["干货清单", "踩坑经验", "一周要闻", "论文解读", "工具实测", "读书笔记", "旅行日记", "活动通知"];
+const ORDER = ["干货清单", "踩坑经验", "一周要闻", "论文解读", "工具实测", "读书笔记", "旅行日记", "活动通知", "备考复盘", "面试复盘", "探店合集", "习惯打卡", "概念科普"];
 const collator = new Intl.Collator("zh-Hans-CN", { numeric: true });
 const rank = (name) => {
   const index = ORDER.indexOf(name.replace(/\.md$/, ""));

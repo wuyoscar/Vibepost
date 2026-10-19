@@ -84,7 +84,7 @@
   colors: { bg, text, accent, secondary, surface },   // #rrggbb；这篇的配色（在主题配色上调过的），见下面 palettes
   tunedColors,          // 单独调过的辅助、衬底：["secondary"]、["secondary", "surface"]……；没列出的按三色规则跟着底色与正文色走
   fonts: { zh, en, code },        // 字体 id，见 fonts.list()；"theme" = 跟随主题
-  fontSize, lineHeight, imageMaxHeight,  // 正文字号、行距、图片最大高（逻辑像素）
+  fontSize, lineHeight, blockGap, imageMaxHeight,  // 正文字号、行距、段距（块与块之间按行高的几倍，0.1–1.5，默认 0.55）、图片最大高（逻辑像素）
   cover: { enabled, subtitle, image },   // 首页做封面（默认关）、副标题（最多 60 字）、底图（这篇的图片 id，null 不要），见下
   cardCss,                               // 这一篇自己的卡片样式（CSS 文字，最长 20000 字），只作用在 HTML 卡片上，见下
   readOnly,             // 内置说明书为 true
@@ -380,7 +380,7 @@ claude -p --input-format stream-json --output-format stream-json --verbose --inc
 | `models(backend?)` | 后端能选的模型：Claude Code 是三个别名；Codex 问它自己（`model/list`，问过一次就记着），不在 App 里时为 `[]`；Codex 的每个模型带它能选的推理强度与默认档 | `[{ id, name, isDefault, efforts?, defaultEffort? }]` |
 | `send(prompt, options?)` | 在**当前稿子**的会话里发一句，这一轮说完（或停止、出错）时返回（改了稿子时修改对比已经显示出来）。`options.skills` 可传最多 8 个写作手册名称，发送时读取正文，只附到本轮 prompt，历史消息记录 `skills: [{name}]`。内置说明书、参数错误、这篇已在回复或还有待确认修改时 reject；启动或技能读取失败返回 `state: "error"` | `TurnResult` |
 | `polish()` | 一键润色：固定的话（改错别字、理顺句子、不改原意和结构、保留所有自定义标记）发进同一个会话 | `TurnResult` |
-| `preset(name)` | 预设命令（`src/ai/presets.js`，AI 助手里的几个按钮）：固定的话发进同一个会话，会话里显示按钮上的字，用户消息 `kind: "command"`、带 `preset: name`。`"coverTitles"` 封面标题 5 选 1（不改稿子，回复里给 5 个候选的 JSON 数组）、`"hook"` 首图文案（正文最前面一行一级标题）、`"humanize"` 去 AI 味（换成自然的个人口吻，事实与结构不变）、`"repaginate"` 按要点重新分页（Claude 直接改 `draft.md` 里的 `[[分页]]`，不用分页工具）、`"caption"` 写小红书正文（照着卡片内容与标题写 `caption.txt`：纯文本、口语、最后一行 3–5 个 #话题，不改 `draft.md` 与 `title.txt`）；后四个改的稿子照常进修改对比。改卡片内容的提示词都要求保留自定义标记与话题标签。AI 助手里另有快捷命令「加话题标签」（5 个 #话题加到 `caption.txt` 最后，同样进修改对比）。设计方向 `"bolder"` 更醒目、`"quieter"` 更安静、`"distill"` 精简、`"colorize"` 上色、`"typeset"` 调字、`"layout"` 理版式：让 Claude 先用 `get_pages` / `view_page` 看、再用 `restyle_block`、`move_section`、`set_style`、`set_card_css`（与预览里点选一块后的操作同一套）改、改完再看；用户还在经典引擎时提示词里多一句，让 Claude 先提醒切到「HTML 试用」。没有这个名字时 `TypeError` | `TurnResult`；`coverTitles` 另有 `titles: TitleOption[]` |
+| `preset(name)` | 预设命令（`src/ai/presets.js`，AI 助手里的几个按钮）：固定的话发进同一个会话，会话里显示按钮上的字，用户消息 `kind: "command"`、带 `preset: name`。`"coverTitles"` 封面标题 5 选 1（不改稿子，回复里给 5 个候选的 JSON 数组）、`"hook"` 首图文案（正文最前面一行一级标题）、`"humanize"` 去 AI 味（换成自然的个人口吻，事实与结构不变）、`"repaginate"` 按要点重新分页（Claude 直接改 `draft.md` 里的 `[[分页]]`，不用分页工具）、`"caption"` 写小红书正文（照着卡片内容与标题写 `caption.txt`：纯文本、口语、最后一行 3–5 个 #话题，不改 `draft.md` 与 `title.txt`）；后四个改的稿子照常进修改对比。改卡片内容的提示词都要求保留自定义标记与话题标签。AI 助手里另有快捷命令「加话题标签」（5 个 #话题加到 `caption.txt` 最后，同样进修改对比）。`"autoLayout"` 一键排版（AI 助手的主按钮：先 `get_pages` / `view_page` 看每页与排版自检，再调分页、块的样式、字号行距与段距 `blockGap`，不改措辞）。排版一组 `"tighten"` 收紧留白（段距调到 0.35–0.5、去掉多余的空行与分页）、`"bolder"` 更醒目、`"quieter"` 更安静、`"distill"` 精简、`"colorize"` 上色、`"typeset"` 调字、`"layout"` 理版式：让 Claude 先用 `get_pages` / `view_page` 看、再用 `restyle_block`、`move_section`、`set_style`、`set_card_css`（与预览里点选一块后的操作同一套）改、改完再看；用户还在经典引擎时提示词里多一句，让 Claude 先提醒切到「HTML 试用」。没有这个名字时 `TypeError` | `TurnResult`；`coverTitles` 另有 `titles: TitleOption[]` |
 | `useTitle(title)` | 把标题换成这个（与点封面标题候选相同）：撤销历史里的一步，⌘Z 撤回。空字符串 `TypeError`，内置说明书 reject | `Draft` |
 | `cancel(draftId?)` | 停止这篇（默认当前这篇）正在跑的一轮：先 SIGINT，还不退出再 SIGTERM、SIGKILL；正在生图的一并停止 | `{ cancelled }` |
 | `model(draftId?)` | 这篇（默认当前这篇）用的后端、选的模型与最近一轮实际用的：`model` 是别名（Claude Code 的 `"opus"` / `"sonnet"` / `"haiku"`）、模型 ID 或 `null`（跟随后端自己的设置），`used` 是后端报的模型（还没跑过为 `null`） | `{ backend, model, used }` |
@@ -502,7 +502,7 @@ Claude 用它们直接操作 App（工具全名 `mcp__mediacraft__<名字>`）�
 | `list(draftId?)` | 这篇（默认当前这篇）的版本，新的在前 | `Version[]` |
 | `revert(id)` | 当前稿子撤回到那一轮之前：还没确认的修改先丢掉（算拒绝），再把版本里的全部字段与图片一次换回去——撤销历史里的一步，⌘Z 撤销这次撤回、⇧⌘Z 再撤回，更早的撤销历史照常；不改版本列表。AI 还在回复时、内置说明书、没有这个版本时 reject | `Draft` |
 
-`Version`：`{ id, at, label, draft: { title, caption, markdown, mode, theme, colors, tunedColors, fonts, fontSize, lineHeight, imageMaxHeight, cover, imageIds } }`（这版之前存的版本没有 `cover` 或 `caption`，撤回时封面设置、正文栏不动；没有 `tunedColors` 的按颜色推断一次），`id` 就是那一轮的 `turnId`，`at` 是毫秒时间戳，`label` 是那一轮说的话（最多 40 字）。会话记录里有版本的每一轮结尾都有「撤回到这一轮之前」。同一编号的实况被重新编辑过（封面、原视频换了）时，撤回后用的是编辑后的画面与视频。
+`Version`：`{ id, at, label, draft: { title, caption, markdown, mode, theme, colors, tunedColors, fonts, fontSize, lineHeight, blockGap, imageMaxHeight, cover, imageIds } }`（这版之前存的版本没有 `cover` 或 `caption`，撤回时封面设置、正文栏不动；没有 `tunedColors` 的按颜色推断一次），`id` 就是那一轮的 `turnId`，`at` 是毫秒时间戳，`label` 是那一轮说的话（最多 40 字）。会话记录里有版本的每一轮结尾都有「撤回到这一轮之前」。同一编号的实况被重新编辑过（封面、原视频换了）时，撤回后用的是编辑后的画面与视频。
 
 ### 页面与壳之间（原生桥）
 

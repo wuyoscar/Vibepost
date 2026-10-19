@@ -17,6 +17,8 @@
     shorten: "把 draft.md 的正文缩短到 800 字以内：保留要点、语气和所有自定义标记，直接修改 draft.md。",
     tags: "为这篇稿子想 5 个小红书话题标签，加到 caption.txt（小红书正文）的最后：另起一行，写成「#话题 #话题」，已经有的不重复；caption.txt 里原来的字一个都不改，也不要修改 draft.md 和 title.txt。",
   };
+  // 输入框最高长到这么高（再多在里面滚）
+  const INPUT_MAX_HEIGHT = 220;
   // 离底部这么近时算「在看最新的」，新消息来了跟着滚到底
   const PIN_DISTANCE = 40;
   // 会话里记下的权限回答
@@ -414,8 +416,8 @@
   function syncBackendNames() {
     composer.setAttribute("aria-label", `对 ${backend.name} 说`);
     input.setAttribute("aria-label", `问 ${backend.name}`);
-    input.placeholder = `问 ${backend.name}，或让它改稿…`;
-    emptyTitle.textContent = `和 ${backend.name} 一起改这篇`;
+    input.placeholder = `让 ${backend.name} 排版或改稿，比如「每页只讲一件事，要点做成步骤」`;
+    emptyTitle.textContent = `让 ${backend.name} 帮你排这篇`;
   }
 
   function syncControls() {
@@ -448,8 +450,15 @@
     syncGuide(Boolean(session?.locked));
     empty.hidden = !thread.hidden || !guide.hidden;
     emptyText.textContent = draft.readOnly
-      ? "内置说明书不能改。新建一篇稿子后，就能让 AI 帮你润色、起标题、按要点分页。"
-      : "AI 助手会读这篇稿子，帮你润色、起标题、按要点分页；改动先标在正文里等你逐处确认，每轮之前自动存版本，随时能撤回。";
+      ? "内置说明书不能改。新建一篇稿子后，就能让 AI 帮你排版、润色、起标题。"
+      : "它会看每一页，帮你分页、换块的样式、调字号行距与段距；改字的地方先标在正文里等你逐处确认，每轮之前自动存版本，随时能撤回。";
+    fitInput();
+  }
+
+  // 输入框跟着字长高（最多约十行），发出去清空后回到两行
+  function fitInput() {
+    input.style.height = "auto";
+    input.style.height = `${Math.min(input.scrollHeight, INPUT_MAX_HEIGHT)}px`;
   }
 
   // 找这个后端（默认这篇用的）的程序
@@ -690,11 +699,18 @@
     submit();
   });
   input.addEventListener("input", () => { composerRevision++; syncControls(); });
+  // 点输入框外面的底栏空白处也聚焦输入框
+  composer.addEventListener("pointerdown", (event) => {
+    if (event.target === composer || event.target.classList?.contains("ai-composer-foot")) {
+      event.preventDefault();
+      input.focus();
+    }
+  });
   stopButton.addEventListener("click", () => run(() => ai.api.cancel(draft.id)));
   polishButton.addEventListener("click", () => run(() => withWritingSkills((options) => ai.api.polish(options))));
   for (const button of commandButtons) {
     const { aiPreset: preset, aiCommand: command } = button.dataset;
-    if (preset) button.textContent = ai.presets.PRESETS[preset].label;
+    if (preset) (button.querySelector("[data-preset-label]") ?? button).textContent = ai.presets.PRESETS[preset].label;
     button.addEventListener("click", () => {
       setPresetsOpen(false);
       run(() => withWritingSkills((options) => (preset

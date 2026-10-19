@@ -33,7 +33,7 @@
   colors: { bg, text, accent, secondary, surface },   // 这篇的配色（#rrggbb）
   tunedColors,                       // 单独调过的辅助、衬底（["secondary"]……），没列出的按三色规则跟着底色与正文色走
   fonts: { zh, en, code },           // 字体 id，"theme" = 跟随主题
-  fontSize?, lineHeight?, imageMaxHeight?,   // 缺的按默认值
+  fontSize?, lineHeight?, blockGap?, imageMaxHeight?,   // 缺的按默认值（blockGap 段距：块与块之间按行高的几倍，0.1–1.5，默认 0.55；v8 加的，旧稿没有就是默认）
   cover?: { enabled, subtitle, image },      // 首页做封面、副标题、底图（图片 id）；这版之前的稿子没有，按不做封面
   cardCss?: string,                          // 这一篇自己的卡片样式（HTML 卡片，检查器「高级 · 卡片样式」，最长 20000 字）；没有按空
   article: { theme?, font?, size?, color? }, // 旧版的长文样式，只为迁移原样保留；长文现在跟随主题，新稿子为 {}
@@ -124,7 +124,7 @@ versions: [{
   id,        // 那一轮的 turnId
   at,        // 存的时间（毫秒）
   label,     // 那一轮说的话，最多 40 字
-  draft: { title, caption, markdown, mode, theme, colors, tunedColors, fonts, fontSize, lineHeight, imageMaxHeight, cover, cardCss, images },
+  draft: { title, caption, markdown, mode, theme, colors, tunedColors, fonts, fontSize, lineHeight, blockGap, imageMaxHeight, cover, cardCss, images },
 }]
 ```
 
@@ -171,7 +171,7 @@ description: 通用的小红书图文笔记：给谁看、标题怎么抓人…�
 ```
 模板/
   我的清单/
-    模板.md                 # 开头 front matter（name、description、tags、title、theme、colors、fonts、fontSize / lineHeight / imageMaxHeight、cover、caption、images），后面是卡片内容
+    模板.md                 # 开头 front matter（name、description、tags、title、theme、colors、fonts、fontSize / lineHeight / blockGap / imageMaxHeight、cover、caption、images），后面是卡片内容
     img_….jpg               # 图片，文件名就是 images 里的路径（相对这个文件夹）
 ```
 

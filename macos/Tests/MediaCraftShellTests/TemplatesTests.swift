@@ -97,7 +97,7 @@ struct TemplatesTests {
         #expect(result?["stale"] as? [String] == [], "登记表过期了：运行 node scripts/build-templates.mjs")
         #expect(result?["problems"] as? [String] == [], "\(result?["problems"] ?? [])")
         let templates = result?["templates"] as? [[String]] ?? []
-        #expect(templates.map { $0[1] } == ["干货清单", "踩坑经验", "一周要闻", "论文解读", "工具实测", "读书笔记", "旅行日记", "活动通知"], "\(templates)")
+        #expect(templates.map { $0[1] } == ["干货清单", "踩坑经验", "一周要闻", "论文解读", "工具实测", "读书笔记", "旅行日记", "活动通知", "备考复盘", "面试复盘", "探店合集", "习惯打卡", "概念科普"], "\(templates)")
         #expect(templates.allSatisfy { $0[0] == "template_\($0[1])" && $0[4] == "true" && $0[2].split(separator: ",").count == 2 }, "id 是 template_名字，两个标签：\(templates)")
         #expect(result?["descriptions"] as? Bool == true)
         #expect(result?["inList"] as? Int == 0, "模板不是稿子，不在 drafts.list() 里")
@@ -224,7 +224,7 @@ struct TemplatesTests {
         """) as? [[String: Any]] ?? []
         await harness.tearDown()
 
-        #expect(result.count == 8)
+        #expect(result.count == 13)
         for item in result {
             let name = item["name"] as? String ?? "?"
             #expect(item["theme"] as? Bool == true, "\(name) 的主题")
@@ -348,7 +348,7 @@ struct TemplatesTests {
         #expect(listedRows.map { $0[0] } == builtIns + ["user_template_我的清单"], "自带的在前，自己的在后：\(listedRows)")
         #expect(listedRows.last == ["user_template_我的清单", "我的清单", "改了说明", "false"])
         #expect(listedRows.dropLast().allSatisfy { $0[3] == "true" && !$0[2].isEmpty })
-        #expect(saved?["folderBefore"] as? Int == builtIns.count && builtIns.count == 8, "存之前只有自带的")
+        #expect(saved?["folderBefore"] as? Int == builtIns.count && builtIns.count == 13, "存之前只有自带的")
         #expect((saved?["revealBuiltIn"] as? String ?? "").contains("自带"))
         #expect(revealed == [templateFolder.resolvingSymlinksInPath().path, folder.resolvingSymlinksInPath().path], "在 Finder 中显示那一套的文件夹、模板文件夹：\(revealed)")
         #expect(onDisk == ["\(imageId).jpg", "模板.md"], "文件夹里是 模板.md 与图片：\(onDisk)")

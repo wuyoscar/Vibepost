@@ -83,8 +83,13 @@
         output.value = input.value;
       }
     }
+    window.MediaCraftSteppers?.sync();
   }
   for (const { input } of readouts) input.addEventListener("input", syncReadouts);
+  // 滑杆旁的读数换成能输入的数值框（src/workspace/steppers.js），各节能收起（src/workspace/sections.js）
+  const stylePanel = $("#stylePanel");
+  window.MediaCraftSteppers.enhance(stylePanel);
+  window.MediaCraftSections.create(stylePanel);
 
 
   // ===== 舞台：一次看一张大卡片，上一张 / 下一张、胶片、跟着光标走 =====

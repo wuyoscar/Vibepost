@@ -51,7 +51,7 @@
       tunedColors,
       fonts: Object.fromEntries(format.FONT_SCRIPTS.map((script) => [script, root.MediaCraftFonts.normalize(script, entry.fonts[script] ?? follow)])),
       // 字号、行距、图片最大高：模板给了就按样式表单的范围收口，没给的不写（打开时用默认值）
-      ...Object.fromEntries(["fontSize", "lineHeight", "imageMaxHeight", "cardHeight"]
+      ...Object.fromEntries(["fontSize", "lineHeight", "blockGap", "imageMaxHeight", "cardHeight"]
         .filter((key) => Number.isFinite(entry[key]))
         .map((key) => [key, root.MediaCraftStyleForm.normalizeNumber(key, entry[key])])),
       cover: { enabled: Boolean(cover.enabled), subtitle: cover.subtitle || "", image: cover.image && images[cover.image] ? cover.image : null },
@@ -163,7 +163,7 @@
       colors,
       fonts,
       // 字号、行距、图片最大高：和默认值不同的才写
-      ...Object.fromEntries(["fontSize", "lineHeight", "imageMaxHeight", "cardHeight"]
+      ...Object.fromEntries(["fontSize", "lineHeight", "blockGap", "imageMaxHeight", "cardHeight"]
         .filter((key) => Number.isFinite(fields[key]) && fields[key] !== root.MediaCraftStyleForm.DEFAULTS[key])
         .map((key) => [key, fields[key]])),
       cover: { enabled: Boolean(cover.enabled), subtitle: cover.subtitle || "", image: cover.image && images[cover.image] ? cover.image : null },

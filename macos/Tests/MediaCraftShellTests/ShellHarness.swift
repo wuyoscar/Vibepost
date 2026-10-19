@@ -52,13 +52,15 @@ final class ShellHarness: NSObject {
     /// - onboarding: false 时新环境不弹新手引导（见 `onboardingPending`）。
     /// - loginShell: 代替默认假登录 shell 的脚本（测查找 claude 时登录 shell 出问题）；shellTimeout 是读它的总超时。
     /// - pageScripts: 每次载入页面时先于页面脚本执行的脚本（测试用来模拟浏览器 API 出错）。
+    /// - inspectorFolded: 检查器「样式」各节用 App 真实的默认开合（版式、主题开着，其余收起，见 src/workspace/sections.js）；
+    ///   默认 false：本机没记过开合时各节都展开，测试照常点里面的控件（像 onboarding: false 一样只是省掉一步）。
     /// - mcp: 外部 Agent（MCP）的套接字与设置放在哪；默认不监听。
     /// - terminalVariables: 「终端」环境里另外的变量（生图的密钥）。这台 Mac 上真的 OPENAI_API_KEY / GEMINI_API_KEY 一律去掉，
     ///   也不读真的 ~/.env（换成 aiRoot 里的 test.env，测试可以往里写）。
     /// - imageAPI: 生图接口的地址（假接口 `FakeImageAPI`）；默认是连不上的本机端口，测试不会调到真的生图接口。
     init(
         webRoot: URL = ShellHarness.repoRoot, glass: Bool = false, terminalPath: [URL] = [], onboarding: Bool = true,
-        loginShell: String? = nil, shellTimeout: Duration = .seconds(15), pageScripts: [String] = [], mcp: MCPConfiguration? = nil,
+        loginShell: String? = nil, shellTimeout: Duration = .seconds(15), pageScripts: [String] = [], inspectorFolded: Bool = false, mcp: MCPConfiguration? = nil,
         terminalVariables: [String: String] = [:], imageAPI: URL = URL(string: "http://127.0.0.1:9")!
     ) {
         let store = Self.idleDataStores.popLast() ?? WKWebsiteDataStore(forIdentifier: UUID())
@@ -93,7 +95,7 @@ final class ShellHarness: NSObject {
                     forMainFrameOnly: true
                 ))
                 config.userContentController.add(recorder, name: "harnessErrors")
-                for source in [Self.uiHelperScript] + pageScripts {
+                for source in [Self.uiHelperScript] + (inspectorFolded ? [] : [Self.unfoldedInspectorScript]) + pageScripts {
                     config.userContentController.addUserScript(WKUserScript(
                         source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true
                     ))
@@ -282,6 +284,16 @@ final class ShellHarness: NSObject {
 
     /// 测试脚本里像用户一样找界面：按可访问名称（aria-labelledby / aria-label / 文字 / title）找看得见的控件。
     /// 测试只通过 `window.mediacraft`、这里的 `ui` 与原生桥说话，不碰 `src/app.js` 的内部名字。
+    /// 本机没记过开合时把检查器「样式」各节都记成展开（见 init 的 inspectorFolded）
+    static let unfoldedInspectorScript = """
+        try {
+          const key = "mediacraft.inspector.folds.v1";
+          if (location.protocol === "mediacraft:" && !localStorage.getItem(key)) {
+            localStorage.setItem(key, JSON.stringify({ layout: false, theme: false, font: false, cover: false, colors: false, images: false, byline: false }));
+          }
+        } catch {}
+    """
+
     private static let uiHelperScript = """
     window.ui = (() => {
       const text = (element) => (element?.textContent || "").replace(/\\s+/g, " ").trim();

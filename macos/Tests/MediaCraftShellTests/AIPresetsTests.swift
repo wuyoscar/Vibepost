@@ -203,31 +203,39 @@ struct AIPresetsTests {
         #expect(harness.pageErrors == [])
     }
 
-    @Test("设计方向（更醒目、更安静……）：先看再改，用 restyle_block、set_card_css 等同一套操作")
+    @Test("排版一组（收紧留白、按要点重新分页、理版式……）：先看再改，用 restyle_block、set_card_css 等同一套操作；「一键排版」是主按钮，只动版式不改字，提到段距")
     func designPresetsLookThenEdit() async throws {
         let fake = try FakeClaude()
         defer { fake.remove() }
         try fake.script(StreamJSON.reply(["好"]), call: 1)
         try fake.script(StreamJSON.reply(["好"]), call: 2)
+        try fake.script(StreamJSON.reply(["好"]), call: 3)
+        try fake.script(StreamJSON.reply(["好"]), call: 4)
         let harness = ShellHarness(terminalPath: [fake.directory], onboarding: false)
         try await harness.load()
         let result = try await harness.evaluate(Self.helpers + """
             await mc.drafts.create({ markdown: "一段" });
             await openAI();
-            const labels = [...document.querySelectorAll('[aria-label="设计方向"] .chip')].map((chip) => chip.textContent);
+            const labels = [...document.querySelectorAll('[aria-label="排版"] .chip')].map((chip) => chip.textContent);
             ui.click("更醒目");
             await until(() => finished(1));
             preset("更安静");
             await until(() => finished(2));
+            ui.click("一键排版");
+            await until(() => finished(3));
+            preset("收紧留白");
+            await until(() => finished(4));
             return { labels, users: await users() };
         """) as? [String: Any]
         await harness.tearDown()
 
-        #expect(result?["labels"] as? [String] == ["更醒目", "更安静", "精简", "上色", "调字", "理版式"])
-        let prompts = (0..<2).map { fake.prompt($0) }
-        #expect(prompts.allSatisfy { $0.contains("view_page") && $0.contains("restyle_block") && $0.contains("set_card_css") })
+        #expect(result?["labels"] as? [String] == ["收紧留白", "按要点重新分页", "理版式", "调字", "更醒目", "更安静", "精简", "上色"])
+        let prompts = (0..<4).map { fake.prompt($0) }
+        #expect([prompts[0], prompts[1], prompts[3]].allSatisfy { $0.contains("view_page") && $0.contains("restyle_block") && $0.contains("set_card_css") })
         #expect(prompts[0].contains("「更醒目」") && prompts[1].contains("「更安静」"))
-        #expect((result?["users"] as? [[String: Any]] ?? []).map { $0["preset"] as? String } == ["bolder", "quieter"])
+        #expect(prompts[2].contains("get_pages") && prompts[2].contains("blockGap") && prompts[2].contains("不改措辞"), "一键排版：先看每页，用段距收紧，不改字")
+        #expect(prompts[3].contains("blockGap") && prompts[3].contains("「收紧留白」"))
+        #expect((result?["users"] as? [[String: Any]] ?? []).map { $0["preset"] as? String } == ["bolder", "quieter", "autoLayout", "tighten"])
         #expect(harness.pageErrors == [])
     }
 

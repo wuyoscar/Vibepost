@@ -172,7 +172,7 @@
   //   parent                    放编辑器的元素
   //   media(ref)                ref 为 { id } 或 { path }，返回 { id, name, src, kind, missing }
   //   onEditImage(detail)       点了缩略图卡片：{ imageIds, ratio, source }，source 是这块在正文里的范围 [起, 止]
-  //   onChange({ history })     用户改了正文（打字、格式命令、粘贴、撤销 / 重做……）；应用自己改的不通知
+  //   onChange({ history })     用户改了正文（打字、格式命令、粘贴、apply()、撤销 / 重做……）；应用自己改的不通知
   //   onMediaEdit(edits)        图片属性改了（edit() 记下的，或撤销 / 重做到的）：[{ id, field, after }]
   //   onFieldEdit(edits)        稿子的其他字段改了（edit() 记下的，或撤销 / 重做到的）：[{ field, after }]
   //   onPasteFiles(files, at)   粘贴进来图片文件
@@ -324,6 +324,20 @@
       setText(text) {
         const current = api.getText();
         if (text !== current) change({ changes: difference(current, text) }, "input.replace");
+      },
+      // 用户在菜单、工具条上点出来的一步改动（左上角「样式」的换样式、对齐）：正文换成 text（只改变了的那一段），
+      // 和打字一样通知 onChange（存稿、出图），撤销历史里单独一步。应用自己改的用 setText / edit（不通知）。
+      apply(text) {
+        const current = api.getText();
+        if (text === current) return false;
+        view.dispatch({ changes: difference(current, text), userEvent: "input.restyle", annotations: [isolateHistory.of("full")] });
+        return true;
+      },
+      // 用户插入的字（「表情」面板）：换掉选区、光标停在后面，和打字一样通知 onChange；只读时不插
+      insertText(text) {
+        if (view.state.readOnly) return false;
+        view.dispatch(view.state.replaceSelection(text), { userEvent: "input.type", scrollIntoView: true });
+        return true;
       },
       // 把 [from, to) 换成 text，光标停在换进去的字后面
       replace(from, to, text) {

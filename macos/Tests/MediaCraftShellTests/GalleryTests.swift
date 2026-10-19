@@ -48,7 +48,7 @@ struct GalleryTests {
         }
     }
 
-    @Test("从稿件抽屉打开画廊：8 套自带模板各一格、缩略图是真实出的第一页；按题材 / 风格筛；方向键 + 回车或点一格就新建一篇照模板的稿子并关上，原来的稿子不变；Esc、点遮罩关上")
+    @Test("从稿件抽屉打开画廊：13 套自带模板各一格、缩略图是真实出的第一页；按题材 / 风格筛；方向键 + 回车或点一格就新建一篇照模板的稿子并关上，原来的稿子不变；Esc、点遮罩关上")
     func galleryListsFiltersAndCreates() async throws {
         let harness = ShellHarness(onboarding: false)
         try await harness.load()
@@ -131,19 +131,19 @@ struct GalleryTests {
         await harness.tearDown()
 
         #expect(result?["opened"] as? Bool == true, "画廊是一个对话框")
-        #expect(result?["names"] as? [String] == result?["expectedNames"] as? [String], "8 套自带模板按登记表顺序：\(result?["names"] ?? [])")
-        #expect((result?["names"] as? [String])?.count == 8)
+        #expect(result?["names"] as? [String] == result?["expectedNames"] as? [String], "13 套自带模板按登记表顺序：\(result?["names"] ?? [])")
+        #expect((result?["names"] as? [String])?.count == 13)
         #expect(result?["focusedFirst"] as? Bool == true, "打开时焦点在第一格")
-        #expect(result?["thumbs"] as? [Bool] == Array(repeating: true, count: 8), "每格的缩略图都画出来了：\(result?["thumbs"] ?? [])")
+        #expect(result?["thumbs"] as? [Bool] == Array(repeating: true, count: 13), "每格的缩略图都画出来了：\(result?["thumbs"] ?? [])")
         #expect(result?["descriptions"] as? Bool == true)
         #expect((result?["tags"] as? [[String]])?[2] == result?["expectedTags"] as? [String], "格子下面是题材与风格的标签")
         #expect(result?["topicChips"] as? [String] == result?["expectedTopics"] as? [String], "\(result?["topicChips"] ?? [])")
         #expect(result?["styleChips"] as? [String] == result?["expectedStyles"] as? [String], "\(result?["styleChips"] ?? [])")
         #expect(result?["byTopic"] as? [String] == ["干货清单"])
-        #expect(result?["byStyle"] as? [String] == ["踩坑经验", "旅行日记"])
+        #expect(result?["byStyle"] as? [String] == ["踩坑经验", "旅行日记", "探店合集", "习惯打卡"])
         #expect(result?["byBoth"] as? [String] == ["旅行日记"], "两组一起筛")
         #expect(result?["none"] as? [AnyHashable] == [0, false] as [AnyHashable], "筛不到时说一声")
-        #expect(result?["all"] as? Int == 8)
+        #expect(result?["all"] as? Int == 13)
         #expect(result?["afterRight"] as? String == result?["expectedRight"] as? String && result?["afterDown"] as? String == result?["expectedDown"] as? String, "方向键在格子间走：\(result?["afterRight"] ?? "") / \(result?["afterDown"] ?? "")")
         let picked = result?["picked"] as? [String: Any]
         #expect(picked?["theme"] as? String == result?["pickedTheme"] as? String && picked?["markdown"] as? Bool == true && picked?["readOnly"] as? Bool == false && picked?["cover"] as? Bool == true, "回车新建的稿子照模板：\(picked ?? [:])")

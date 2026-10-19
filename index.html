@@ -37,6 +37,7 @@
       <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6" /></symbol>
       <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></symbol>
       <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5" /><path d="M11 18.5h2" /></symbol>
+      <symbol id="i-emoji" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M8.6 14.2c.8 1.2 2 1.9 3.4 1.9s2.6-.7 3.4-1.9" /><path d="M9.2 9.8h.01M14.8 9.8h.01" stroke-width="2.4" /></symbol>
       <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9z" /><path d="M18.5 16.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" /></symbol>
       <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 18V6M7 11l5-5 5 5" /></symbol>
       <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4.5v10M7.5 10.5l4.5 4.5 4.5-4.5M5 19.5h14" /></symbol>
@@ -194,6 +195,7 @@
             <span class="bar-separator" aria-hidden="true"></span>
             <!-- 字号（src/editor/font-size.js）：像 PPT 的「减小 / 增大字号」，每按一下这篇的字号 ±1，和检查器「版式 › 字号」是同一个值 -->
             <button type="button" class="format-button format-size" data-font-step="-1" aria-label="字号减小" aria-keyshortcuts="Meta+Shift+Comma" title="字号减小 ⇧⌘&lt;">A<span class="format-size-sign">−</span></button>
+            <span class="format-size-value" data-font-size-value title="这篇的字号（检查器「版式 › 字号」里能输入精确的值）">34</span>
             <button type="button" class="format-button format-size" data-font-step="1" aria-label="字号增大" aria-keyshortcuts="Meta+Shift+Period" title="字号增大 ⇧⌘&gt;">A<span class="format-size-sign">+</span></button>
             <span class="bar-separator" aria-hidden="true"></span>
             <details class="pop-menu">
@@ -214,7 +216,17 @@
                 <div class="menu-section" data-insert-items></div>
               </div>
             </details>
-            <button type="button" class="source-toggle" data-source-toggle aria-label="源码" aria-pressed="false" aria-keyshortcuts="Meta+/" title="显示 Markdown 源码 ⌘/">&lt;/&gt; 源码</button>
+            <!-- 表情（src/editor/emoji.js）：插到光标所在处（正文、标题框或小红书正文） -->
+            <details id="emojiMenu" class="pop-menu emoji-menu">
+              <summary class="menu-button emoji-button" aria-label="插入表情" title="插入表情：插到光标所在处（正文、标题或小红书正文）；按住 ⇧ 点可以连着插">
+                <svg class="icon icon-small" aria-hidden="true"><use href="#i-emoji" /></svg>
+              </summary>
+              <div class="pop-menu-panel emoji-panel" role="group" aria-label="表情">
+                <div class="emoji-tabs" role="tablist" aria-label="表情分类" data-emoji-tabs></div>
+                <div class="emoji-grid" role="group" data-emoji-grid></div>
+              </div>
+            </details>
+            <button type="button" class="source-toggle" data-source-toggle aria-label="源码" aria-pressed="false" aria-keyshortcuts="Meta+/" title="显示 Markdown 源码 ⌘/"><svg class="icon icon-small" aria-hidden="true"><use href="#i-code" /></svg></button>
           </div>
 
           <div class="title-field" data-guide-lock>
@@ -414,6 +426,7 @@
         </section>
 
         <aside class="inspector" aria-label="检查器">
+          <div class="editor-divider inspector-divider" data-panel-resize="inspector" role="separator" aria-orientation="vertical" tabindex="0" aria-label="检查器宽度" title="拖动调整检查器宽度；← → 微调，双击恢复"></div>
           <div class="inspector-head">
             <div class="segmented segmented-tabs" role="tablist" aria-label="检查器">
               <button id="styleTab" type="button" role="tab" aria-selected="true" aria-controls="stylePanel">样式</button>
@@ -422,7 +435,7 @@
           </div>
 
           <div id="stylePanel" class="inspector-panel" role="tabpanel" aria-labelledby="styleTab" data-guide-lock>
-            <section class="inspector-section" aria-labelledby="layoutLabel">
+            <section class="inspector-section" data-fold="layout" aria-labelledby="layoutLabel">
               <h2 id="layoutLabel" class="section-label">版式</h2>
               <label class="field card-only">
                 <span>图文尺寸</span>
@@ -433,12 +446,11 @@
                   <option value="1728">长页 · 1:2</option>
                 </select>
               </label>
-              <div class="segmented card-only" role="group" aria-label="排版密度">
+              <div class="segmented card-only" role="group" aria-label="排版密度" title="想多放内容，选文档排版或更长的页面；超出一页仍会自动分页。整篇不分页可用顶部「长文」。">
                 <button type="button" data-density="card">大字卡片</button>
                 <button type="button" data-density="reading">舒适阅读</button>
                 <button type="button" data-density="document">文档排版</button>
               </div>
-              <p class="section-note card-only">想多放内容，选文档排版或更长的页面；超出一页仍会自动分页。整篇不分页可用顶部「长文」。</p>
               <label class="slider-row">
                 <span class="option-label">字号</span>
                 <input id="fontSizeInput" type="range" min="18" max="40" step="1" value="34" />
@@ -446,22 +458,27 @@
               </label>
               <label class="slider-row">
                 <span class="option-label">行距</span>
-                <input id="lineHeightInput" type="range" min="1" max="2.4" step="0.01" value="1.85" />
+                <input id="lineHeightInput" type="range" min="1" max="2.4" step="0.01" value="1.85" data-nudge="0.05" />
                 <output class="slider-value" for="lineHeightInput">1.85</output>
+              </label>
+              <label class="slider-row card-only" title="块与块之间的距离，按一行的高度算几倍；块之间太空就调小">
+                <span class="option-label">段距</span>
+                <input id="blockGapInput" type="range" min="0.1" max="1.5" step="0.05" value="0.55" aria-label="段距" />
+                <output class="slider-value" for="blockGapInput">0.55</output>
               </label>
               <label class="slider-row card-only">
                 <span class="option-label">图片高</span>
-                <input id="imageHeightInput" type="range" min="220" max="1048" step="1" value="1048" aria-label="图片最大高度" />
+                <input id="imageHeightInput" type="range" min="220" max="1048" step="1" value="1048" aria-label="图片最大高度" data-nudge="20" />
                 <output class="slider-value" for="imageHeightInput">1048</output>
               </label>
             </section>
 
-            <section class="inspector-section" aria-labelledby="themeLabel">
+            <section class="inspector-section" data-fold="theme" aria-labelledby="themeLabel">
               <h2 id="themeLabel" class="section-label">主题</h2>
               <div id="themeOptions" class="theme-grid" role="group" aria-label="主题"></div>
             </section>
 
-            <section class="inspector-section" aria-labelledby="fontLabel">
+            <section class="inspector-section" data-fold="font" aria-labelledby="fontLabel">
               <h2 id="fontLabel" class="section-label">字体</h2>
               <div class="font-row">
                 <span id="zhFontLabel" class="option-label">中文<span class="visually-hidden">字体</span></span>
@@ -489,7 +506,7 @@
 
 
             <!-- 封面：src/workspace/cover-form.js。标题取标题框，版式随主题；结尾页在正文里写 [[结尾]] -->
-            <section id="coverPanel" class="inspector-section cover-panel card-only" aria-labelledby="coverLabel">
+            <section id="coverPanel" class="inspector-section cover-panel card-only" data-fold="cover" aria-labelledby="coverLabel">
               <h2 id="coverLabel" class="section-label">封面</h2>
               <label class="check-row">
                 <input id="coverToggle" type="checkbox" />
@@ -512,7 +529,7 @@
               </div>
             </section>
 
-            <section class="inspector-section palette-section" aria-labelledby="colorLabel">
+            <section class="inspector-section palette-section" data-fold="colors" aria-labelledby="colorLabel">
               <div class="section-head">
                 <h2 id="colorLabel" class="section-label">配色</h2>
                 <button id="resetColorsBtn" class="text-button is-accent" type="button">恢复主题配色</button>
@@ -562,7 +579,7 @@
               </div>
             </section>
 
-            <section id="imagePanel" class="inspector-section image-panel" aria-labelledby="imagesLabel">
+            <section id="imagePanel" class="inspector-section image-panel" data-fold="images" aria-labelledby="imagesLabel">
               <div class="section-head">
                 <h2 id="imagesLabel" class="section-label">图片</h2>
                 <span class="image-panel-scope" data-image-scope>全部图片</span>
@@ -580,7 +597,7 @@
               <p class="section-note" data-image-hint>在预览里点一张图，单独调它的宽度、对齐与裁剪；没选中时，下面的设置可以一次用到全部图片。</p>
               <label class="slider-row" data-image-size>
                 <span class="option-label">宽度</span>
-                <input type="range" min="25" max="100" step="1" value="100" data-image-width aria-label="图片宽度（百分比）" />
+                <input type="range" min="25" max="100" step="1" value="100" data-image-width aria-label="图片宽度（百分比）" data-nudge="5" />
                 <span class="slider-value" data-image-width-value>100%</span>
               </label>
               <div class="option-row image-align-row" data-image-align-row hidden>
@@ -619,7 +636,7 @@
               </details>
             </section>
 
-            <section class="inspector-section byline" aria-labelledby="bylineLabel">
+            <section class="inspector-section byline" data-fold="byline" aria-labelledby="bylineLabel">
               <h2 id="bylineLabel" class="section-label">署名</h2>
               <div class="byline-row">
                 <label class="avatar-button" title="换头像">
@@ -849,9 +866,13 @@
                  有了对话收成一行，「快捷命令」从这一行上面弹出两组 -->
             <div id="aiPresets" class="ai-presets">
               <div class="ai-presets-bar">
-                <button id="aiPolishBtn" class="primary-button ai-polish" type="button" disabled>
+                <!-- 主按钮是「一键排版」：AI 助手主要帮着排版（只动版式、不改字）；润色全文在旁边 -->
+                <button id="aiLayoutBtn" class="primary-button ai-polish ai-layout" type="button" data-ai-preset="autoLayout" title="看每一页，按排版自检调分页、块的样式、字号行距与段距；不改措辞" disabled>
                   <svg class="icon" aria-hidden="true"><use href="#i-sparkle" /></svg>
-                  <span>一键润色全文</span>
+                  <span data-preset-label>一键排版</span>
+                </button>
+                <button id="aiPolishBtn" class="pill-button ai-polish-text" type="button" aria-label="一键润色全文" title="润色全文的措辞：改动先标在正文里，等你逐处确认" disabled>
+                  <span>润色全文</span>
                 </button>
                 <button id="aiPresetsToggle" class="pill-button ai-presets-toggle" type="button" aria-expanded="false" aria-controls="aiPresetsBody">
                   <span>快捷命令</span>
@@ -859,28 +880,29 @@
                 </button>
               </div>
               <div id="aiPresetsBody" class="ai-presets-body">
+                <!-- 排版：先看再改，用卡片上点选一块后的同一套操作（src/ai/presets.js 的 design） -->
                 <div class="ai-preset-group">
-                  <p id="aiPresetsWriting" class="ai-preset-label">改稿</p>
-                  <div class="chip-grid chip-grid-two" role="group" aria-label="快捷命令" aria-describedby="aiPresetsWriting">
-                    <button type="button" class="chip" data-ai-preset="coverTitles" disabled></button>
-                    <button type="button" class="chip" data-ai-preset="hook" disabled></button>
-                    <button type="button" class="chip" data-ai-preset="humanize" disabled></button>
+                  <p id="aiPresetsDesign" class="ai-preset-label">排版</p>
+                  <div class="chip-flow" role="group" aria-label="排版" aria-describedby="aiPresetsDesign">
+                    <button type="button" class="chip" data-ai-preset="tighten" disabled></button>
                     <button type="button" class="chip" data-ai-preset="repaginate" disabled></button>
-                    <button type="button" class="chip" data-ai-command="shorten" disabled>缩短到 800 字</button>
-                    <button type="button" class="chip" data-ai-preset="caption" disabled></button>
-                    <button type="button" class="chip" data-ai-command="tags" disabled>加话题标签</button>
-                  </div>
-                </div>
-                <!-- 设计方向：先看再改，用卡片上点选一块后的同一套操作（src/ai/presets.js 的 design） -->
-                <div class="ai-preset-group">
-                  <p id="aiPresetsDesign" class="ai-preset-label">设计方向</p>
-                  <div class="chip-grid chip-grid-three" role="group" aria-label="设计方向">
+                    <button type="button" class="chip" data-ai-preset="layout" disabled></button>
+                    <button type="button" class="chip" data-ai-preset="typeset" disabled></button>
                     <button type="button" class="chip" data-ai-preset="bolder" disabled></button>
                     <button type="button" class="chip" data-ai-preset="quieter" disabled></button>
                     <button type="button" class="chip" data-ai-preset="distill" disabled></button>
                     <button type="button" class="chip" data-ai-preset="colorize" disabled></button>
-                    <button type="button" class="chip" data-ai-preset="typeset" disabled></button>
-                    <button type="button" class="chip" data-ai-preset="layout" disabled></button>
+                  </div>
+                </div>
+                <div class="ai-preset-group">
+                  <p id="aiPresetsWriting" class="ai-preset-label">改稿</p>
+                  <div class="chip-flow" role="group" aria-label="快捷命令" aria-describedby="aiPresetsWriting">
+                    <button type="button" class="chip" data-ai-preset="coverTitles" disabled></button>
+                    <button type="button" class="chip" data-ai-preset="hook" disabled></button>
+                    <button type="button" class="chip" data-ai-preset="humanize" disabled></button>
+                    <button type="button" class="chip" data-ai-command="shorten" disabled>缩短到 800 字</button>
+                    <button type="button" class="chip" data-ai-preset="caption" disabled></button>
+                    <button type="button" class="chip" data-ai-command="tags" disabled>加话题标签</button>
                   </div>
                 </div>
               </div>
@@ -894,26 +916,27 @@
                 </button>
               </div>
               <div id="aiSelectedSkills" class="ai-skill-tags" aria-label="下一条消息的写作技能" hidden></div>
-              <div class="ai-composer-row">
-                <textarea id="aiInput" rows="2" aria-label="问 Claude" placeholder="问 Claude，或让它改稿…" title="↩ 发送，⇧↩ 换行" disabled></textarea>
+              <textarea id="aiInput" rows="2" aria-label="问 Claude" placeholder="让 Claude 排版或改稿…" title="↩ 发送，⇧↩ 换行" disabled></textarea>
+              <!-- 底栏：写作技能在左，发送 / 停止在右 -->
+              <div class="ai-composer-foot">
+                <div id="aiWritingSkills" class="ai-writing-skills" hidden>
+                  <button id="aiSkillsToggle" class="pill-button ai-skills-toggle" type="button" aria-expanded="false" aria-controls="aiSkillsPicker" title="写作技能：空输入框按 /，或 ⌘⇧K（Windows：Ctrl+Shift+K）；只用于下一条消息">写作技能</button>
+                  <div id="aiSkillsPicker" class="ai-skills-picker" role="group" aria-label="选择写作技能" hidden>
+                    <div class="ai-skills-search-row">
+                      <input id="aiSkillsSearch" type="search" aria-label="搜索写作技能" placeholder="搜索标题、文风、去 AI 味…" autocomplete="off" />
+                      <button id="aiSkillsDone" class="pill-button" type="button">完成</button>
+                    </div>
+                    <div id="aiSkillsList" class="ai-skills-list"></div>
+                    <p id="aiSkillsNote" class="ai-skills-note" role="status"></p>
+                  </div>
+                </div>
+                <span class="ai-composer-hint" aria-hidden="true">↩ 发送 · ⇧↩ 换行</span>
                 <button id="aiSendBtn" class="send-button" type="submit" aria-label="发送" title="发送" disabled>
                   <svg class="icon" aria-hidden="true"><use href="#i-send" /></svg>
                 </button>
                 <button id="aiStopBtn" class="send-button is-stop" type="button" aria-label="停止" title="停止" hidden>
                   <svg class="icon" aria-hidden="true"><use href="#i-stop" /></svg>
                 </button>
-              </div>
-              <div id="aiWritingSkills" class="ai-writing-skills" hidden>
-                <button id="aiSkillsToggle" class="pill-button ai-skills-toggle" type="button" aria-expanded="false" aria-controls="aiSkillsPicker" title="写作技能：空输入框按 /，或 ⌘⇧K（Windows：Ctrl+Shift+K）">写作技能</button>
-                <span class="ai-skills-hint">/ 选择 · 仅下一条消息</span>
-                <div id="aiSkillsPicker" class="ai-skills-picker" role="group" aria-label="选择写作技能" hidden>
-                  <div class="ai-skills-search-row">
-                    <input id="aiSkillsSearch" type="search" aria-label="搜索写作技能" placeholder="搜索标题、文风、去 AI 味…" autocomplete="off" />
-                    <button id="aiSkillsDone" class="pill-button" type="button">完成</button>
-                  </div>
-                  <div id="aiSkillsList" class="ai-skills-list"></div>
-                  <p id="aiSkillsNote" class="ai-skills-note" role="status"></p>
-                </div>
               </div>
             </form>
           </div>
@@ -1295,6 +1318,7 @@
     <script src="src/editor/editor.js"></script>
     <script src="src/editor/find.js"></script>
     <script src="src/editor/hints.js"></script>
+    <script src="src/editor/emoji.js"></script>
     <script src="src/drafts/store.js"></script>
     <script src="src/drafts/drafts.js"></script>
     <script src="src/drafts/windows.js"></script>
@@ -1344,6 +1368,8 @@
     <script src="src/workspace/cover-form.js"></script>
     <script src="src/workspace/card-css.js"></script>
     <script src="src/workspace/panels.js"></script>
+    <script src="src/workspace/sections.js"></script>
+    <script src="src/workspace/steppers.js"></script>
     <script src="src/workspace/menus.js"></script>
     <script src="src/stage/render.js"></script>
     <script src="src/stage/preview.js"></script>
