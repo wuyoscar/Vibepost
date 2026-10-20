@@ -61,7 +61,7 @@ Claude Code ──stdio（JSON-RPC）── mediacraft-mcp ──Unix 域套接�
 ```
 
 - `mediacraft-mcp` 由 Agent 启动，自己回答握手（`initialize` / `server/discover`）与 `ping`；`tools/list`、`tools/call` 经 `~/Library/Application Support/MediaCraft/mcp.sock` 交给正在运行的 App，一次一个，按收到的顺序。
-- **握手说明**（`instructions`）：一段通用说明（App 是什么、一般流程），App 开着、打开了「允许外部 Agent 连接」时后面再接上**操作手册全文**（向 App 要 `manual/get`，页面从 `src/engine/manual.js` 写出，和 [docs/manual.md](manual.md) 一样）。连不上时只有通用说明，提示用 `get_manual` 读手册——不为了握手把 App 打开，最多等 5 秒。
+- **握手说明**（`instructions`）：一段通用说明（App 是什么、一般流程），App 开着、打开了「允许外部 Agent 连接」时后面再接上**写作技能的短版**与**操作手册全文**（向 App 要 `manual/get`，页面从 `src/skills/skills.js` 写出；操作手册和 [docs/manual.md](manual.md) 一样）。连不上时只有通用说明，提示用 `get_writing_skill`、`get_manual` 读两份内置技能——不为了握手把 App 打开，最多等 5 秒。
 - **App 没开**时它先打开 App（`open -b com.wuyoscar.mediacraft`），最多等 20 秒套接字出现；打不开、等不到都在工具结果里说明原因。App 中途退出或重新打开过，下一次调用自动重连。一次调用最多等 10 分钟（导出很多实况也够），过了就断开、说明可能没做完。
 - 每个 `mediacraft-mcp` 进程（一次 Agent 会话）有自己的会话编号，每个请求都带上：App 按它记这次会话在改哪篇稿子，重连、页面重新载入都还记得。
 - 同时开着两个 Vibepost（比如 Debug 构建与装好的）时，后开的不抢先开的套接字（它不接外部 Agent，设置里也不显示开关），退出时也不删别人的。
@@ -87,8 +87,9 @@ Claude Code ──stdio（JSON-RPC）── mediacraft-mcp ──Unix 域套接�
 
 | 工具 | 做什么 |
 | --- | --- |
-| `get_manual` | 操作手册全文（Markdown）：块样式、组件、记号的写法，什么时候用哪种，排版经验（与 docs/manual.md 一样） |
-| `list_writing_manuals` | 用户的写作手册（只管写什么、什么口味）：每份一行「名字：说明」，Agent 按这篇的题材挑一份，用户点名的优先 |
+| `get_manual` | 内置技能「使用 Vibepost」，即操作手册全文（Markdown）：块样式、组件、记号的写法，什么时候用哪种，排版经验（与 docs/manual.md 一样） |
+| `get_writing_skill` | 内置技能「写作」全文（Markdown，`src/skills/写作.md`）：讲一件真事、按顺序讲、用作者自己的话、不升华，AI 腔清单，标题 / 卡片 / 小红书正文怎么写，改稿与转述的规矩。写稿、改稿之前读，每次都守 |
+| `list_writing_manuals` | 用户自己的写作手册（补充题材的口味）：每份一行「名字：说明」，Agent 按这篇的题材挑一份，用户点名的优先；和写作技能冲突时照写作技能 |
 | `read_writing_manual` | 一份写作手册的全文（开头 `name` / `description`，后面是正文 Markdown）；没有这份时回错误 |
 | `save_writing_manual` ★ | 提议新建或整份改写一份写作手册（`name`、`description`、`content`）：App 弹确认框给用户看改动（新建的看开头，修改的看 +N / −M 行与前几行），用户同意才存，拒绝时回「用户没有同意保存这份写作手册」；名字不合规矩直接回错误。不用先认定稿子，列进「外部 Agent 的操作」 |
 | `list_templates` ★ | 模板库（仓库自带的整篇示范稿与用户自己存的，`drafts.templates()`）：每套一行「名字（id）— 说明（题材 / 风格，主题）」。不用先认定稿子 |

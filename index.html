@@ -738,10 +738,16 @@
                       <p id="aiImageError" class="ai-settings-error" role="alert" hidden></p>
                       <p id="aiImageNote" class="section-note"></p>
                     </div>
-                    <!-- 写作手册：只管写什么、什么口味，App 支持目录「写作手册」文件夹里的 .md（src/ai/manuals.js）；只在 App 里有 -->
+                    <!-- 内置技能：App 自带、只读、AI 每轮都用（src/skills/skills.js），每份「查看」展开全文（src/ai/manuals.js） -->
+                    <div id="builtInSkills" class="ai-manuals" role="group" aria-labelledby="builtInSkillsTitle">
+                      <h2 id="builtInSkillsTitle" class="section-label">内置技能</h2>
+                      <p class="section-note">App 自带，AI 每一轮都照着写、照着排，不用选；只读。</p>
+                      <ul id="builtInSkillList" class="ai-manual-list"></ul>
+                    </div>
+                    <!-- 写作手册：用户自己的，补充题材的口味，App 支持目录「写作手册」文件夹里的 .md（src/ai/manuals.js）；只在 App 里有 -->
                     <div id="writingManuals" class="ai-manuals" role="group" aria-labelledby="writingManualsTitle" hidden>
                       <h2 id="writingManualsTitle" class="section-label">写作手册</h2>
-                      <p class="section-note">只管写什么、什么口味（排版的写法不归它管）。AI 按这篇的题材自己挑一份，也可以在对话里点名；用任何编辑器改文件，下一轮就用新的。</p>
+                      <p class="section-note">你自己的手册，补充某类题材的口味（新闻、菜谱、游记……）；怎么写的底线照内置的写作技能。AI 按这篇的题材自己挑，也可以在输入框的「写作手册」里点名；用任何编辑器改文件，下一轮就用新的。</p>
                       <ul id="writingManualList" class="ai-manual-list"></ul>
                       <p id="writingManualError" class="ai-settings-error" role="alert" hidden></p>
                       <button id="writingManualFolderBtn" class="pill-button" type="button" title="在 Finder 里打开写作手册的文件夹">打开文件夹</button>
@@ -915,15 +921,15 @@
                   <svg class="icon icon-small" aria-hidden="true"><use href="#i-close" /></svg>
                 </button>
               </div>
-              <div id="aiSelectedSkills" class="ai-skill-tags" aria-label="下一条消息的写作技能" hidden></div>
+              <div id="aiSelectedSkills" class="ai-skill-tags" aria-label="下一条消息的写作手册" hidden></div>
               <textarea id="aiInput" rows="2" aria-label="问 Claude" placeholder="让 Claude 排版或改稿…" title="↩ 发送，⇧↩ 换行" disabled></textarea>
-              <!-- 底栏：写作技能在左，发送 / 停止在右 -->
+              <!-- 底栏：写作手册在左，发送 / 停止在右 -->
               <div class="ai-composer-foot">
                 <div id="aiWritingSkills" class="ai-writing-skills" hidden>
-                  <button id="aiSkillsToggle" class="pill-button ai-skills-toggle" type="button" aria-expanded="false" aria-controls="aiSkillsPicker" title="写作技能：空输入框按 /，或 ⌘⇧K（Windows：Ctrl+Shift+K）；只用于下一条消息">写作技能</button>
-                  <div id="aiSkillsPicker" class="ai-skills-picker" role="group" aria-label="选择写作技能" hidden>
+                  <button id="aiSkillsToggle" class="pill-button ai-skills-toggle" type="button" aria-expanded="false" aria-controls="aiSkillsPicker" title="写作手册：空输入框按 /，或 ⌘⇧K（Windows：Ctrl+Shift+K）；只用于下一条消息。内置的写作技能每轮都在，不用选">写作手册</button>
+                  <div id="aiSkillsPicker" class="ai-skills-picker" role="group" aria-label="选择写作手册" hidden>
                     <div class="ai-skills-search-row">
-                      <input id="aiSkillsSearch" type="search" aria-label="搜索写作技能" placeholder="搜索标题、文风、去 AI 味…" autocomplete="off" />
+                      <input id="aiSkillsSearch" type="search" aria-label="搜索写作手册" placeholder="搜索手册名、说明…" autocomplete="off" />
                       <button id="aiSkillsDone" class="pill-button" type="button">完成</button>
                     </div>
                     <div id="aiSkillsList" class="ai-skills-list"></div>
@@ -1297,6 +1303,10 @@
     <script src="src/engine/colors.js"></script>
     <script src="src/engine/media.js"></script>
     <script src="src/engine/manual.js"></script>
+    <!-- 内置技能：「使用 Vibepost」（操作手册）与「写作」（src/skills/写作.md，登记表由 scripts/build-skills.mjs 生成） -->
+    <script src="src/skills/format.js"></script>
+    <script src="src/skills/index.js"></script>
+    <script src="src/skills/skills.js"></script>
     <script src="src/engine/snippets.js"></script>
     <script src="src/engine/markdown.js"></script>
     <script src="src/engine/plain-text.js"></script>

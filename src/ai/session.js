@@ -31,7 +31,10 @@
     "- 稿子里的 Vibepost 自定义标记必须原样保留，不要改写、翻译、挪动或删除。写法（中文是规范写法，英文也认，App 收下时换成中文）与排版经验：",
     "{{manual}}",
     "  完整的操作手册在当前目录的 AGENTS.md，说明被压缩、记不清时回头读它。",
-    "- 写什么、什么口味（读者、语气、结构、话题）照写作手册：目录在 AGENTS.md 末尾，全文在当前目录的 写作手册/ 里。用户本条选了技能时按各自用途配合使用；本条没有选择时按题材挑合适的手册，不自动继承历史消息的技能选择；",
+    "- 写稿、改稿、润色、起标题、写正文，每一轮都守内置的写作技能（全文在 AGENTS.md 操作手册后面的「# 写作」，动笔前读一遍）。最要紧的几条：",
+    "{{writing}}",
+    "- 用户的写作手册是题材口味的补充（新闻、菜谱、游记这类各自的读者、结构、话题）：目录在 AGENTS.md 末尾，全文在当前目录的 写作手册/ 里。",
+    "  用户本条选了手册时按各自用途配合使用；本条没有选择时按题材挑合适的，没有合适的就只照写作技能，不自动继承历史消息的选择；手册和写作技能冲突时照写作技能，除非用户本条点名要；",
     "  用户要你把这次的经验记进写作手册时，用工具 save_writing_manual 提议（用户确认才保存，直接改 写作手册/ 里的文件不会留下）。",
     "- 其余是常见 Markdown：# 标题、**加粗**、*斜体*、~~删除线~~、`代码`、> 引用、- 列表、1. 列表、表格、---。每一行在卡片上另起一行，空行分段。",
     "- 除了改文件，你还能用 Vibepost 的工具（{{tools}}）直接操作 App，马上生效，每个动作都列在会话里、用户可以撤销：",
@@ -49,9 +52,11 @@
     "  不读与这篇稿子无关的本机文件，不把本机文件、密钥或对话内容写进网址、图片地址、卡片样式或稿子；找配图只给图片本身的地址。",
   ];
   // 给这个后端的说明：App 的工具按它那边的名字写，生图照它的办法（Claude Code 用 App 的 generate_image，Codex 用自带的）
-  // 操作手册的短版（src/engine/manual.js）缩进两格，接在「自定义标记」那一条下面
+  // 两份内置技能的短版（src/skills/skills.js）缩进两格：操作手册的接在「自定义标记」那一条下面，写作的接在「写作技能」那一条下面
+  const indent = (text) => text.split("\n").map((line) => `  ${line}`).join("\n");
   const systemPrompt = (backend) => PROMPT_LINES.join("\n")
-    .replace("{{manual}}", root.MediaCraftManual.brief().split("\n").map((line) => `  ${line}`).join("\n"))
+    .replace("{{manual}}", indent(root.MediaCraftSkills.brief("使用 Vibepost")))
+    .replace("{{writing}}", indent(root.MediaCraftSkills.brief("写作")))
     .replace("{{tools}}", backend.toolNames)
     .replace("{{images}}", backend.imagePrompt);
   // 有对话却没记后端的稿子（这版之前的）都是 Claude Code
@@ -66,8 +71,9 @@
   // 密钥在哪个环境变量里
   const IMAGE_API = { provider: "openai", label: "OpenAI", model: "gpt-image-2", key: "OPENAI_API_KEY" };
 
-  const POLISH_PROMPT = "润色 draft.md 全文：改错别字、理顺不通顺的句子，不改原意和结构，保留所有自定义标记（图片、分页、字色、高亮、下划线）。直接修改 draft.md，改完用一两句话说明改了哪些地方。";
-  const REWRITE_PROMPT = "把这段改写得更通顺、更有感染力，不改原意，保留其中的自定义标记。只改这一段，直接修改 draft.md。";
+  // 一键润色与改写选中的一段：照写作技能「改别人的稿子」那一节（润色只修错字、读不通、指代不清）
+  const POLISH_PROMPT = "润色 draft.md 全文：只改错别字、读不通的句子和指代不清的地方，不换作者的词（圈内说法、中英夹杂照留），不加冒号、口癖和总结，不改原意、顺序和结构，保留所有自定义标记（图片、分页、字色、高亮、下划线）。直接修改 draft.md，改完用一两句话说明改了哪些地方。";
+  const REWRITE_PROMPT = "把这段改得读起来更顺：修错字、读不通的句子和指代不清的地方，按写作技能删掉这段里的 AI 腔，不加没有的内容和情绪，用作者自己的词，不改原意，保留其中的自定义标记。只改这一段，直接修改 draft.md。";
 
   const listeners = new Set();
   // 正在跑的一轮：稿子 id → turn；同一篇同时只有一轮，不同稿子可以同时跑
@@ -1027,8 +1033,8 @@
         title: turn.base.title,
         caption: turn.base.caption,
         systemPrompt: turn.instructions,
-        // 工作副本里的 AGENTS.md：操作手册全文（src/engine/manual.js），每轮由壳重写
-        agentsFile: root.MediaCraftManual.document(),
+        // 工作副本里的 AGENTS.md：两份内置技能的全文（操作手册在前，写作在后，src/skills/skills.js），每轮由壳重写、后面接写作手册的目录
+        agentsFile: root.MediaCraftSkills.agentsFile(),
         ...turn.backend.launch(turn, { rules: [...(sessionRules.get(turn.draftId) ?? [])] }),
       });
       if (turn.cancelRequested) await native.cancel(turn.draftId);

@@ -33,8 +33,7 @@ class AiService {
 
   async _initialize() {
     await fs.mkdir(this.temp, { recursive: true });
-    const bundled = path.resolve(__dirname, '..', '..', 'src', 'writing-manuals');
-    await require('./writing-manuals.cjs').seedWritingManuals(this.manuals, bundled);
+    await require('./writing-manuals.cjs').seedWritingManuals(this.manuals);
   }
 
   _backend(backend = 'claude') { if (!['claude', 'codex'].includes(backend)) throw failure('不认识的 AI 后端'); return backend; }
@@ -225,7 +224,7 @@ class AiService {
     const folder = path.join(turn.directory, '写作手册');
     // Remove only this draft's copy, after verifying its parent work directory.
     await fs.rm(folder, { recursive: true, force: true }); await fs.mkdir(folder);
-    const manualLines = ['## 写作手册', '', '写作手册只管题材、读者、语气与结构；排版看操作手册。用户本条选了多份技能时按用途配合使用；未选时按题材挑选，不自动继承历史消息的选择。全文在当前目录的 写作手册/。', '新建或修改手册请用 save_writing_manual 提议，经用户确认后保存。直接改工作副本里的手册不会保留。', ''];
+    const manualLines = ['## 写作手册', '', '写作手册是用户自己的，补充某类题材的口味（读者、结构、话题）；怎么写的底线照上面的写作技能，排版看操作手册。用户本条选了几份写作手册时按用途配合使用；未选时按题材挑选，不自动继承历史消息的选择；都不合适就只照写作技能，和写作技能冲突时照写作技能，除非用户本条点名要。全文在当前目录的 写作手册/。', '新建或修改手册请用 save_writing_manual 提议，经用户确认后保存。直接改工作副本里的手册不会保留。', ''];
     for (const name of await fs.readdir(this.manuals)) {
       if (!name.endsWith('.md') || name.includes('\n')) continue;
       const file = path.join(this.manuals, name), stat = await fs.lstat(file);

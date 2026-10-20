@@ -63,7 +63,7 @@ class Library {
   }
   async seed() {
     const dir = this.folder("manuals");
-    await require("./writing-manuals.cjs").seedWritingManuals(dir, path.join(this.webRoot, "src", "writing-manuals"));
+    await require("./writing-manuals.cjs").seedWritingManuals(dir);
     await fs.mkdir(this.folder("templates"), { recursive: true });
   }
   async manuals(action, input = {}) {

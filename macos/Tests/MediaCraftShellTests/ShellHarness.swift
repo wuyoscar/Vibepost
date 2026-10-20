@@ -80,7 +80,7 @@ final class ShellHarness: NSObject {
             root: aiRoot, loginShell: shellURL, cancelGrace: .milliseconds(500), exitGrace: .seconds(2), shellTimeout: shellTimeout,
             appEnvironment: appEnvironment, imageAPI: ImageAPI(openAI: imageAPI),
             keyFile: aiRoot.appendingPathComponent("test.env"),
-            // 写作手册（代替 ~/Library/Application Support/MediaCraft/写作手册）：第一次用时照 src/writing-manuals/ 建好
+            // 写作手册（代替 ~/Library/Application Support/MediaCraft/写作手册）：第一次用时建一个空文件夹（测试要手册时自己放进去，见 WritingManualsTests.seed）
             writingManuals: aiRoot.appendingPathComponent("写作手册", isDirectory: true),
             // 用户模板（代替 ~/Library/Application Support/MediaCraft/模板）：第一次存时才建
             templates: aiRoot.appendingPathComponent("模板", isDirectory: true)

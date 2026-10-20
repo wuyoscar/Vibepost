@@ -11,8 +11,8 @@ public final class MCPServer: @unchecked Sendable {
     static let supportedVersions = [currentVersion] + legacyVersions
     static let versionKey = "io.modelcontextprotocol/protocolVersion"
     static let serverInfo: [String: Any] = ["name": "mediacraft", "title": "Vibepost", "version": "1"]
-    /// 握手说明的通用部分。App 开着、允许外部 Agent 连接时，后面再接上 App 给的操作手册全文（页面从 src/engine/manual.js 写出）；
-    /// 连不上时只有这段，并提示用 get_manual 读手册（不为了握手把 App 打开）
+    /// 握手说明的通用部分。App 开着、允许外部 Agent 连接时，后面再接上 App 给的写作技能短版与操作手册全文（页面从 src/skills/skills.js 写出）；
+    /// 连不上时只有这段，并提示用 get_writing_skill、get_manual 读两份内置技能（不为了握手把 App 打开）
     static let instructions = """
         Vibepost 是用户这台 Mac 上的排版 App：把 Markdown 排成小红书图文卡片（3:4，每页 864 × 1152）或长文长图，再隔空投送到 iPhone。\
         工具操作的是 App 里正在编辑的那篇稿子，改动马上出现在用户眼前，每一步都能 ⌘Z 撤销、也列在 AI 助手的「外部 Agent 的操作」里。\
@@ -20,7 +20,8 @@ public final class MCPServer: @unchecked Sendable {
         render_pages 看每页的图、get_pages 看每页的问题，按需 insert_page_break / move_section / restyle_block 调整 → \
         export 导出或 send_to_iphone（会在 App 里弹出隔空投送，由用户选设备）。内置说明书只读，先新建稿子再改。\
         块样式、组件（:::小标签 这类）、记号（[[分页]]、{{字色:#色值|文字}} 这类）的写法与排版经验在操作手册里，用 get_manual 读全文；\
-        写什么内容、什么口味看写作手册（list_writing_manuals、read_writing_manual）。
+        写稿、改稿、润色、起标题之前用 get_writing_skill 读内置的写作技能，每次都守（讲一件真事、按顺序讲、用作者自己的话、不升华、不编）；\
+        用户自己的写作手册（list_writing_manuals、read_writing_manual）补充题材的口味。
         """
 
     private let link: AppLink

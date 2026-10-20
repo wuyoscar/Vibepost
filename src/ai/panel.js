@@ -282,7 +282,7 @@
       if (message.context) node.append(quoteNode(message.context));
       if (message.skills?.length) {
         const tags = element("div", "ai-skill-tags ai-message-skills");
-        tags.setAttribute("aria-label", "本条消息的写作技能");
+        tags.setAttribute("aria-label", "本条消息的写作手册");
         for (const { name } of message.skills) tags.append(element("span", "ai-skill-tag", name));
         node.append(tags);
       }

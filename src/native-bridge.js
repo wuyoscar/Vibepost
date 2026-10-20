@@ -257,7 +257,7 @@
       // 外部 Agent 的这次会话（session）认定了这篇：壳记着，之后它的请求交给开着这篇的窗口
       bindAgent: (session, draftId) => callJson("window/bind-agent", { session, draftId }),
     },
-    // 写作手册（只管写什么、什么口味）：App 支持目录「写作手册」文件夹里的 .md，壳在第一次用时用自带的示例建好（WritingManuals.swift）。
+    // 写作手册（只管写什么、什么口味）：App 支持目录「写作手册」文件夹里的 .md，壳在第一次用时建好空文件夹（WritingManuals.swift；App 自带的只有内置技能 src/skills/）。
     // list() → { manuals: [{ name, description }], folder }；read(name) → { name, description, content（正文）}；
     // save({ name, description, content }) 新建或整份换掉（先问过用户），名字、说明、正文不合规矩时 reject 带原因；
     // reveal(name) 在 Finder 中显示（不给 name 时打开文件夹）；open(name) 用默认的 App 打开

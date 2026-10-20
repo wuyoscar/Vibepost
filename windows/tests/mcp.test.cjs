@@ -199,8 +199,8 @@ test('queued cancellation skips mutation and ping stays responsive', async () =>
   release(); await server.close(); assert.deepEqual(calls, ['first']); assert.ok(!sent.some(message => message.id === 2));
 });
 
-test('renderer preserves the original 30 Mac tools and exposes Windows phone/motion capabilities', async () => {
-  const original = ['get_manual','list_writing_manuals','read_writing_manual','save_writing_manual','list_templates','list_drafts','get_draft','create_draft','open_draft','update_draft','set_theme','set_style','set_mode','list_palettes','apply_palette','insert_page_break','remove_page_break','move_section','restyle_block','insert_section','set_card_css','import_images','insert_image','move_image','resize_image','crop_image','get_pages','render_pages','export','send_to_iphone'];
+test('renderer preserves the original 31 Mac tools and exposes Windows phone/motion capabilities', async () => {
+  const original = ['get_manual','get_writing_skill','list_writing_manuals','read_writing_manual','save_writing_manual','list_templates','list_drafts','get_draft','create_draft','open_draft','update_draft','set_theme','set_style','set_mode','list_palettes','apply_palette','insert_page_break','remove_page_break','move_section','restyle_block','insert_section','set_card_css','import_images','insert_image','move_image','resize_image','crop_image','get_pages','render_pages','export','send_to_iphone'];
   const source = await fs.readFile(path.resolve(__dirname, '../../src/mcp/tools.js'), 'utf8');
   const dispatcher = await fs.readFile(path.resolve(__dirname, '../../src/mcp/server.js'), 'utf8');
   async function toolList(capabilities) {

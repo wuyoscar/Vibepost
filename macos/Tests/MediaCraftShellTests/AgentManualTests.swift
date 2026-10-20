@@ -85,7 +85,7 @@ struct AgentManualTests {
         client.close()
 
         let instructions = hello["instructions"] as? String ?? ""
-        #expect(instructions.contains("get_manual"))
+        #expect(instructions.contains("get_manual") && instructions.contains("get_writing_skill"), "没连上 App 时也提示读两份内置技能")
         #expect(!instructions.contains("# Vibepost 操作手册"))
         #expect(!launched.value, "握手不打开 App")
     }

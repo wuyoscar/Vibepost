@@ -4881,6 +4881,22 @@ body[data-layout-mode="article"] .card-only {
   font-size: 11px;
 }
 
+/* 内置技能的全文（「查看」展开）：只读，限高滚动 */
+.ai-skill-text {
+  max-height: 240px;
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border-radius: 7px;
+  background: var(--ui-window);
+  color: var(--ui-text);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* 正在生图：一行进度（服务、模型、张数、用时），右边「停止生成」 */
 .ai-generating {
   display: flex;

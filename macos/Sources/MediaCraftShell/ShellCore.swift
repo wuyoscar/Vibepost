@@ -154,7 +154,7 @@ public final class ShellCore {
         self.glass = glass
         self.configure = configure
         // 示例手册随网页一起（build-app.sh 把 src/ 拷进 App）
-        writingManuals = WritingManuals(folder: ai.writingManuals, examples: webRoot.appendingPathComponent("src/writing-manuals", isDirectory: true))
+        writingManuals = WritingManuals(folder: ai.writingManuals)
         templates = TemplateLibrary(folder: ai.templates)
         aiSessions = AISessions(configuration: ai, manuals: writingManuals)
         livePhotos = LivePhotos()

@@ -271,7 +271,7 @@ struct AISessionTests {
         #expect(fake.prompt(0).contains("润色") && fake.prompt(0).contains("保留所有自定义标记"))
         #expect(fake.prompt(1).contains("5 个小红书封面标题"))
         #expect(fake.prompt(2).contains("第 13–16 个字符") && fake.prompt(2).contains("公园散步") && fake.prompt(2).hasSuffix("更口语一点"))
-        #expect(fake.prompt(3).contains("第 3–6 个字符") && fake.prompt(3).contains("天气很好") && fake.prompt(3).contains("改写得更通顺"))
+        #expect(fake.prompt(3).contains("第 3–6 个字符") && fake.prompt(3).contains("天气很好") && fake.prompt(3).contains("改得读起来更顺"))
 
         let rewrite = result?["rewrite"] as? [String: String]
         #expect(rewrite?["tab"] == "true", "改写切到 AI 助手")

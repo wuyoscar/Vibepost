@@ -1,4 +1,4 @@
-// 外部 Agent（MCP）另外要的工具：操作手册与写作手册、列稿子、新建（可以照模板）、打开、写正文、配色库、从本机路径插图、出图（PNG）、导出到目录、发送到 iPhone。
+// 外部 Agent（MCP）另外要的工具：两份内置技能（操作手册、写作）与用户的写作手册、列稿子、新建（可以照模板）、打开、写正文、配色库、从本机路径插图、出图（PNG）、导出到目录、发送到 iPhone。
 // 换主题、调样式、分页、挪段落、插片段、摆图片、列模板这些直接用 AI 助手的工具（src/ai/tools.js 里标了 shared 的），分派与操作记录在 src/mcp/server.js。
 // 只经 App API（window.mediacraft）读写。本机文件只由壳碰：插图时壳按 Agent 给的路径读好、校验过交过来（request.files），
 // 导出时页面把做好的文件交给壳（MediaCraftNative.mcp.write），写进 Agent 指定、壳校验过的目录。
@@ -110,7 +110,8 @@
     return `已更新：${parts.join("、")}。${pages ? `现在排成 ${pages} 页，用 render_pages 看看效果。` : "长文模式，没有分页。"}`;
   }
 
-  // ===== 写作手册（只管写什么、什么口味；壳 WritingManuals.swift 读 App 支持目录里的文件）=====
+  // ===== 写作手册（用户自己的，补充题材的口味；壳 WritingManuals.swift 读 App 支持目录里的文件）=====
+  // 怎么写的底线是内置的写作技能（get_writing_skill，src/skills/写作.md），每次写都守
   // 新建、修改用共用的 save_writing_manual（src/ai/tools.js，要用户确认）
 
   const manualsNative = () => {
@@ -121,9 +122,9 @@
 
   async function listWritingManuals() {
     const { manuals } = await manualsNative().list();
-    if (!manuals.length) return "还没有写作手册。用户要新建时用 save_writing_manual。";
+    if (!manuals.length) return "还没有写作手册，照内置的写作技能（get_writing_skill）写就行。用户要新建时用 save_writing_manual。";
     return [
-      `共 ${manuals.length} 份写作手册（只管写什么、什么口味；按这篇的题材挑一份，用户点名的优先，用 read_writing_manual 读全文）：`,
+      `共 ${manuals.length} 份写作手册（补充题材的口味；按这篇的题材挑一份，用户点名的优先，用 read_writing_manual 读全文；怎么写的底线照 get_writing_skill）：`,
       ...manuals.map(({ name, description }) => (description ? `- ${name}：${description}` : `- ${name}`)),
     ].join("\n");
   }
@@ -257,15 +258,23 @@
       name: "get_manual",
       free: true,
       description: "Vibepost 的操作手册全文（Markdown）：块样式、组件（:::小标签、:::提示……）、记号（[[图片:编号]]、[[分页]]、{{字色:#色值|文字}}……）的写法、"
-        + "什么时候用哪种、排版经验。改稿、排版之前读一遍；只讲 App 认得的写法，写什么内容看写作手册。",
+        + "什么时候用哪种、排版经验。改稿、排版之前读一遍；只讲 App 认得的写法，怎么写内容看 get_writing_skill。",
       inputSchema: { type: "object", properties: {} },
-      run: async () => reply(root.MediaCraftManual.document()),
+      run: async () => reply(root.MediaCraftSkills.document("使用 Vibepost")),
+    },
+    {
+      name: "get_writing_skill",
+      free: true,
+      description: "Vibepost 内置的写作技能全文（Markdown）：讲一件真事、按发生的顺序讲、用作者自己的话、不升华，附 AI 腔清单、标题 / 卡片 / 小红书正文怎么写、改别人稿子与转述新闻论文的规矩、写完自查。"
+        + "写稿、改稿、润色、起标题、写正文之前读一遍，每次都守；用户的写作手册（list_writing_manuals）只是题材口味的补充，冲突时照这份，除非用户点名要。",
+      inputSchema: { type: "object", properties: {} },
+      run: async () => reply(root.MediaCraftSkills.document("写作")),
     },
     {
       name: "list_writing_manuals",
       free: true,
-      description: "列出用户的写作手册：每份一行「名字：说明」。写作手册只管写什么、什么口味（读者、语气、结构、话题），排版写法看 get_manual。"
-        + "写稿之前按这篇的题材挑一份（用户点名的优先），用 read_writing_manual 读全文照着写；都不合适就按常识写。",
+      description: "列出用户自己的写作手册：每份一行「名字：说明」。写作手册补充某类题材的口味（读者、结构、话题），怎么写的底线看 get_writing_skill，排版写法看 get_manual。"
+        + "写稿之前按这篇的题材挑一份（用户点名的优先），用 read_writing_manual 读全文配合着写；都不合适就只照写作技能。",
       inputSchema: { type: "object", properties: {} },
       run: listWritingManuals,
     },

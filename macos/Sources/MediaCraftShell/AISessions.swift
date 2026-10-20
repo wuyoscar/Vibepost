@@ -555,7 +555,7 @@ final class AISessions: @unchecked Sendable {
     }
 
     /// 工作副本：这篇稿子的常驻目录（`--resume` 要在同一个目录里），每轮开始时写进最新的卡片内容、标题与小红书正文，
-    /// 以及 `AGENTS.md`（操作手册 + 写作手册的目录；Codex 自己会读它，Claude Code 的说明书里指向它）与写作手册的拷贝（`写作手册/`）。
+    /// 以及 `AGENTS.md`（页面给的两份内置技能全文（操作手册、写作）+ 写作手册的目录；Codex 自己会读它，Claude Code 的说明书里指向它）与写作手册的拷贝（`写作手册/`）。
     /// 每轮都重写，Agent 在这一轮里改了也不留。
     private func prepareWorkCopy(for request: TurnRequest) throws -> URL {
         let directory = configuration.root.appendingPathComponent(request.draftId, isDirectory: true)
@@ -586,8 +586,8 @@ final class AISessions: @unchecked Sendable {
         var lines = [
             "## 写作手册",
             "",
-            "写作手册只管写什么、什么口味（题材、读者、语气、结构、话题），排版的写法看上面的操作手册。"
-                + "用户本条选择了多份写作技能时，按标题、文风、修订等用途配合使用；没有选择时按题材挑合适的，不自动继承之前消息的选择。都不合适就按常识写，不用硬套。全文在当前目录的 \(manualsFolder)/ 里。",
+            "写作手册是用户自己的，补充某类题材的口味（读者、结构、话题）；怎么写的底线照上面的写作技能，排版的写法看上面的操作手册。"
+                + "用户本条选了几份写作手册时按各自用途配合使用；没有选择时按题材挑合适的，不自动继承之前消息的选择。都不合适就只照写作技能，不用硬套；和写作技能冲突时照写作技能，除非用户本条点名要。全文在当前目录的 \(manualsFolder)/ 里。",
             "用户要你把这次的经验记进写作手册、或新建一份时，用工具 save_writing_manual 提议：先读原来的全文，整份改好交过去，"
                 + "App 弹确认框给用户看改动，用户同意才保存。直接改 \(manualsFolder)/ 里的文件不会保留（每轮开始时重写）。",
             "",
@@ -595,7 +595,7 @@ final class AISessions: @unchecked Sendable {
         do {
             let copied = try manuals.copy(into: folder)
             if copied.isEmpty {
-                lines.append("现在还没有写作手册（用户可以在 AI 助手 › 设置 › 写作手册里打开文件夹添加）。")
+                lines.append("现在还没有写作手册，照写作技能写就行（用户可以在 AI 助手 › 设置 › 写作手册里打开文件夹添加）。")
             }
             for manual in copied {
                 let path = "\(manualsFolder)/\(manual.file.lastPathComponent)"

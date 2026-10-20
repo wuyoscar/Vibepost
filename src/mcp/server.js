@@ -15,9 +15,9 @@
   const LOG_LIMIT = 50;
   const capabilities = root.MediaCraftNative?.capabilities;
 
-  // 工具在清单里的顺序：操作手册与写作手册、模板、稿子、样式、结构（含插片段）、图片、出图与导出
+  // 工具在清单里的顺序：内置技能（操作手册、写作）与写作手册、模板、稿子、样式、结构（含插片段）、图片、出图与导出
   const ORDER = [
-    "get_manual", "list_writing_manuals", "read_writing_manual", "save_writing_manual", "list_templates",
+    "get_manual", "get_writing_skill", "list_writing_manuals", "read_writing_manual", "save_writing_manual", "list_templates",
     "list_drafts", "get_draft", "create_draft", "open_draft", "update_draft",
     "set_theme", "set_style", "set_mode", "list_palettes", "apply_palette",
     "insert_page_break", "remove_page_break", "move_section", "restyle_block", "insert_section", "set_card_css",
@@ -128,8 +128,11 @@
       return { tools: TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) };
     }
     if (request.method === "tools/call") return callTool(request);
-    // 握手时 MCP 服务要的操作手册（接在握手说明后面，src/engine/manual.js）
-    if (request.method === "manual/get") return { text: root.MediaCraftManual.document() };
+    // 握手时 MCP 服务要的说明（接在握手说明后面）：写作技能的短版（全文用 get_writing_skill 读），再是操作手册全文（src/skills/skills.js）
+    if (request.method === "manual/get") {
+      const writing = `## 写作（内置技能，每次写稿、改稿都守；全文用 get_writing_skill 读）\n\n${root.MediaCraftSkills.brief("写作")}`;
+      return { text: `${writing}\n\n${root.MediaCraftSkills.document("使用 Vibepost")}` };
+    }
     throw new Error(`不支持 ${request.method}`);
   }
 
