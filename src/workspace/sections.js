@@ -1,5 +1,5 @@
 // 检查器「样式」的各节能收起，像 PPT 的「设置格式」窗格：点节名收起 / 展开，⌥ 点一下全部一起；
-// 收起时节名后面一行摘要（版式写尺寸与字号行距，主题写名字，配色画五个小色点……），不用滚就看得到现在是什么样。
+// 收起时节名后面一行摘要（版式写尺寸与字号行距，主题写名字，配色画五个小色点，署名是头像的小圆与名字……），不用滚就看得到现在是什么样。
 // 开合记在本机；在预览里点选一张图时「图片」那节自己展开（不改记下的开合），取消选中再收回去。
 // 节是 #stylePanel 里带 data-fold 的 <section>，节名是其中的 .section-label（可能在 .section-head 里）。
 (function (root) {
@@ -7,7 +7,7 @@
 
   const STORAGE_KEY = "mediacraft.inspector.folds.v1";
   // 没记过时：版式、主题开着，其余收起（一屏放得下）
-  const DEFAULT_FOLDED = Object.freeze(["font", "cover", "colors", "images", "byline"]);
+  const DEFAULT_FOLDED = Object.freeze(["font", "cover", "colors", "images", "cardCss", "byline"]);
 
   const $ = (selector, within = document) => within.querySelector(selector);
 
@@ -49,7 +49,24 @@
       return dots;
     },
     images: () => [text("[data-image-scope]"), text("[data-image-width-value]")].filter(Boolean).join(" · 宽度 "),
-    byline: () => $("#displayNameInput")?.value.trim() || "还没填名字",
+    cardCss() {
+      const rules = ($("#cardCssInput")?.value.match(/\{/g) ?? []).length;
+      return rules ? `${rules} 条规则` : "没有";
+    },
+    // 头像的小圆 + 名字：收着也看得出这里能换头像、填名字
+    byline() {
+      const peek = document.createElement("span");
+      peek.className = "section-peek-byline";
+      const avatar = $("#avatarPreview")?.src;
+      if (avatar) {
+        const image = document.createElement("img");
+        image.src = avatar;
+        image.alt = "";
+        peek.append(image);
+      }
+      peek.append($("#displayNameInput")?.value.trim() || "还没填名字");
+      return peek;
+    },
   };
 
   function create(panel) {
@@ -143,6 +160,9 @@
     panel.addEventListener("change", later);
     panel.addEventListener("click", later);
     new MutationObserver(later).observe(document.documentElement, { attributes: true, attributeFilter: ["data-card-theme"] });
+    // 换了头像（裁剪框关上之后才换好）：署名的摘要跟上
+    const avatar = $("#avatarPreview");
+    if (avatar) new MutationObserver(later).observe(avatar, { attributes: true, attributeFilter: ["src"] });
     root.mediacraft?.on?.("change", later);
 
     for (const entry of sections) apply(entry);
