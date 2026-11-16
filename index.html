@@ -20,6 +20,7 @@
     <link rel="stylesheet" href="src/onboarding.css" />
     <!-- 动效的共同部分：先于页面内容定下 <html data-motion>，别的脚本都能用 MediaCraftMotion -->
     <script src="src/motion.js"></script>
+    <script src="src/platform.js"></script>
   </head>
   <!--
     界面骨架（v3）。带 id 的元素和少数类名（toolbar、pop-menu、pop-menu-panel、layout-mode-switch、
@@ -174,7 +175,7 @@
           </div>
           <div id="draftList" class="draft-list" role="list"></div>
           <p id="draftSearchEmpty" class="drawer-note" hidden>没有找到这篇稿件</p>
-          <p class="drawer-note">稿件只存在这台 Mac 上，改动自动保存。</p>
+          <p class="drawer-note">稿件只存在这台电脑上，改动自动保存。</p>
         </aside>
 
         <section class="editor-pane" aria-label="编辑器">
@@ -446,7 +447,7 @@
                   <option value="1728">长页 · 1:2</option>
                 </select>
               </label>
-              <div class="segmented card-only" role="group" aria-label="排版密度" title="想多放内容，选文档排版或更长的页面；超出一页仍会自动分页。整篇不分页可用顶部「长文」。">
+              <div class="segmented segmented-fill card-only" role="group" aria-label="排版密度" title="想多放内容，选文档排版或更长的页面；超出一页仍会自动分页。整篇不分页可用顶部「长文」。">
                 <button type="button" data-density="card">大字卡片</button>
                 <button type="button" data-density="reading">舒适阅读</button>
                 <button type="button" data-density="document">文档排版</button>
@@ -744,13 +745,13 @@
                       <p class="section-note">App 自带，AI 每一轮都照着写、照着排，不用选；只读。</p>
                       <ul id="builtInSkillList" class="ai-manual-list"></ul>
                     </div>
-                    <!-- 写作手册：用户自己的，补充题材的口味，App 支持目录「写作手册」文件夹里的 .md（src/ai/manuals.js）；只在 App 里有 -->
-                    <div id="writingManuals" class="ai-manuals" role="group" aria-labelledby="writingManualsTitle" hidden>
+                    <!-- 写作手册：补充题材的口味。内置的几份（src/skills/手册/）只读、可「复制一份来改」；你自己的是 App 支持目录「写作手册」文件夹里的 .md（src/ai/manuals.js） -->
+                    <div id="writingManuals" class="ai-manuals" role="group" aria-labelledby="writingManualsTitle">
                       <h2 id="writingManualsTitle" class="section-label">写作手册</h2>
-                      <p class="section-note">你自己的手册，补充某类题材的口味（新闻、菜谱、游记……）；怎么写的底线照内置的写作技能。AI 按这篇的题材自己挑，也可以在输入框的「写作手册」里点名；用任何编辑器改文件，下一轮就用新的。</p>
+                      <p class="section-note">补充某类题材的口味（经验分享、教程、测评、论文解读……），怎么写的底线照内置的写作技能。AI 按这篇的题材自己挑，也可以在输入框的「写作手册」里点名。标「内置」的是 App 自带的，点「复制一份来改」就成了你自己的；自己的手册用任何编辑器改，下一轮就用新的。</p>
                       <ul id="writingManualList" class="ai-manual-list"></ul>
                       <p id="writingManualError" class="ai-settings-error" role="alert" hidden></p>
-                      <button id="writingManualFolderBtn" class="pill-button" type="button" title="在 Finder 里打开写作手册的文件夹">打开文件夹</button>
+                      <button id="writingManualFolderBtn" class="pill-button" type="button" title="在 Finder 里打开写作手册的文件夹" hidden>打开文件夹</button>
                     </div>
                     <!-- 外部 Agent（MCP）：终端里的 Claude Code 等经 mediacraft-mcp 操作 App（src/mcp/panel.js）；只在 App 里有 -->
                     <div id="mcpSettings" class="mcp-settings" role="group" aria-labelledby="mcpSettingsTitle" hidden>
@@ -909,6 +910,7 @@
                     <button type="button" class="chip" data-ai-command="shorten" disabled>缩短到 800 字</button>
                     <button type="button" class="chip" data-ai-preset="caption" disabled></button>
                     <button type="button" class="chip" data-ai-command="tags" disabled>加话题标签</button>
+                    <button type="button" class="chip" data-ai-preset="saveManual" title="把这篇的写法提炼成一份你自己的写作手册（保存前给你确认），以后同类的稿子照它写" disabled></button>
                   </div>
                 </div>
               </div>
@@ -925,7 +927,7 @@
               <textarea id="aiInput" rows="2" aria-label="问 Claude" placeholder="让 Claude 排版或改稿…" title="↩ 发送，⇧↩ 换行" disabled></textarea>
               <!-- 底栏：写作手册在左，发送 / 停止在右 -->
               <div class="ai-composer-foot">
-                <div id="aiWritingSkills" class="ai-writing-skills" hidden>
+                <div id="aiWritingSkills" class="ai-writing-skills">
                   <button id="aiSkillsToggle" class="pill-button ai-skills-toggle" type="button" aria-expanded="false" aria-controls="aiSkillsPicker" title="写作手册：空输入框按 /，或 ⌘⇧K（Windows：Ctrl+Shift+K）；只用于下一条消息。内置的写作技能每轮都在，不用选">写作手册</button>
                   <div id="aiSkillsPicker" class="ai-skills-picker" role="group" aria-label="选择写作手册" hidden>
                     <div class="ai-skills-search-row">
@@ -1303,7 +1305,7 @@
     <script src="src/engine/colors.js"></script>
     <script src="src/engine/media.js"></script>
     <script src="src/engine/manual.js"></script>
-    <!-- 内置技能：「使用 Vibepost」（操作手册）与「写作」（src/skills/写作.md，登记表由 scripts/build-skills.mjs 生成） -->
+    <!-- 内置技能：「使用 Vibepost」（操作手册）与「写作」（src/skills/写作.md）；内置写作手册（src/skills/手册/）；登记表由 scripts/build-skills.mjs 生成 -->
     <script src="src/skills/format.js"></script>
     <script src="src/skills/index.js"></script>
     <script src="src/skills/skills.js"></script>

@@ -222,7 +222,7 @@
     if (versions.has(message.turn)) {
       const revert = button("text-button ai-revert", "撤回到这一轮之前", () => run(async () => {
         await ai.api.versions.revert(message.turn);
-        appStatus.textContent = "已撤回到这一轮之前，⌘Z 可以撤销这次撤回";
+        appStatus.textContent = root.MediaCraftPlatform.keys("已撤回到这一轮之前，⌘Z 可以撤销这次撤回");
       }), "正文、标题、主题配色、字体版式与图片都换回这一轮开始前的样子");
       revert.disabled = ai.running(draft.id);
       node.append(revert);
@@ -763,7 +763,7 @@
     option.append(element("span", "ai-title-text", text), count);
     option.addEventListener("click", () => run(async () => {
       await ai.api.useTitle(text);
-      appStatus.textContent = `标题换成了「${text}」，⌘Z 可以撤销`;
+      appStatus.textContent = `标题换成了「${text}」，${root.MediaCraftPlatform.keys("⌘Z")} 可以撤销`;
     }));
     return option;
   }
@@ -916,7 +916,7 @@
       return;
     }
     await ai.api.useTitle(text);
-    appStatus.textContent = `标题改成了「${text}」，⌘Z 可以撤销`;
+    appStatus.textContent = `标题改成了「${text}」，${root.MediaCraftPlatform.keys("⌘Z")} 可以撤销`;
   }
 
   sessionTitle.addEventListener("keydown", (event) => {

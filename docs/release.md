@@ -5,7 +5,7 @@
 ## 步骤
 
 1. 改仓库根目录的 `VERSION`（只写在这里；`build-app.sh` 把它写进 App 的 Info.plist）。
-2. 跑全量测试：`caffeinate -dimu macos/run-tests.sh`（约 36 分钟；不防睡眠的话显示器一睡，测试会被节流到超时）。
+2. 跑全量测试：`caffeinate -dimu macos/run-tests.sh 3600`（约 36 分钟，默认的 300 秒超时不够；不防睡眠的话显示器一睡，测试会被节流到超时）。
 3. 打 DMG：`scripts/make-dmg.sh`（有 Developer ID 时加 `--sign` / `--notarize`，见脚本开头）。得到
    - `dist/Vibepost-<版本>.dmg`
    - `dist/Vibepost-<版本>.dmg.sha256`

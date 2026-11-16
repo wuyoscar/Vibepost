@@ -4,7 +4,8 @@ import Testing
 @testable import MediaCraftShell
 
 /// 写作手册：用户自己的，补充题材的口味，每份一个 .md（开头 name / description，后面是正文），放在支持目录的「写作手册」文件夹
-/// （测试里是 aiRoot/写作手册）。App 不自带手册（内置的写作技能在 src/skills/，见 SkillsTests）：第一次用时只建空文件夹，里面的文件从不删、不补；
+/// （测试里是 aiRoot/写作手册）。App 不往这个文件夹里放东西（内置的写作技能和几份内置题材手册在 src/skills/，随 App 走）：第一次用时只建空文件夹，里面的文件从不删、不补；
+/// 内置的题材手册和用户的列在一起，标着「内置」，「复制一份来改」存成同名的用户手册，之后用用户那份；
 /// AI 设置里列出，「打开」「在 Finder 中显示」「打开文件夹」交给系统（harness 只记下来）；App 里的 AI 每轮在工作副本里拿到拷贝与
 /// AGENTS.md 末尾的目录；save_writing_manual 弹确认框，用户同意才存；外部 Agent 经 MCP 列出、读取、提议保存。
 /// 测试用的手册是这里自己放进去的（`seed`）。
@@ -57,8 +58,11 @@ struct WritingManualsTests {
           }
           throw new Error(`等不到：${condition}`);
         };
-        const rows = () => [...document.querySelectorAll("#writingManualList > li")]
-          .map((row) => [row.querySelector(".ai-manual-name")?.textContent ?? "", row.querySelector(".ai-manual-description")?.textContent ?? row.textContent]);
+        // 写作手册一节里的行：[名字, 说明, 标记（内置 / 已定制 / 空）]；rows() 只要用户自己的，builtInRows() 只要内置的
+        const allRows = () => [...document.querySelectorAll("#writingManualList > li")]
+          .map((row) => [row.getAttribute("aria-label"), row.querySelector(".ai-manual-description")?.textContent ?? row.textContent, row.querySelector(".ai-manual-badge")?.textContent ?? ""]);
+        const rows = () => allRows().filter((row) => row[2] !== "内置").map(([name, description]) => [name, description]);
+        const builtInRows = () => allRows().filter((row) => row[2] === "内置");
     """
 
     @Test("第一次用时只建空文件夹（App 不自带写作手册）；AI 设置里先列两个内置技能（只读，「查看」展开全文），再列用户的写作手册（名字与说明），每次打开设置重新读；「打开」「在 Finder 中显示」「打开文件夹」交给系统")
@@ -71,17 +75,25 @@ struct WritingManualsTests {
             await mc.drafts.create();
             ui.click("AI 助手");
             ui.expand("AI 设置");
-            await until(() => rows().length === 1 && document.querySelector("#writingManualList .ai-manual-empty"));
+            await until(() => builtInRows().length === 4);
             const builtIn = [...document.querySelectorAll("#builtInSkillList > li")]
               .map((row) => [row.querySelector(".ai-manual-name").textContent, row.querySelector(".ai-manual-description").textContent]);
             ui.click("查看", { within: "写作" });
             const shown = document.querySelector('[aria-label="「写作」全文"]');
-            const text = shown.hidden ? null : shown.textContent;
+            await until(() => !shown.hidden);
+            const text = shown.textContent;
             ui.click("收起", { within: "写作" });
+            await until(() => shown.hidden);
+            // 内置写作手册：「查看」展开的是那一份的全文
+            ui.click("查看", { within: "教程攻略" });
+            const guide = document.querySelector('[aria-label="「教程攻略」全文"]');
+            await until(() => !guide.hidden);
             return {
+              own: rows(), manuals: builtInRows(), guide: guide.textContent,
+              guideExpected: window.MediaCraftManualRegistry.find((item) => item.name === "教程攻略").markdown,
+              manualButtons: [...document.querySelectorAll('#writingManualList [aria-label="经验分享"] button')].map((button) => button.textContent),
               builtIn, text, expected: window.MediaCraftSkills.document("写作"), hiddenAgain: shown.hidden,
               buttons: [...document.querySelectorAll("#builtInSkillList button")].map((button) => button.textContent),
-              note: document.querySelector("#writingManualList .ai-manual-empty").textContent,
             };
         """) as? [String: Any]
         let createdAfterUse = Self.files(in: folder)
@@ -130,7 +142,11 @@ struct WritingManualsTests {
         #expect(empty?["text"] as? String == empty?["expected"] as? String && (empty?["text"] as? String)?.hasPrefix("# 写作") == true, "「查看」展开的是写作技能全文")
         #expect(empty?["hiddenAgain"] as? Bool == true, "「收起」收回去")
         #expect(empty?["buttons"] as? [String] == ["查看", "查看"], "内置技能只读：只有「查看」")
-        #expect((empty?["note"] as? String)?.contains("还没有写作手册") == true)
+        #expect((empty?["own"] as? [[String]])?.isEmpty == true, "用户自己的还没有")
+        let builtInManuals = empty?["manuals"] as? [[String]] ?? []
+        #expect(builtInManuals.map { $0.first ?? "" } == ["经验分享", "教程攻略", "测评种草", "论文与技术解读"], "内置的四份题材手册标着「内置」列在后面：\(builtInManuals)")
+        #expect(empty?["guide"] as? String == empty?["guideExpected"] as? String && (empty?["guide"] as? String)?.hasPrefix("# 教程攻略") == true)
+        #expect(empty?["manualButtons"] as? [String] == ["查看", "复制一份来改"])
         #expect(first?["visible"] as? Bool == true)
         let listed = first?["rows"] as? [[String]] ?? []
         #expect(listed.map { $0.first ?? "" } == Self.names, "按名字排：\(listed)")
@@ -141,6 +157,78 @@ struct WritingManualsTests {
             [name, name == "我的手册" ? "（没有说明）" : try Self.example(name).description]
         }
         #expect(second == expectedSecond, "\(second ?? [])")
+        #expect(harness.pageErrors == [])
+    }
+
+    @Test("内置写作手册「复制一份来改」：存成同名的用户手册并打开，之后列出、读到、AI 拿到的都是用户改过的那份（AGENTS.md 里不再列内置的那份）；删掉文件就回到内置的；输入框里点名内置手册，全文随这条消息发出")
+    func customizeBuiltInManual() async throws {
+        let fake = try FakeClaude(script: StreamJSON.reply(["好的。"]))
+        defer { fake.remove() }
+        let harness = ShellHarness(terminalPath: [fake.directory], onboarding: false)
+        let folder = harness.aiRoot.appendingPathComponent("写作手册")
+        try await harness.load()
+        let before = try await harness.evaluate(AIReviewTests.helpers + Self.listScript.replacingOccurrences(of: "const mc = window.mediacraft;", with: "").replacingOccurrences(of: "const until = async", with: "const untilListed = async") + """
+            const draft = await mc.drafts.create({ markdown: "原来的一段" });
+            await openAI();
+            ui.expand("AI 设置");
+            await until(() => builtInRows().length === 4);
+            ui.click("复制一份来改", { within: "经验分享" });
+            await until(() => rows().length === 1 && builtInRows().length === 3);
+            const listed = allRows();
+            ui.click("AI 设置");
+            const library = window.MediaCraftManualLibrary;
+            return { id: draft.id, listed, read: await library.read("经验分享"), original: window.MediaCraftManualRegistry.find((item) => item.name === "经验分享") };
+        """) as? [String: Any]
+        try await Self.waitFor { harness.openedFiles.count == 1 }
+        let file = folder.appendingPathComponent("经验分享.md")
+        let copied = (try? String(contentsOf: file, encoding: .utf8)) ?? ""
+        let opened = harness.openedFiles.map { $0.resolvingSymlinksInPath().path }
+
+        // 用户改了自己的这份：读到的、AI 这一轮拿到的都是改过的
+        try "---\nname: 经验分享\ndescription: 我自己的经验帖：先说花了多少钱\n---\n\n# 经验分享\n\n先说花了多少钱。\n".write(to: file, atomically: true, encoding: .utf8)
+        let mine = try await harness.evaluate(AIReviewTests.helpers + """
+            const read = await window.MediaCraftManualLibrary.read("经验分享");
+            // 输入框里点名一份内置的：全文随这条消息发出
+            document.getElementById("aiSkillsToggle").click();
+            await until(() => document.querySelectorAll("#aiSkillsList input").length === 4);
+            const details = [...document.querySelectorAll("#aiSkillsList label")].map((label) => label.textContent);
+            [...document.querySelectorAll("#aiSkillsList input")].find((node) => node.value === "教程攻略").click();
+            document.getElementById("aiSkillsDone").click();
+            ask("写一篇");
+            await until(() => finished(1));
+            return { read, details };
+        """) as? [String: Any]
+        let id = before?["id"] as? String ?? ""
+        let work = harness.aiRoot.appendingPathComponent(id)
+        let agents = (try? String(contentsOf: work.appendingPathComponent("AGENTS.md"), encoding: .utf8)) ?? ""
+        let copies = Self.files(in: work.appendingPathComponent("写作手册"))
+        let prompt = fake.prompt(0)
+
+        // 删掉文件：回到内置的
+        try FileManager.default.removeItem(at: file)
+        let restored = try await harness.evaluate("""
+            const library = window.MediaCraftManualLibrary;
+            return { list: (await library.list()).manuals, read: await library.read("经验分享") };
+        """) as? [String: Any]
+        await harness.tearDown()
+
+        let original = before?["original"] as? [String: Any]
+        let listed = before?["listed"] as? [[String]] ?? []
+        #expect(listed.map { [$0[0], $0[2]] } == [["经验分享", "已定制"], ["教程攻略", "内置"], ["测评种草", "内置"], ["论文与技术解读", "内置"]], "\(listed)")
+        #expect(WritingManuals.parse(copied, fallbackName: "").body.trimmingCharacters(in: .newlines) == (original?["markdown"] as? String)?.trimmingCharacters(in: .newlines), "存下来的就是内置那份的全文")
+        #expect(WritingManuals.parse(copied, fallbackName: "").description == original?["description"] as? String)
+        #expect(opened == [file.resolvingSymlinksInPath().path], "复制完用默认的 App 打开它")
+        #expect((before?["read"] as? [String: Any])?["builtIn"] as? Bool == false, "复制以后读到的是用户那份")
+        #expect((mine?["read"] as? [String: Any])?["content"] as? String == "# 经验分享\n\n先说花了多少钱。\n")
+        let details = mine?["details"] as? [String] ?? []
+        #expect(details.filter { $0.contains("内置 · ") }.count == 3 && details.first?.hasPrefix("经验分享我自己的经验帖") == true, "输入框的菜单里内置的标着「内置」：\(details)")
+        #expect(copies["经验分享.md"]?.contains("先说花了多少钱") == true, "用户那份拷进工作副本")
+        #expect(agents.contains("# 内置写作手册") && agents.contains("\n## 教程攻略\n") && !agents.contains("\n## 经验分享\n"), "AGENTS.md 里内置的只剩没被盖住的三份")
+        #expect(agents.contains("- 经验分享：我自己的经验帖：先说花了多少钱（写作手册/经验分享.md）"))
+        #expect(prompt.contains("【写作手册：教程攻略】") && prompt.contains("读者会一边看一边照着做"), "点名的内置手册全文随消息发出：\(prompt.prefix(200))")
+        let restoredList = restored?["list"] as? [[String: Any]] ?? []
+        #expect(restoredList.map { $0["name"] as? String ?? "" } == ["经验分享", "教程攻略", "测评种草", "论文与技术解读"] && restoredList.allSatisfy { $0["builtIn"] as? Bool == true })
+        #expect((restored?["read"] as? [String: Any])?["builtIn"] as? Bool == true && (restored?["read"] as? [String: Any])?["content"] as? String == original?["markdown"] as? String, "删掉文件就回到内置的")
         #expect(harness.pageErrors == [])
     }
 
@@ -186,7 +274,14 @@ struct WritingManualsTests {
         #expect(copiesAfterFirst["露营.md"] == Self.fixtures["露营.md"] && copiesAfterFirst.count == Self.names.count)
         #expect(userFolder["菜谱.md"] == Self.fixtures["菜谱.md"], "用户的写作手册没被 Agent 改到")
         #expect(agentsAfterFirst.hasPrefix(manual), "AGENTS.md 先是操作手册全文")
-        #expect(agentsAfterFirst.contains("\n\n" + writing.trimmingCharacters(in: .newlines) + "\n\n## 写作手册"), "操作手册后面是写作技能全文，再后面是写作手册的目录")
+        #expect(agentsAfterFirst.contains("\n\n" + writing.trimmingCharacters(in: .newlines) + "\n\n# 内置写作手册\n\n"), "操作手册后面是写作技能全文，再后面是内置写作手册")
+        let builtInAt = agentsAfterFirst.range(of: "\n# 内置写作手册\n")?.lowerBound
+        let ownAt = agentsAfterFirst.range(of: "\n## 写作手册\n")?.lowerBound
+        #expect(builtInAt != nil && ownAt != nil && builtInAt! < ownAt!, "内置写作手册的全文在前，用户写作手册的目录在最后")
+        for name in ["经验分享", "教程攻略", "测评种草", "论文与技术解读"] {
+            #expect(agentsAfterFirst.contains("\n## \(name)\n"), "AGENTS.md 里有内置手册「\(name)」的全文")
+        }
+        #expect(agentsAfterFirst.contains("### 这类稿子容易出的毛病"), "内置手册的小节降了一级")
         #expect(agentsAfterFirst.contains("- 菜谱：家常菜谱：用料、步骤、火候（写作手册/菜谱.md）"), "\(agentsAfterFirst.suffix(600))")
         #expect(agentsAfterFirst.contains("- 露营：") && agentsAfterFirst.contains("- 标题打磨："))
         #expect(agentsAfterFirst.contains("save_writing_manual") && agentsAfterFirst.contains("照写作技能"))
@@ -289,7 +384,8 @@ struct WritingManualsTests {
 
         let titles = try Self.example("标题打磨")
         let recipe = try Self.example("菜谱")
-        #expect(!list.isError && list.text.hasPrefix("共 \(Self.names.count) 份写作手册"), "\(list.text)")
+        #expect(!list.isError && list.text.hasPrefix("共 \(Self.names.count + 4) 份写作手册"), "\(list.text)")
+        #expect(list.text.contains("- 经验分享（内置）：") && list.text.contains("- 论文与技术解读（内置）："), "内置的题材手册也列出来，标着（内置）")
         #expect(list.text.contains("- 标题打磨：\(titles.description)") && list.text.contains("- 菜谱：\(recipe.description)") && list.text.contains("- 露营：") && list.text.contains("get_writing_skill"))
         #expect(!read.isError && read.text == "---\nname: 标题打磨\ndescription: \(titles.description)\n---\n\n\(titles.body)", "\(read.text.prefix(120))")
         #expect(missing.isError && missing.text.contains("没有这份写作手册"), "\(missing.text)")
@@ -335,7 +431,7 @@ struct WritingManualsTests {
             await openAI();
             const input = document.getElementById('aiInput');
             input.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true, cancelable: true }));
-            await until(() => document.querySelectorAll('#aiSkillsList input').length === 3);
+            await until(() => document.querySelectorAll('#aiSkillsList input').length === 7);
             for (const name of ['标题打磨', '菜谱']) {
               [...document.querySelectorAll('#aiSkillsList input')].find(node => node.value === name).click();
             }
@@ -352,7 +448,7 @@ struct WritingManualsTests {
             ask('解释一下');
             await until(() => finished(2));
             document.getElementById('aiInput').dispatchEvent(new KeyboardEvent('keydown', { key: 'K', metaKey: true, shiftKey: true, bubbles: true, cancelable: true }));
-            await until(() => !document.getElementById('aiSkillsPicker').hidden && document.querySelectorAll('#aiSkillsList input').length === 3);
+            await until(() => !document.getElementById('aiSkillsPicker').hidden && document.querySelectorAll('#aiSkillsList input').length === 7);
             [...document.querySelectorAll('#aiSkillsList input')].find(n => n.value === '标题打磨').click();
             document.getElementById('aiSkillsDone').click();
             preset('封面标题 5 选 1');
@@ -384,7 +480,7 @@ struct WritingManualsTests {
             await mc.drafts.create({ markdown: "正文" });
             await openAI();
             document.getElementById('aiSkillsToggle').click();
-            await until(() => document.querySelectorAll('#aiSkillsList input').length === 3);
+            await until(() => document.querySelectorAll('#aiSkillsList input').length === 7);
             [...document.querySelectorAll('#aiSkillsList input')].find(n => n.value === '标题打磨').click();
             document.getElementById('aiSkillsDone').click();
         """)

@@ -144,9 +144,17 @@
     return null;
   }
 
-  // 和 [start, end] 相交的、能换样式的顶层块（光标只在一处时是它所在的那一块）
-  function blocksIn(text, [start, end]) {
-    return list(text).filter((block) => styleOf(block) && block.source[0] <= Math.max(start, end - 1) && start < Math.max(block.source[1], block.source[0] + 1));
+  // [start, end] 碰不碰得到这一块。光标只在一处时按整行算：停在这一块最后一行的行尾（刚打完字就在那儿）也算在里面；
+  // 选了一段文字时要真的选到这一块里的字
+  function covers(text, block, [start, end]) {
+    const last = Math.max(block.source[1], block.source[0] + 1);
+    if (start === end) return lineStart(text, block.source[0]) <= start && start <= lineEnd(text, last - 1);
+    return block.source[0] <= end - 1 && start < last;
+  }
+
+  // 和 [start, end] 相交的、能换样式的顶层块（光标只在一处时是它所在的那一块）；blocks 是已经解析好的（list(text)），省得再解析
+  function blocksIn(text, range, blocks = list(text)) {
+    return blocks.filter((block) => styleOf(block) && covers(text, block, range));
   }
 
   // 编辑器左上角的「样式」：选区里的几块都换成 style（和卡片上的「换样式」同一个 setStyle）；从后往前换，前面的位置不受影响。没变化时为 null

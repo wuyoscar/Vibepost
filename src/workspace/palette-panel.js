@@ -118,7 +118,7 @@
         // 套用后稿子存盘会发 change，下面跟着标出现在用的这一组
         mc.palettes.apply(palette.id)
           .then(() => {
-            status.textContent = `已套用配色「${palette.name}」，⌘Z 可以撤回`;
+            status.textContent = `已套用配色「${palette.name}」，${window.MediaCraftPlatform.keys("⌘Z")} 可以撤回`;
           })
           .catch(report);
       });
@@ -538,7 +538,7 @@
       try {
         await mc.palettes.apply(chosenColors());
         state.applied = true;
-        status.textContent = "已应用色轮配出的配色，⌘Z 可以撤回";
+        status.textContent = window.MediaCraftPlatform.keys("已应用色轮配出的配色，⌘Z 可以撤回");
       } catch (error) {
         report(error);
       }

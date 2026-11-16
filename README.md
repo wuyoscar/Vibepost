@@ -4,22 +4,46 @@
 
 <h1 align="center">Vibepost</h1>
 
-<p align="center">在 Mac/Windows 上用 Markdown 写小红书：排成 3:4 图文卡片、长文长图和实况照片，Mac按页序隔空投送到 iPhone</p>
+<p align="center">用 Markdown 写小红书的桌面 App：把稿子排成 3:4 图文卡片、长文长图和实况照片。Mac 上按页序隔空投送到 iPhone，Windows 上手机扫码接收。</p>
 
 <p align="center">
   <a href="https://github.com/wuyoscar/Vibepost/releases">下载</a> ·
+  <a href="#怎么用">怎么用</a> ·
   <a href="#从源码构建">从源码构建</a> ·
   <a href="#english">English</a>
 </p>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/app.png" />
-  <img src="docs/screenshots/app-light.png" alt="Vibepost 主界面：左边写稿，中间是排好的卡片，右边是主题与样式" />
-</picture>
+<p align="center">
+  <img src="docs/screenshots/demo-write.webp" alt="在左边的编辑器里打字，中间的卡片跟着排好：先是小标题「出发前准备」，再是三条编号列表" width="100%" />
+</p>
 
-写一篇小红书图文，花时间的常常不是写，而是排版、切图、导出、传到手机。Vibepost 把这几步收进一个 Mac App：左边像写文档一样写 Markdown，中间实时排出卡片，挑好主题，点「发送到 iPhone」，整组图片按页序隔空投送到手机，图片下面那段正文进剪贴板，打开 App 粘贴就能发。
+Vibepost 是一个在本机排版的工具，有 Mac 和 Windows 两个版本。左边像写文档一样写 Markdown，中间实时排成一张张卡片，右边换主题、调样式。写完点「发送到 iPhone」，整组图片按页序隔空投送到手机，图片下面那段正文同时进剪贴板，打开小红书粘贴就能发。
 
-稿子只存在你的 Mac 上，没有账号，不上传。
+稿子只存在你的电脑上，没有账号，不上传。
+
+## 怎么用
+
+[演示视频](docs/screenshots/vibepost.mp4)（84 秒）是一篇稿子从写完到发出去的全过程：你写字，本机的 Agent 排版、配图，你确认。[教程视频](docs/screenshots/tutorial.mp4)先讲基础功能，再演几个常见的用法。一篇笔记从写到发是五步：
+
+1. **写**：点稿件栏的 + 开一篇空白稿子，或点「从模板新建」挑一套写好的改。在左边打字，`#` 是标题，`1.` 是列表，行首输入 `/` 插图片、分页和组件。
+2. **排**：右边「样式」里点一个主题，卡片结构、配色和字体一起换；字号、行距、封面在下面调。
+3. **改**：想让 AI 帮忙，点「AI 助手」里的「一键排版」或「润色全文」，改动标在正文里，逐处接受或拒绝。这一步可以不用。
+4. **查**：页脚的「检查」标出极限词、联系方式和太长的标题；顶栏的「手机预览」看它在手机上的样子。
+5. **发**：点「发送到 iPhone」，在隔空投送里选自己的手机。图片按页序到相册，正文在剪贴板里。Windows 上是「发送到手机」，手机扫码接收。
+
+### 常见的用法
+
+AI 助手用的是你电脑上的 Codex 或 Claude Code，每篇稿子选一个。下面几件事都在「AI 助手」里做：
+
+- **稿子写好了，让 AI 收拾一下**：点「一键润色全文」，它只修错字、读不通和指代不清的地方，改动逐处给你确认；再点「一键排版」，它看过每一页以后调分页、块的样式和间距，不改字。
+- **手上有一篇现成的长文**：整篇贴进对话框，说一句「排成小红书图文」。它分页、起标题、把稿子里的照片放到说到它们的地方，再写好图片下面那段小红书正文。
+- **还没有稿子**：说一句想写什么方向，比如「看看最近一周 AI safety 有什么新论文，挑一条写成图文」。用 Claude Code 时它会联网找（联网之前先问你），找到出处以后写成一篇。
+- **照你的口味写**：输入框旁的「写作手册」可以点名一份题材手册。内置四份（经验分享、教程攻略、测评种草、论文与技术解读），在 AI 设置里点「复制一份来改」就成了你自己的；也可以点快捷命令「存成我的写作手册」，让 AI 把一篇你满意的稿子的写法提炼成一份新手册，保存前给你确认。
+- **在终端里用**：打开 AI 设置里的「外部 Agent（MCP）」，终端里的 Claude Code 等 Agent 就能连进来新建稿子、排版、换主题，做了什么都记在 App 里。接入见 [docs/mcp.md](docs/mcp.md)。
+
+<p align="center">
+  <img src="docs/screenshots/demo-themes.webp" alt="在主题面板里依次点杂志、撞色、纯黑、清新，同一篇稿子的卡片换成对应的结构和配色" width="100%" />
+</p>
 
 ## 功能
 
@@ -53,7 +77,7 @@
 
 - **AI 助手**：用你 Mac 上已经装好的 Codex 或 Claude Code（沿用它们自己的登录、技能、MCP 和权限规则），每篇稿子一个会话，各自选后端、模型与推理强度，聊过的稿子都在会话历史里；顶上的「+」新建一篇在新窗口里直接开聊。主按钮是「一键排版」：它看每一页，调分页、块的样式、字号行距与段距，不改你的字；排版一组还有收紧留白、按要点重新分页、理版式、调字等。也可以润色全文、出 5 个封面标题、写首图文案、去 AI 味、按要点重新分页、写小红书正文、换主题、找配图或生图。改动在编辑器里逐处标出，一处一处接受或拒绝；每一轮之前自动存一个版本，随时撤回；要授权的操作先在 App 里问你。
 - **两个内置技能，每轮都用**：「写作」教 AI 像真人一样讲自己的事——素材不够先问、不编，从一个具体时刻开头，按发生的顺序讲，先证据后判断，不升华，用作者自己的词，附一份具体的 AI 腔清单（[src/skills/写作.md](src/skills/写作.md)）；「使用 Vibepost」就是操作手册（App 认哪些样式、记号，什么时候用哪种，排版经验）。两份的短版写进每轮的说明书，全文写进 Agent 工作副本的 `AGENTS.md`，外部 Agent 用 `get_writing_skill` / `get_manual` 读。AI 设置里能查看，只读。来由见 [写作技能](docs/writing-skills.md)。
-- **你自己的写作手册**：`~/Library/Application Support/MediaCraft/写作手册/` 里的 Markdown 文件，补充某类题材的口味（新闻、菜谱、游记……），App 不自带、也从不删。AI 按篇挑；也可以在输入框旁点「写作手册」或在空输入框按 `/` 点名几份，只随下一条消息发送。Agent 想记经验要经你确认才能改。排完版每页有自检（只有标题、太空、偏挤、溢出），Agent 在 `get_pages` 里看到，你在发布检查里看到。
+- **写作手册**：补充某类题材的口味。App 内置四份（经验分享、教程攻略、测评种草、论文与技术解读），AI 按这篇的题材自己挑，也可以在输入框的「写作手册」里点名。想改成自己的，在 AI 设置里点「复制一份来改」；也可以让 AI 把一篇写好的稿子「存成我的写作手册」，或自己往 `~/Library/Application Support/MediaCraft/写作手册/` 里放 Markdown 文件。你自己的手册 App 从不删。
 - **外部 Agent（MCP）**：终端里的 Claude Code 等 Agent 可以经 App 自带的 MCP 服务 `mediacraft-mcp` 直接操作 Vibepost：新建稿子（也能照模板新建）、写正文、插片段、换主题、出图检查、导出、发送到 iPhone。每一步都能 ⌘Z 撤销，也列在 AI 助手里。这个功能默认关，在「AI 助手 › 设置」里打开，接入方法见 [docs/mcp.md](docs/mcp.md)，配套的 Claude Code 技能在 [skills/vibepost](skills/vibepost/SKILL.md)。
 
 **其他**
@@ -68,6 +92,8 @@
 
 ## 安装
 
+### macOS
+
 1. 从 [Releases](https://github.com/wuyoscar/Vibepost/releases) 下载最新的 `Vibepost-版本号.dmg`，双击打开。
 2. 把窗口里的 Vibepost 拖到「应用程序」文件夹。
 3. 第一次打开时，如果这个 DMG 没有经过 Apple 公证，macOS 会拦下来：
@@ -78,7 +104,11 @@
 
 - 需要 macOS 14 Sonoma 或更新，Apple 芯片和 Intel 都能用。系统里的 WebKit 较旧时，个别动效会简化，功能不受影响，见[兼容性](docs/compatibility.md)。
 - 中英文字体已经打包在 App 里，不用另外安装。
-- AI 助手是可选的：要在这台 Mac 上装好 [Codex](https://github.com/openai/codex)（`npm install -g @openai/codex`）或 [Claude Code](https://www.anthropic.com/claude-code)（`npm install -g @anthropic-ai/claude-code`）其中一个，并在终端里登录过一次。都不装也不影响其他功能。
+- AI 助手是可选的：要在这台电脑上装好 [Codex](https://github.com/openai/codex)（`npm install -g @openai/codex`）或 [Claude Code](https://www.anthropic.com/claude-code)（`npm install -g @anthropic-ai/claude-code`）其中一个，并在终端里登录过一次。都不装也不影响其他功能。
+
+### Windows
+
+Windows 版和 Mac 版用同一套界面，发到手机是局域网扫码，动态卡片导出 MP4 / GIF；没有隔空投送和实况照片。现在还没有签名的安装包，要从源码运行或自己打包，见[从源码构建](#从源码构建)与 [docs/windows.md](docs/windows.md)。
 
 ## 隐私与安全
 
@@ -123,8 +153,8 @@ scripts/make-dmg.sh                   # 打安装用的 DMG 到 dist/（通用�
 测试在真实的 WKWebView 里加载页面，隔空投送、Codex、Claude Code 与生图接口都换成假的，不会调到真的服务：
 
 ```sh
-macos/run-tests.sh                    # 全部测试（默认 300 秒超时）
-macos/run-tests.sh --filter Guides 120
+macos/run-tests.sh --filter Guides 120            # 只跑名字匹配的一组，120 秒超时（平时这样跑）
+caffeinate -dimu macos/run-tests.sh 3600          # 全部测试，约 36 分钟；机器睡眠会让它慢几十倍，所以挡住睡眠
 ```
 
 只想看界面，也可以 `npm start` 后用浏览器打开 <http://127.0.0.1:5173>（发送到 iPhone、实况合成和 AI 只在 App 里可用）。
@@ -181,12 +211,12 @@ Vibepost 自己的代码、文档与素材采用 [CC BY-NC-SA 4.0](https://creat
 
 ## English
 
-**Vibepost** is a Mac app for Xiaohongshu (RedNote) posts. You write in Markdown on the left and it lays the text out as 3:4 image cards in the middle. Pick a theme and press **Send to iPhone**: the whole set is AirDropped to your phone in page order, with the caption on your clipboard. Drafts stay on your Mac. There is no account and nothing is uploaded.
+**Vibepost** is a desktop app (macOS, with a Windows port) for Xiaohongshu (RedNote) posts. You write in Markdown on the left and it lays the text out as 3:4 image cards in the middle. Pick a theme and press **Send to iPhone**: the whole set is AirDropped to your phone in page order, with the caption on your clipboard. Drafts stay on your computer. There is no account and nothing is uploaded.
 
 - **Write**: a live-preview Markdown editor (CodeMirror 6) with a format bar, a floating selection toolbar and a `/` command menu. A small custom syntax covers page breaks, text color, highlight, underline and image pairs. The caption below the images is written in its own field.
-- **Lay out**: 8 themes, each switching the card structure, palette and fonts together; the app UI follows the system light/dark appearance. Per-draft tweaks cover fonts, size, spacing, the cover page and custom card CSS; the byline is shared by all drafts. A palette library and color wheel help with colors. Images, PDFs and Live Photos (composed natively with AVFoundation) are supported. Article mode exports a long image or rich text for WeChat. All bundled fonts are SIL OFL.
+- **Lay out**: 12 themes in three groups, each switching the card structure, palette and fonts together; the app UI follows the system light/dark appearance. Per-draft tweaks cover fonts, size, spacing, the cover page and custom card CSS; the byline is shared by all drafts. A palette library and color wheel help with colors. Images, PDFs and Live Photos (composed natively with AVFoundation) are supported. Article mode exports a long image or rich text for WeChat. All bundled fonts are SIL OFL.
 - **Publish**: a phone preview, an offline pre-publish check (absolute claims, traffic diversion, title width, topic and image limits, AI disclosure), AirDrop to iPhone, and PNG / ZIP / long-image export.
-- **AI**: an assistant powered by the Codex or Claude Code already on your Mac, chosen per draft. Each draft keeps its own session with history. Every change is reviewed hunk by hunk, and every turn is versioned.
+- **AI**: an assistant powered by the Codex or Claude Code already installed on your computer, chosen per draft. Each draft keeps its own session with history. Every change is reviewed hunk by hunk, and every turn is versioned.
 - **Agents**: a bundled MCP server (`mediacraft-mcp`) lets external agents such as Claude Code create, lay out, render, export and send drafts. It is **off by default**; turn it on in AI Assistant › Settings.
 
 **Privacy and security.**
@@ -205,8 +235,8 @@ Vibepost 自己的代码、文档与素材采用 [CC BY-NC-SA 4.0](https://creat
 - macOS 14: Control-click the app and choose Open.
 - macOS 15 and later: open it once, then click Open Anyway in System Settings › Privacy & Security.
 
-Vibepost requires macOS 14 Sonoma or later and runs on Apple silicon and Intel.
+Vibepost requires macOS 14 Sonoma or later and runs on Apple silicon and Intel. The Windows port (`windows/`, Electron) shares the same UI, sends to a phone over the local network with a QR code, and exports motion cards as MP4 / GIF; it has no signed installer yet, so run or package it from source ([docs/windows.md](docs/windows.md)).
 
-**Build from source.** Run `python3 scripts/fetch-fonts.py && macos/build-app.sh`. Run the tests with `macos/run-tests.sh`; they use fake AirDrop, AI and image services. `scripts/make-dmg.sh` packages a DMG.
+**Build from source.** Run `python3 scripts/fetch-fonts.py && macos/build-app.sh`. Run one group of tests with `macos/run-tests.sh --filter Guides 120`, or all of them (about 36 minutes) with `caffeinate -dimu macos/run-tests.sh 3600`; they use fake AirDrop, AI and image services. `scripts/make-dmg.sh` packages a DMG.
 
 Licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). The source is available, but commercial use is not allowed. Third-party components keep their own licenses.

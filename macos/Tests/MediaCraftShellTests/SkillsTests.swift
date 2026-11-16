@@ -14,11 +14,20 @@ struct SkillsTests {
     @Test("登记表与 src/skills/*.md 一致（改了技能文件要重新运行 node scripts/build-skills.mjs）；MediaCraftSkills 列出两份：使用 Vibepost 是操作手册全文，写作是技能正文；AGENTS.md 两份全文、操作手册在前")
     func registryMatchesFiles() async throws {
         let onDisk = try FileManager.default.contentsOfDirectory(atPath: Self.files.path).filter { $0.hasSuffix(".md") }.map { "src/skills/\($0)" }
+        let manualsOnDisk = try FileManager.default.contentsOfDirectory(atPath: Self.files.appendingPathComponent("手册").path)
+            .filter { $0.hasSuffix(".md") }.map { "src/skills/手册/\($0)".precomposedStringWithCanonicalMapping }
         let harness = ShellHarness(onboarding: false)
         try await harness.load()
         let result = try await harness.evaluate("""
             const format = window.MediaCraftSkillFormat;
             const registry = window.MediaCraftSkillRegistry;
+            // 内置写作手册（src/skills/手册/*.md）：登记表里不带短版
+            const staleManuals = [];
+            for (const item of window.MediaCraftManualRegistry) {
+              const { brief, ...entry } = format.entry(item.file, await fetch(item.file).then((response) => response.text()));
+              if (JSON.stringify(entry) !== JSON.stringify(item)) staleManuals.push(item.file);
+            }
+            const library = await window.MediaCraftManualLibrary.list();
             const skills = window.MediaCraftSkills;
             const stale = [];
             for (const item of registry) {
@@ -29,6 +38,8 @@ struct SkillsTests {
             const agents = skills.agentsFile();
             return {
               files: registry.map((item) => item.file), stale,
+              manualFiles: window.MediaCraftManualRegistry.map((item) => item.file), staleManuals,
+              library: library.manuals.map(({ name, builtIn }) => [name, String(builtIn)]),
               list: skills.list().map(({ name, builtIn }) => [name, String(builtIn)]),
               manualSame: skills.document("使用 Vibepost") === window.MediaCraftManual.document(),
               manualBrief: skills.brief("使用 Vibepost") === window.MediaCraftManual.brief(),
@@ -43,6 +54,9 @@ struct SkillsTests {
         #expect(Set(result?["files"] as? [String] ?? []) == Set(onDisk), "登记表里的文件就是目录里的：\(onDisk)")
         #expect(result?["stale"] as? [String] == [], "登记表过期了：运行 node scripts/build-skills.mjs")
         #expect(result?["list"] as? [[String]] == [["使用 Vibepost", "true"], ["写作", "true"]], "只有两份内置技能")
+        #expect(Set(result?["manualFiles"] as? [String] ?? []) == Set(manualsOnDisk), "登记表里的内置写作手册就是 src/skills/手册/ 里的：\(manualsOnDisk)")
+        #expect(result?["staleManuals"] as? [String] == [], "内置写作手册的登记表过期了：运行 node scripts/build-skills.mjs")
+        #expect(result?["library"] as? [[String]] == [["经验分享", "true"], ["教程攻略", "true"], ["测评种草", "true"], ["论文与技术解读", "true"]], "用户还没有手册时，写作手册的库里是四份内置的")
         #expect(result?["manualSame"] as? Bool == true && result?["manualBrief"] as? Bool == true, "使用 Vibepost 就是操作手册")
         #expect(result?["writingSame"] as? Bool == true)
         let brief = result?["writingBrief"] as? String ?? ""

@@ -817,7 +817,8 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 
 .titlebar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  /* 右边那组按钮至少占它自己的宽度：窗口窄、按钮多（Windows 多两个导出按钮）时让左边的标题先截断，按钮不互相压住 */
+  grid-template-columns: minmax(0, 1fr) auto minmax(max-content, 1fr);
   align-items: center;
   gap: 16px;
   padding: 0 16px 0 calc(16px + var(--traffic-lights));
@@ -1204,8 +1205,9 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   background: var(--ui-border);
 }
 
-/* 字号的「A−」「A+」：A 正常大小，加减号小一点贴在右上，像 PPT 的那两个 */
-.format-size {
+/* 字号的「A−」「A+」：A 正常大小，加减号小一点贴在右上，像 PPT 的那两个。
+   选择器要比后面的 .format-button 具体：那条是 inline-grid，会把字母和加减号排成上下两行 */
+.format-button.format-size {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1223,9 +1225,10 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 }
 
 .format-size-sign {
+  align-self: flex-start;
+  margin: 3px 0 0 1px;
   font-size: 0.72em;
-  vertical-align: 0.35em;
-  margin-left: 1px;
+  line-height: 1;
 }
 
 .format-button {
@@ -2840,6 +2843,17 @@ button.check-jump:hover {
   justify-self: start;
   gap: 6px;
   padding-left: 12px;
+}
+
+/* 舞台很窄（窗口缩到最小）：卡片两边少留一点，下载按钮贴近卡片 */
+@container (max-width: 360px) {
+  .card-frame {
+    height: min(calc(100cqh - 20px), calc((100cqw - 92px) / var(--card-ratio, 0.75)));
+  }
+
+  .card-footer {
+    padding-left: 6px;
+  }
 }
 
 .card-footer > span {
@@ -4860,6 +4874,17 @@ body[data-layout-mode="article"] .card-only {
   overflow-wrap: anywhere;
 }
 
+.ai-manual-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ui-text) 9%, transparent);
+  color: var(--ui-text-2);
+  font-size: 11px;
+  font-weight: 500;
+  vertical-align: 1px;
+}
+
 .ai-manual-description,
 .ai-manual-empty {
   color: var(--ui-text-2);
@@ -5039,6 +5064,18 @@ body[data-layout-mode="article"] .card-only {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* 摊开时面板放不下：两组快捷命令在自己那块里滚，输入框留在面板里 */
+.ai-presets:not(.is-compact) {
+  flex: 0 1 auto;
+  min-height: 84px;
+}
+
+.ai-presets:not(.is-compact) .ai-presets-body {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .ai-preset-group {
@@ -6020,10 +6057,12 @@ body[data-layout-mode="article"] .card-only {
   gap: 6px;
   min-height: 0;
   padding: 16px 8px;
+  overflow: hidden;
   color: var(--ui-text-2);
   font-size: 12.5px;
   line-height: 1.65;
   text-align: center;
+  container-type: size;
 }
 
 /* 选中的文字带进输入框、空白页的说明：淡入 */
@@ -6047,6 +6086,7 @@ body[data-layout-mode="article"] .card-only {
 
 .ai-empty-mark {
   display: grid;
+  flex: none;
   place-items: center;
   width: 44px;
   height: 44px;
@@ -6086,6 +6126,26 @@ body[data-layout-mode="article"] .card-only {
   background: var(--ui-layer);
   color: var(--ui-text-2);
   font: 500 11px/16px var(--font-ui);
+}
+
+/* 面板矮（窗口缩到最小）：说明放不下就一段段让位，不压到上面的会话栏和下面的快捷命令上 */
+@container (max-height: 210px) {
+  .ai-empty-mark,
+  .ai-empty .ai-empty-tip {
+    display: none;
+  }
+}
+
+@container (max-height: 130px) {
+  .ai-empty p {
+    display: none;
+  }
+}
+
+@container (max-height: 52px) {
+  .ai-empty-title {
+    display: none;
+  }
 }
 
 .ai-composer {
@@ -6703,6 +6763,28 @@ button.ai-skill-tag:hover { background: var(--ui-hover); }
 }
 
 /* ===== 窄窗口：顶栏按钮只留图标（名字仍给读屏） ===== */
+/* 编辑区窄（38vw 放不下一整行格式条）：去掉分隔线、「插入」只留加号，尽量还是一行；再窄就折成两行 */
+@media (max-width: 1240px) {
+  .format-bar {
+    padding-inline: 10px;
+  }
+
+  .format-bar > .bar-separator {
+    width: 0;
+    margin: 0 2px;
+    background: none;
+  }
+
+  .format-bar .menu-button > .icon + span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
 @media (max-width: 1320px) {
   .titlebar-trailing .pill-button:not(.theme-button) > span:not(.status-dot) {
     position: absolute;

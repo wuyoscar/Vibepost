@@ -33,7 +33,7 @@
     "  完整的操作手册在当前目录的 AGENTS.md，说明被压缩、记不清时回头读它。",
     "- 写稿、改稿、润色、起标题、写正文，每一轮都守内置的写作技能（全文在 AGENTS.md 操作手册后面的「# 写作」，动笔前读一遍）。最要紧的几条：",
     "{{writing}}",
-    "- 用户的写作手册是题材口味的补充（新闻、菜谱、游记这类各自的读者、结构、话题）：目录在 AGENTS.md 末尾，全文在当前目录的 写作手册/ 里。",
+    "- 写作手册是题材口味的补充（经验分享、教程、测评、论文解读这类各自的读者、取材、结构）：App 内置的几份全文在 AGENTS.md 的「# 内置写作手册」；用户自己的目录在 AGENTS.md 末尾，全文在当前目录的 写作手册/ 里。",
     "  用户本条选了手册时按各自用途配合使用；本条没有选择时按题材挑合适的，没有合适的就只照写作技能，不自动继承历史消息的选择；手册和写作技能冲突时照写作技能，除非用户本条点名要；",
     "  用户要你把这次的经验记进写作手册时，用工具 save_writing_manual 提议（用户确认才保存，直接改 写作手册/ 里的文件不会留下）。",
     "- 其余是常见 Markdown：# 标题、**加粗**、*斜体*、~~删除线~~、`代码`、> 引用、- 列表、1. 列表、表格、---。每一行在卡片上另起一行，空行分段。",
@@ -1033,8 +1033,9 @@
         title: turn.base.title,
         caption: turn.base.caption,
         systemPrompt: turn.instructions,
-        // 工作副本里的 AGENTS.md：两份内置技能的全文（操作手册在前，写作在后，src/skills/skills.js），每轮由壳重写、后面接写作手册的目录
-        agentsFile: root.MediaCraftSkills.agentsFile(),
+        // 工作副本里的 AGENTS.md：两份内置技能的全文（操作手册在前，写作在后）加内置写作手册的全文（src/skills/skills.js），
+        // 每轮由壳重写、后面接用户写作手册的目录
+        agentsFile: [root.MediaCraftSkills.agentsFile().trimEnd(), (await root.MediaCraftManualLibrary.agentsSection()).trimEnd()].filter(Boolean).join("\n\n") + "\n",
         ...turn.backend.launch(turn, { rules: [...(sessionRules.get(turn.draftId) ?? [])] }),
       });
       if (turn.cancelRequested) await native.cancel(turn.draftId);

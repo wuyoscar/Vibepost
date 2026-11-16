@@ -1,8 +1,9 @@
-// 输入框的「写作手册」：选用户自己的写作手册，只注入下一条消息。手册正文只在发送时读取；菜单不调用模型。
+// 输入框的「写作手册」：选写作手册（内置的几份 + 用户自己的，src/skills/skills.js 的 MediaCraftManualLibrary），只注入下一条消息。
+// 手册正文只在发送时读取；菜单不调用模型。
 // 内置的写作技能（src/skills/写作.md）每轮都在，不在这里选（src/ai/session.js 的说明书与 AGENTS.md）。
 (function (root) {
   "use strict";
-  const native = root.MediaCraftNative?.manuals;
+  const library = root.MediaCraftManualLibrary;
   const MAX_SKILLS = 8;
 
   function names(value = []) {
@@ -16,11 +17,10 @@
 
   async function load(selected) {
     if (!selected.length) return [];
-    if (!native) throw new Error("写作手册需要在桌面 App 中使用");
     const skills = [];
     let length = 0;
     for (const name of selected) {
-      const { description, content } = await native.read(name);
+      const { description, content } = await library.read(name);
       if (typeof content !== "string" || !content.trim()) throw new Error(`写作手册「${name}」没有正文`);
       length += content.length;
       if (length > 200000) throw new Error("所选写作手册内容过长，请减少选择");
@@ -52,7 +52,7 @@
     let selected = [];
     let manuals = [];
     let generation = 0;
-    wrap.hidden = !native;
+    wrap.hidden = false;
 
     function close(focus = false) {
       generation++;
@@ -79,7 +79,7 @@
     function render() {
       const query = search.value.trim().toLocaleLowerCase();
       const matches = manuals.filter(({ name, description }) => `${name} ${description || ""}`.toLocaleLowerCase().includes(query));
-      list.replaceChildren(...matches.map(({ name, description }) => {
+      list.replaceChildren(...matches.map(({ name, description, builtIn }) => {
         const row = document.createElement("label");
         row.className = "ai-skill-option";
         const checkbox = document.createElement("input");
@@ -91,7 +91,7 @@
         const title = document.createElement("strong");
         title.textContent = name;
         const detail = document.createElement("small");
-        detail.textContent = description || "自定义写作手册";
+        detail.textContent = `${builtIn ? "内置 · " : ""}${description || "自己的写作手册"}`;
         text.append(title, detail);
         row.append(checkbox, text);
         checkbox.addEventListener("change", () => {
@@ -100,10 +100,10 @@
         });
         return row;
       }));
-      note.textContent = matches.length ? "可多选，仅用于下一条消息。" : query ? "没有匹配的手册。" : "还没有写作手册，可在 AI 设置中添加。";
+      note.textContent = matches.length ? "可多选，仅用于下一条消息。" : query ? "没有匹配的手册。" : "还没有写作手册。";
     }
     async function open() {
-      if (!native || toggle.disabled) return;
+      if (toggle.disabled) return;
       const request = ++generation;
       picker.hidden = false;
       toggle.setAttribute("aria-expanded", "true");
@@ -112,7 +112,7 @@
       note.textContent = "正在读取写作手册…";
       search.focus();
       try {
-        const result = await native.list();
+        const result = await library.list();
         if (request !== generation) return;
         manuals = result.manuals;
         render();
@@ -135,7 +135,7 @@
       items[Math.max(0, Math.min(items.length - 1, at + (event.key === "ArrowDown" ? 1 : -1)))].focus();
     });
     input.addEventListener("keydown", (event) => {
-      if (event.isComposing || event.keyCode === 229 || !native || toggle.disabled) return;
+      if (event.isComposing || event.keyCode === 229 || toggle.disabled) return;
       const slash = event.key === "/" && !input.value && !event.metaKey && !event.ctrlKey && !event.altKey;
       const shortcut = (event.metaKey || event.ctrlKey) && event.shiftKey && !event.altKey && event.key.toLowerCase() === "k";
       if (!slash && !shortcut) return;

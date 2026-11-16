@@ -207,6 +207,17 @@
     settle();
   }
 
+  // 页面要换走（刷新、关标签页）或转到后台时，还在等的改动马上开始存，不等那几百毫秒：
+  // 壳里关窗、重新载入前会先叫页面存完（saveNow），浏览器里没有人叫，刚打的几个字会丢。
+  // 写入在 beforeunload 里就开了事务，库等它写完才关（src/drafts/store.js 的 pagehide）
+  function saveBeforeLeaving() {
+    if (saveTimer) save();
+  }
+  root.addEventListener("beforeunload", saveBeforeLeaving);
+  root.document.addEventListener("visibilitychange", () => {
+    if (root.document.visibilityState === "hidden") saveBeforeLeaving();
+  });
+
   // 马上存（保存按钮、⌘S、壳在退出 / 关窗 / 重新载入前）：不再等、存、等写完；没存上时 reject 原因。之前没存上过就整篇重写
   async function saveNow() {
     if (currentId && !isBuiltIn(currentId)) {

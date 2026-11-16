@@ -129,15 +129,17 @@
     });
     // 光标所在的那几块：正文没变时不重新解析
     let parsedDoc = null;
+    let text = "";
     let blocks = [];
     return function sync() {
       const { state } = editor.view;
       if (state.doc !== parsedDoc) {
         parsedDoc = state.doc;
-        blocks = cardBlocks().list(state.doc.toString());
+        text = state.doc.toString();
+        blocks = cardBlocks().list(text);
       }
       const { from, to } = state.selection.main;
-      const found = blocks.filter((block) => cardBlocks().styleOf(block) && block.source[0] <= Math.max(from, to - 1) && from < Math.max(block.source[1], block.source[0] + 1));
+      const found = cardBlocks().blocksIn(text, [from, to], blocks);
       const style = cardBlocks().styleOf(found[0]);
       current.textContent = style ? manual().style(style).name : "样式";
       for (const item of panel.querySelectorAll("[data-style]")) {

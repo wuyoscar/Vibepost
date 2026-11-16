@@ -877,8 +877,8 @@
 
   // Agent 提议新建或修改一份写作手册：弹确认框给用户看改动，用户同意才经壳保存（App 里的 AI 与外部 Agent 都走这里）
   async function saveWritingManual(args, context) {
-    const manuals = root.MediaCraftNative?.manuals;
-    if (!manuals) throw new Error("写作手册只在 Vibepost App 里有（浏览器里存不了）");
+    const manuals = root.MediaCraftManualLibrary;
+    if (!manuals.canEdit()) throw new Error("写作手册只在 Vibepost App 里能存（浏览器里存不了）");
     const next = manualFields(args);
     const { manuals: list } = await manuals.list();
     const before = list.some((manual) => manual.name === next.name) ? await manuals.read(next.name) : null;

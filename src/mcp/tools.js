@@ -110,29 +110,27 @@
     return `已更新：${parts.join("、")}。${pages ? `现在排成 ${pages} 页，用 render_pages 看看效果。` : "长文模式，没有分页。"}`;
   }
 
-  // ===== 写作手册（用户自己的，补充题材的口味；壳 WritingManuals.swift 读 App 支持目录里的文件）=====
+  // ===== 写作手册（补充题材的口味：内置的几份 + 用户自己的，后者由壳 WritingManuals.swift 读 App 支持目录里的文件）=====
   // 怎么写的底线是内置的写作技能（get_writing_skill，src/skills/写作.md），每次写都守
   // 新建、修改用共用的 save_writing_manual（src/ai/tools.js，要用户确认）
 
-  const manualsNative = () => {
-    const manuals = root.MediaCraftNative?.manuals;
-    if (!manuals) throw new Error("写作手册只在 Vibepost App 里有");
-    return manuals;
-  };
+  // 内置的几份题材手册和用户自己的列在一起（src/skills/skills.js 的 MediaCraftManualLibrary）
+  const library = () => root.MediaCraftManualLibrary;
 
   async function listWritingManuals() {
-    const { manuals } = await manualsNative().list();
-    if (!manuals.length) return "还没有写作手册，照内置的写作技能（get_writing_skill）写就行。用户要新建时用 save_writing_manual。";
+    const { manuals } = await library().list();
+    const line = ({ name, description, builtIn }) => `- ${name}${builtIn ? "（内置）" : ""}${description ? `：${description}` : ""}`;
     return [
-      `共 ${manuals.length} 份写作手册（补充题材的口味；按这篇的题材挑一份，用户点名的优先，用 read_writing_manual 读全文；怎么写的底线照 get_writing_skill）：`,
-      ...manuals.map(({ name, description }) => (description ? `- ${name}：${description}` : `- ${name}`)),
+      `共 ${manuals.length} 份写作手册（补充题材的口味；按这篇的题材挑一份，用户点名的优先，都不合适就只照写作技能；用 read_writing_manual 读全文；怎么写的底线照 get_writing_skill）。`
+        + "标「内置」的是 App 自带的，用 save_writing_manual 存一份同名的就是用户定制的版本，之后用用户那份：",
+      ...manuals.map(line),
     ].join("\n");
   }
 
   async function readWritingManual(args) {
     const name = String(args.name ?? "").trim();
     if (!name) throw new TypeError("name 要写手册名（见 list_writing_manuals）");
-    const manual = await manualsNative().read(name);
+    const manual = await library().read(name);
     // 和文件一样的样子：开头 name / description，后面是正文
     return `---\nname: ${manual.name}\ndescription: ${manual.description}\n---\n\n${manual.content}`;
   }
@@ -273,7 +271,7 @@
     {
       name: "list_writing_manuals",
       free: true,
-      description: "列出用户自己的写作手册：每份一行「名字：说明」。写作手册补充某类题材的口味（读者、结构、话题），怎么写的底线看 get_writing_skill，排版写法看 get_manual。"
+      description: "列出写作手册（App 内置的几份题材手册和用户自己的）：每份一行「名字：说明」。写作手册补充某类题材的口味（读者、结构、话题），怎么写的底线看 get_writing_skill，排版写法看 get_manual。"
         + "写稿之前按这篇的题材挑一份（用户点名的优先），用 read_writing_manual 读全文配合着写；都不合适就只照写作技能。",
       inputSchema: { type: "object", properties: {} },
       run: listWritingManuals,

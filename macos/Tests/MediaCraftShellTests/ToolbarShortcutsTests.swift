@@ -105,6 +105,49 @@ struct ToolbarShortcutsTests {
         #expect(harness.pageErrors == [])
     }
 
+    @Test("光标停在一段的末尾（刚打完字的位置）：「样式」照样写着这一块是什么、各项能点，点「小标题」换的就是这一段；空行上没有块，各项是灰的")
+    func styleMenuWorksAtTheEndOfABlock() async throws {
+        let harness = ShellHarness()
+        try await harness.load()
+        let result = try await harness.evaluate(Self.helpers + """
+            await mc.drafts.create();
+            await setBody("第一段内容\\n\\n## 已经是小标题\\n\\n最后一段");
+            const menu = document.querySelector("#styleMenu");
+            const state = () => [menu.querySelector("[data-style-current]").textContent, menu.querySelector('[data-style="h2"]').disabled];
+            const seen = {};
+            await caretAt("第一段内容", 5); await settle(); seen.endOfFirst = state();
+            await caretAt("第一段内容", 0); await settle(); seen.startOfFirst = state();
+            await caretAt("第一段内容", 6); await settle(); seen.blankLine = state();
+            await caretAt("已经是小标题", 6); await settle(); seen.endOfHeading = state();
+            await caretAt("最后一段", 4); await settle(); seen.endOfDocument = state();
+            // 文末：点「小标题」，换的是最后一段
+            menu.open = true;
+            menu.querySelector('[data-style="h2"]').click();
+            await settle();
+            const restyled = await markdown();
+            // 第一段的末尾：点「引用」
+            await caretAt("第一段内容", 5); await settle();
+            menu.open = true;
+            menu.querySelector('[data-style="quote"]').click();
+            await settle();
+            return { seen, restyled, quoted: await markdown() };
+        """) as? [String: Any]
+        await harness.tearDown()
+
+        let seen = result?["seen"] as? [String: [Any]] ?? [:]
+        func shows(_ key: String, _ name: String, disabled: Bool) -> Bool {
+            seen[key]?.first as? String == name && seen[key]?.last as? Bool == disabled
+        }
+        #expect(shows("endOfFirst", "正文", disabled: false), "一段的末尾算在这一段里：\(seen["endOfFirst"] ?? [])")
+        #expect(shows("startOfFirst", "正文", disabled: false))
+        #expect(shows("blankLine", "样式", disabled: true), "空行上没有块：\(seen["blankLine"] ?? [])")
+        #expect(shows("endOfHeading", "小标题", disabled: false))
+        #expect(shows("endOfDocument", "正文", disabled: false), "文末（刚打完字）：\(seen["endOfDocument"] ?? [])")
+        #expect(result?["restyled"] as? String == "第一段内容\n\n## 已经是小标题\n\n## 最后一段")
+        #expect(result?["quoted"] as? String == "> 第一段内容\n\n## 已经是小标题\n\n## 最后一段")
+        #expect(harness.pageErrors == [])
+    }
+
     @Test("光标所在处的行内格式在按钮上显示选中态；按钮标出快捷键")
     func activeStateFollowsCaretAndTooltipsShowShortcuts() async throws {
         let harness = ShellHarness()

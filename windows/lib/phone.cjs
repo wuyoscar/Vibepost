@@ -29,17 +29,33 @@ function addresses(port, token) {
   return [...ips, '127.0.0.1'].map((ip) => `http://${ip}:${port}/t/${token}/`);
 }
 
+// PNG 的宽高（IHDR），别的格式不量：只用来认出长图、给预览留好位置
+function pngSize(data) {
+  if (data.length < 24 || data.readUInt32BE(0) !== 0x89504e47 || data.toString('latin1', 12, 16) !== 'IHDR') return null;
+  const width = data.readUInt32BE(16);
+  const height = data.readUInt32BE(20);
+  return width && height ? { width, height } : null;
+}
+
+const LONG_RATIO = 2.2; // 高超过宽这么多倍算长图：预览只露开头一截，不把整张压成一条细线
+
 function page({ title, text, topics, files, prefix, expiresAt, nonce }) {
   const rows = files.map((file, index) => {
     const href = `${prefix}files/${index}`;
-    const preview = file.type.startsWith('image/') ? `<img loading="lazy" src="${href}" alt="${escapeHtml(file.name)}">`
-      : file.type.startsWith('video/') ? `<video controls playsinline preload="metadata" src="${href}"></video>` : '';
+    const size = file.width && file.height ? ` width="${file.width}" height="${file.height}"` : '';
+    const long = file.width && file.height / file.width > LONG_RATIO;
+    const image = `<img loading="lazy" src="${href}" alt="${escapeHtml(file.name)}"${size}>`;
+    // #t=0.001：iPhone 的 Safari 不自己取第一帧，不加就是一块白
+    const preview = file.type.startsWith('image/') ? (long ? `<div class="long">${image}</div><p class="notice">长图只预览开头，下载或长按保存的是完整的一张。</p>` : image)
+      : file.type.startsWith('video/') ? `<video controls playsinline preload="metadata" src="${href}#t=0.001"></video>` : '';
     return `<article>${preview}<a class="download" href="${href}?download=1" download="${escapeHtml(file.name)}">下载 ${escapeHtml(file.name)}</a></article>`;
   }).join('');
   const section = (label, value, id) => value ? `<section><h2>${label}</h2><textarea readonly id="${id}" rows="${id === 'caption' ? 6 : 2}">${escapeHtml(value)}</textarea><button data-copy="${id}">复制${label}</button></section>` : '';
-  return `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title || 'Vibepost 手机传输')}</title><style nonce="${nonce}">
-  :root{color-scheme:light dark;font:16px/1.6 system-ui,sans-serif}body{margin:0;background:#f5f3ee;color:#24251f}main{max-width:720px;margin:auto;padding:28px 18px 60px}h1{font-size:26px;margin-bottom:8px}h2{font-size:18px}p{color:#5c6055}article,section{margin:18px 0;padding:16px;background:white;border-radius:16px;border:1px solid #dadbd2}img,video{display:block;max-width:100%;max-height:65vh;margin:0 auto 16px;border-radius:8px}a,button{display:inline-block;background:#244d3e;color:white;border:0;border-radius:8px;padding:10px 14px;text-decoration:none;font:inherit;cursor:pointer}textarea{box-sizing:border-box;width:100%;background:#f6f6f2;color:inherit;border:1px solid #ccc;border-radius:8px;padding:12px;font:inherit;resize:vertical;margin:0 0 10px}#status{min-height:1.6em}.notice{font-size:14px}@media(prefers-color-scheme:dark){body{background:#191b18;color:#f1f2ec}p{color:#c0c5b9}article,section{background:#262b24;border-color:#485044}textarea{background:#1b201a}}
-  </style><main><h1>接收 Vibepost 卡片</h1><p>请保持电脑和手机连接同一局域网，电脑上的传输窗口保持打开。</p><p class="notice">下载会交给手机浏览器。保存到相册请使用浏览器的分享或保存操作；ZIP 通常保存在「文件」或「下载」中。</p><a href="${prefix}bundle.zip" download="Vibepost.zip">下载全部 ZIP</a><p class="notice">链接到期时间：${escapeHtml(expiresAt)}</p><div>${rows}</div>${section('标题', title, 'title')}${section('正文', text, 'caption')}${section('话题', topics.map((t) => `#${t.replace(/^#/, '')}`).join(' '), 'topics')}<p id="status" role="status"></p></main><script nonce="${nonce}">
+  return `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title || 'Vibepost 手机传输')}</title><style>
+  :root{color-scheme:light dark;font:16px/1.6 system-ui,sans-serif}body{margin:0;background:#f5f3ee;color:#24251f}main{max-width:720px;margin:auto;padding:28px 18px 60px}h1{font-size:26px;margin-bottom:8px}h2{font-size:18px}p{color:#5c6055}article,section{margin:18px 0;padding:16px;background:white;border-radius:16px;border:1px solid #dadbd2}img,video{display:block;max-width:100%;height:auto;max-height:65vh;margin:0 auto 16px;border-radius:8px}img{width:auto;object-fit:contain}.long{position:relative;max-height:65vh;overflow:hidden;margin:0 0 8px;border-radius:8px}.long img{width:100%;max-height:none;margin:0;border-radius:0}.long::after{content:"";position:absolute;left:0;right:0;bottom:0;height:72px;background:linear-gradient(transparent,white)}a,button{display:inline-block;background:#244d3e;color:white;border:0;border-radius:8px;padding:10px 14px;text-decoration:none;font:inherit;cursor:pointer}textarea{box-sizing:border-box;width:100%;background:#f6f6f2;color:inherit;border:1px solid #ccc;border-radius:8px;padding:12px;font:inherit;resize:vertical;margin:0 0 10px}#status{min-height:1.6em}.notice{font-size:14px}#inapp{padding:12px 14px;border-radius:12px;background:#fdf1d6;color:#5b4300;border:1px solid #e8cf93}@media(prefers-color-scheme:dark){body{background:#191b18;color:#f1f2ec}p{color:#c0c5b9}article,section{background:#262b24;border-color:#485044}textarea{background:#1b201a;border-color:#485044}a,button{background:#3a7a62}.long::after{background:linear-gradient(transparent,#262b24)}#inapp{background:#3b3014;color:#f3deaa;border-color:#6b5621}}
+  </style><main><h1>接收 Vibepost 卡片</h1><p>请保持电脑和手机连接同一局域网，电脑上的传输窗口保持打开。</p><p id="inapp" hidden>这里是 App 自带的浏览器，下载多半会被拦下。点右上角的菜单，选「在浏览器打开」再保存。</p><p class="notice">图片长按，选「存储到照片」或「保存图片」就进相册。视频和 ZIP 点下载，之后在「文件」或「下载」里找。</p><a href="${prefix}bundle.zip" download="Vibepost.zip">下载全部 ZIP</a><p class="notice">链接到 <time id="expires" datetime="${escapeHtml(expiresAt)}">十分钟内</time> 失效，过期后在电脑上重新发送。</p><div>${rows}</div>${section('标题', title, 'title')}${section('正文', text, 'caption')}${section('话题', topics.map((t) => `#${t.replace(/^#/, '')}`).join(' '), 'topics')}<p id="status" role="status"></p></main><script nonce="${nonce}">
+  const expires=document.getElementById('expires');const due=new Date(expires.dateTime);if(!isNaN(due))expires.textContent=String(due.getHours()).padStart(2,'0')+':'+String(due.getMinutes()).padStart(2,'0');
+  if(/MicroMessenger|QQ\\/|Weibo|AlipayClient|DingTalk|Lark|XiaoHongShu/i.test(navigator.userAgent))document.getElementById('inapp').hidden=false;
   for(const button of document.querySelectorAll('[data-copy]'))button.addEventListener('click',async()=>{const field=document.getElementById(button.dataset.copy);const status=document.getElementById('status');try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(field.value);status.textContent='已复制，可以粘贴到发布页面';return}}catch{}field.focus();field.select();field.setSelectionRange(0,field.value.length);let copied=false;try{copied=document.execCommand('copy')}catch{}status.textContent=copied?'已复制，可以粘贴到发布页面':'文字已选中，请长按文字并选择「复制」';});
   </script></html>`;
 }
@@ -81,7 +97,7 @@ class PhoneService {
         const type = MIME.get(path.extname(name).toLowerCase()) || 'application/octet-stream';
         const target = path.join(dir, String(index));
         await fsp.writeFile(target, data);
-        staged.push({ name, type, path: target, size: data.length });
+        staged.push({ name, type, path: target, size: data.length, ...(type === 'image/png' ? pngSize(data) : null) });
         zip.file(name, data);
       }
       const safeTitle = String(title).slice(0, 10000);
@@ -104,7 +120,9 @@ class PhoneService {
         res.setHeader('Cache-Control', 'no-store');
         res.setHeader('Referrer-Policy', 'no-referrer');
         res.setHeader('X-Content-Type-Options', 'nosniff');
-        res.setHeader('Content-Security-Policy', `default-src 'none'; img-src 'self'; media-src 'self'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'`);
+        // style-src 用 'unsafe-inline'：Safari 的视频控件靠自己插的行内样式表排版，只认 nonce 时会被拦掉、播放键错位。
+        // 页面里没有不转义的内容，脚本仍然只认 nonce
+        res.setHeader('Content-Security-Policy', `default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'`);
         if (Date.now() >= expires) { res.writeHead(410); res.end('传输链接已到期'); return; }
         if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { Allow: 'GET, HEAD' }); res.end(); return; }
         let url;

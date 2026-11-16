@@ -27,7 +27,7 @@
 | `color-mix()` | 16.2 | 界面令牌：悬停、按下、边框、焦点环、浮层（`styles.css` 开头） | 14.0 自带，不用退路 | [MDN](https://developer.mozilla.org/docs/Web/CSS/Reference/Values/color_value/color-mix) |
 | 相对颜色语法 `oklch(from …)` | 16.4 | 清新主题的薄荷、奶黄色团：从强调色转色相推出来（`cards/structures.css` 的 `--fresh-mint`） | 同上 | [WebKit 16.4](https://webkit.org/blog/13966/webkit-features-in-safari-16-4/) |
 | `overflow: clip` | 16.0 | `html, body`：页面本身连程序性滚动（`focus()` / `scrollIntoView()`）也不允许，顶栏不会被滚出窗口（`styles.css`） | 退成 `hidden`：界面照常，只是极端情况下页面可能被滚走 | [MDN](https://developer.mozilla.org/docs/Web/CSS/overflow#browser_compatibility) |
-| 容器查询、`cqw` / `cqh` | 16.0 | 舞台上卡片的尺寸（`.stage-scroller`） | 同上 | [MDN](https://developer.mozilla.org/docs/Web/CSS/Reference/At-rules/@container) |
+| 容器查询、`cqw` / `cqh` | 16.0 | 舞台上卡片的尺寸（`.stage-scroller`）；AI 助手还没有对话时的说明在面板矮的时候一段段让位（`.ai-empty`） | 同上 | [MDN](https://developer.mozilla.org/docs/Web/CSS/Reference/At-rules/@container) |
 | `:has()`、`:focus-visible`、无前缀 `appearance`、`structuredClone`、`Array.prototype.at` / `findLast`、`Object.hasOwn` | 15.4 | 各处 | 同上 | [WebKit 15.4](https://webkit.org/blog/12445/new-webkit-features-in-safari-15-4/) |
 | `crypto.randomUUID` | 15.4 | 图片、AI 会话、原生桥请求的编号 | 同上 | [MDN](https://developer.mozilla.org/docs/Web/API/Crypto/randomUUID) |
 | `inert` | 15.5 | 说明书只读时关掉菜单 | 同上 | [WebKit 15.5](https://webkit.org/blog/12669/new-webkit-features-in-safari-15-5/) |

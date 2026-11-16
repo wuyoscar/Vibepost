@@ -126,7 +126,7 @@
 
   // ===== 插入：「插入」菜单与「/」菜单里不是样式的那几项（组件也能插入，见 STYLES）=====
   const INSERTS = [
-    { id: "image", name: "图片或 PDF", glyph: "图", keys: ["image", "pdf", "tp", "tupian"], summary: "从这台 Mac 选图片或 PDF（PDF 每页一张图）" },
+    { id: "image", name: "图片或 PDF", glyph: "图", keys: ["image", "pdf", "tp", "tupian"], summary: "从这台电脑选图片或 PDF（PDF 每页一张图）" },
     { id: "live", name: "实况视频", glyph: "实", keys: ["live", "video", "sk", "shikuang"], summary: "选一段视频做成实况" },
     { id: "divider", name: "分割线", glyph: "—", keys: ["hr", "divider", "fgx", "fengexian"], summary: "一条细线隔开上下" },
     { id: "pageBreak", name: "分页", glyph: "页", keys: ["page", "fy", "fenye"], shortcut: "⌘↩", summary: "后面的内容从下一张卡片开始" },

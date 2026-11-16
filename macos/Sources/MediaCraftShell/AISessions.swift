@@ -595,7 +595,7 @@ final class AISessions: @unchecked Sendable {
         do {
             let copied = try manuals.copy(into: folder)
             if copied.isEmpty {
-                lines.append("现在还没有写作手册，照写作技能写就行（用户可以在 AI 助手 › 设置 › 写作手册里打开文件夹添加）。")
+                lines.append("用户自己的写作手册现在还没有，用上面内置的几份或只照写作技能写就行（用户可以在 AI 助手 › 设置 › 写作手册里打开文件夹添加）。")
             }
             for manual in copied {
                 let path = "\(manualsFolder)/\(manual.file.lastPathComponent)"

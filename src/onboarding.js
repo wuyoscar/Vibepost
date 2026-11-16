@@ -26,11 +26,18 @@
       title: "挑一个主题",
       body: "主题面板里一键换，卡片结构和配色一起换。缩略图画的是你自己的第一页，还标着会排成几页。",
     },
-    {
-      spot: ["#aiButton, #exportActions"],
-      title: "发到 iPhone，或让 AI 帮忙",
-      body: "「发送到 iPhone」按页序隔空投送，正文同时进剪贴板。AI 用你 Mac 上的 Claude Code 润色，改动逐处确认。",
-    },
+    // 没有隔空投送的壳（Windows）：手机扫码接收
+    window.MediaCraftNative?.capabilities?.phoneTransfer
+      ? {
+          spot: ["#aiButton, #exportActions"],
+          title: "发到手机，或让 AI 帮忙",
+          body: "「发送到手机」弹出二维码，手机扫码接收卡片和正文。AI 用这台电脑上的 Claude Code 或 Codex 润色，改动逐处确认。",
+        }
+      : {
+          spot: ["#aiButton, #exportActions"],
+          title: "发到 iPhone，或让 AI 帮忙",
+          body: "「发送到 iPhone」按页序隔空投送，正文同时进剪贴板。AI 用你 Mac 上的 Codex 或 Claude Code 润色，改动逐处确认。",
+        },
   ];
 
   let tour = null;
@@ -173,7 +180,7 @@
     tour.index = index;
     ui.count.textContent = `${index + 1} / ${STEPS.length}`;
     ui.title.textContent = step.title;
-    ui.body.textContent = step.body;
+    ui.body.textContent = window.MediaCraftPlatform.keys(step.body);
     ui.dots.forEach((dot, dotIndex) => dot.classList.toggle("is-current", dotIndex === index));
     // 回到第一步时「上一步」藏起来，焦点在它上面就挪到「下一步」
     const backFocused = document.activeElement === ui.back;

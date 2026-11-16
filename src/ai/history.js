@@ -95,9 +95,9 @@
       element("span", "ai-history-said", `${session.last.role === "user" ? "你：" : ""}${session.last.text}`),
     );
     button.append(head, meta);
-    button.addEventListener("click", (event) => void open(session, { newWindow: event.metaKey }));
+    button.addEventListener("click", (event) => void open(session, { newWindow: root.MediaCraftPlatform.mod(event) }));
     button.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" || !event.metaKey) return;
+      if (event.key !== "Enter" || !root.MediaCraftPlatform.mod(event)) return;
       event.preventDefault();
       void open(session, { newWindow: true });
     });
@@ -143,7 +143,7 @@
       buttons()[0]?.focus();
     } else if (event.key === "Enter" && sessions.length) {
       event.preventDefault();
-      void open(sessions[0], { newWindow: event.metaKey });
+      void open(sessions[0], { newWindow: root.MediaCraftPlatform.mod(event) });
     }
   });
 

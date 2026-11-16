@@ -443,7 +443,7 @@ Claude 用它们直接操作 App（工具全名 `mcp__mediacraft__<名字>`）�
 - **动作**：会改稿子的工具每次在会话里记一行 `action`，行尾「撤销」只撤这一个（正文结构的改动与之后别处的改动三方合并，重叠时说明原因、请你用 ⌘Z）；每个动作同时是撤销历史里的一步（⌘Z）：正文、图片，以及主题、样式、模式（`drafts.update(patch, { undoable: true })`）。
 - **外部 Agent 也用**：标了 shared 的工具（`get_pages`、`set_theme`、`set_style`、`set_mode`、分页、挪段落、`insert_section`、摆图片、`save_writing_manual`、`list_templates`）同样给外部 Agent 的 MCP 服务用（[mcp.md](mcp.md)），描述里提到 `draft.md`、`propose_images`、工作副本的那一句只给 AI 助手。
 - **内置技能**（`src/skills/skills.js` 的 `MediaCraftSkills`：「使用 Vibepost」即操作手册，「写作」即 `src/skills/写作.md`，登记表 `src/skills/index.js` 由 `node scripts/build-skills.mjs` 生成）：说明书带两份的短版（写作的是 `## 最要紧的几条` 那一节），`AGENTS.md` 是两份全文，每轮都守。`MediaCraftSkills.list()` / `document(name)` / `brief(name)` / `agentsFile()`；AI 设置 › 内置技能里列出、「查看」展开全文，只读。
-- **写作手册**（用户自己的，补充题材的口味；文件见 [storage.md](storage.md#写作手册写作手册)）：每轮开始时壳把它们拷进工作副本的 `写作手册/`，`AGENTS.md` 末尾列出目录（名字、说明、路径）；说明书里写明按这篇的题材自己挑一份（你在对话里点名的优先），没有合适的就只照写作技能，和写作技能冲突时照写作技能；要把经验记进写作手册时用 `save_writing_manual` 提议。
+- **写作手册**（补充题材的口味；内置的四份全文在 `AGENTS.md` 的「# 内置写作手册」一节，用户同名的那份盖住它；下面说的是用户自己的，文件见 [storage.md](storage.md#写作手册写作手册)）：每轮开始时壳把它们拷进工作副本的 `写作手册/`，`AGENTS.md` 末尾列出目录（名字、说明、路径）；说明书里写明按这篇的题材自己挑一份（你在对话里点名的优先），没有合适的就只照写作技能，和写作技能冲突时照写作技能；要把经验记进写作手册时用 `save_writing_manual` 提议。
 - **同步 draft.md**：分页、挪段落、摆图片这类结构改动是纯函数（Markdown → Markdown），在编辑器里生效后，同样的改动套到工作副本的 `draft.md` 与这一轮的比对基准上（`ai/work-file`），Claude 之后读到的与编辑器一致，这一轮结束时也不会再套用一次；`draft.md` 那一带被 Claude 改过、套不上时不同步，工具结果里会说。
 - 工具看到的是编辑器里的稿子：Claude 在 `draft.md` 里的文字修改要等这一轮结束才进编辑器。
 
@@ -514,7 +514,7 @@ Claude 用它们直接操作 App（工具全名 `mcp__mediacraft__<名字>`）�
 | `ai/status` | `{ refresh, backend }`（`backend` 没给时是 `"claude"`） | `AIStatus` |
 | `ai/settings` | `{ backend, path }`（`null` 恢复自动查找；旧的 `{ claudePath }` 也认） | `AIStatus` |
 | `ai/models` | `{ backend }` | Codex：起一次 `codex app-server`，握手后问 `model/list` 就关上，`{ models: [{ id, name, isDefault }] }`；别的后端 `{ models: [] }` |
-| `ai/send` | `{ turnId, draftId, backend, prompt, markdown, title, caption, systemPrompt, agentsFile, … }`（`agentsFile`：写进工作副本 `AGENTS.md` 的两份内置技能全文（`MediaCraftSkills.agentsFile()`，操作手册在前、写作在后），壳在后面接上写作手册的目录、把写作手册拷进 `写作手册/`，每轮重写），后面是这个后端要的：Claude Code 是 `sessionId, resume, model, allowedTools`（`model`：这篇选的模型，`null` 不传 `--model`，格式不对时 `ok: false`；`allowedTools`：这篇的会话里「本次会话都允许」过的规则），Codex 不要别的（线程由页面经 stdin 开） | 进程启动后立即返回 `{ ok }`；找不到这个后端、缺了它要的字段、这篇已在跑时 `ok: false` 带原因 |
+| `ai/send` | `{ turnId, draftId, backend, prompt, markdown, title, caption, systemPrompt, agentsFile, … }`（`agentsFile`：写进工作副本 `AGENTS.md` 的两份内置技能全文（`MediaCraftSkills.agentsFile()`，操作手册在前、写作在后）加内置写作手册全文（`MediaCraftManualLibrary.agentsSection()`），壳在后面接上写作手册的目录、把写作手册拷进 `写作手册/`，每轮重写），后面是这个后端要的：Claude Code 是 `sessionId, resume, model, allowedTools`（`model`：这篇选的模型，`null` 不传 `--model`，格式不对时 `ok: false`；`allowedTools`：这篇的会话里「本次会话都允许」过的规则），Codex 不要别的（线程由页面经 stdin 开） | 进程启动后立即返回 `{ ok }`；找不到这个后端、缺了它要的字段、这篇已在跑时 `ok: false` 带原因 |
 | `ai/cancel` | `{ draftId }` | `{ cancelled }` |
 | `ai/respond` | `{ draftId, turnId, message }`：`message` 是一整行（Claude Code 是 `control_response`；Codex 是对服务端请求的回答，或 `thread/start`、`thread/resume`、`turn/start`、`turn/interrupt`，壳按上面「Codex」里说的填好工作目录、沙箱与审批、去掉别的字段），不是这个后端认得的样子时不写、`ok: false` | 写进那一轮的 stdin，真写进去了才回 `{ delivered: true }`；这一轮已经结束、stdin 已关时 `{ delivered: false }`；写失败时 `ok: false` 带原因 |
 | `ai/work-file` | `{ draftId, turnId, markdown? }` | 这一轮进行中读工作副本的 `draft.md`；带 `markdown` 时先写进去。返回 `{ markdown }`；这一轮已经结束时 `ok: false` |
@@ -565,7 +565,9 @@ App 可以开几个窗口，每个窗口开着一篇稿子，各改各存（都�
 
 ## 写作手册（原生桥）
 
-写作手册是用户自己的，补充题材的口味，文件在 App 支持目录的「写作手册」文件夹（布局见 [storage.md](storage.md#写作手册写作手册)，壳 `WritingManuals.swift`，第一次用时建一个空文件夹；App 不自带手册，也从不删里面的文件）。页面经原生桥 `POST mediacraft://app/__native/manuals/<动作>`（body 是 JSON）调用，`src/native-bridge.js` 包成 `MediaCraftNative.manuals`；浏览器里没有（AI 设置里这一节不显示，`save_writing_manual` 回错误）。几个窗口共用一份，读写排在一把锁里。
+写作手册补充题材的口味，有两处：App 内置的四份（`src/skills/手册/`，登记在 `window.MediaCraftManualRegistry`）和用户自己的。页面上凡是列手册、读手册的地方都经 `window.MediaCraftManualLibrary`（`src/skills/skills.js`）：`list()` → `{ manuals: [{ name, description, builtIn, customized }], folder }`（用户的在前，和内置同名的标 `customized`；后面是没被盖住的内置手册），`read(name)` → `{ name, description, content, builtIn }`（同名时读用户那份），`customize(name)` 把一份内置手册存成同名的用户手册，`save` / `reveal` / `open` 交给下面的原生桥，`agentsSection()` 是 `AGENTS.md` 里「# 内置写作手册」那一节。浏览器里没有壳，只有内置的。
+
+用户自己的写作手册文件在 App 支持目录的「写作手册」文件夹（布局见 [storage.md](storage.md#写作手册写作手册)，壳 `WritingManuals.swift`，第一次用时建一个空文件夹；App 不自带手册，也从不删里面的文件）。页面经原生桥 `POST mediacraft://app/__native/manuals/<动作>`（body 是 JSON）调用，`src/native-bridge.js` 包成 `MediaCraftNative.manuals`；浏览器里没有（AI 设置里这一节不显示，`save_writing_manual` 回错误）。几个窗口共用一份，读写排在一把锁里。
 
 | 动作 | body | 返回 |
 | --- | --- | --- |
@@ -575,7 +577,7 @@ App 可以开几个窗口，每个窗口开着一篇稿子，各改各存（都�
 | `manuals/reveal` | `{ name? }` | 在 Finder 中显示这份；没给 `name` 时打开文件夹。`{ ok }` |
 | `manuals/open` | `{ name }` | 用默认的 App 打开这份。`{ ok }` |
 
-在 Finder 中显示、用默认的 App 打开经 `ShellCore.revealFile` / `openFile`（测试 harness 换成记下来）。**界面**：AI 助手 › 设置（`src/ai/manuals.js`）：先是「内置技能」（两份，只读，「查看」展开全文），再是「写作手册」：一句说明、每份一块（名字、说明、「打开」「在 Finder 中显示」）、「打开文件夹」；每次打开设置重新列一遍，`save_writing_manual` 存好后也刷新。
+在 Finder 中显示、用默认的 App 打开经 `ShellCore.revealFile` / `openFile`（测试 harness 换成记下来）。**界面**：AI 助手 › 设置（`src/ai/manuals.js`）：先是「内置技能」（两份，只读，「查看」展开全文），再是「写作手册」：一句说明、每份一块（名字、说明、「打开」「在 Finder 中显示」）、「打开文件夹」；每次打开设置重新列一遍，`save_writing_manual` 存好后也刷新。 「写作手册」一节把内置的和用户的列在一起：内置的标「内置」，「查看」展开全文、「复制一份来改」存成同名的用户手册并打开；定制过的标「已定制」。
 
 点名写作手册：输入框的「写作手册」、空输入框 `/` 或输入框内 ⌘⇧K（Windows：Ctrl+Shift+K）调出可搜索列表，多选后随下一条消息发送（正文包在「【写作手册：名字】」里附到这一轮的 prompt）。发送失败且用户尚未输入新内容、选择新手册或换稿时恢复选择。两份内置技能每轮自动加载，不在这里选，详见 [写作技能](writing-skills.md)。
 

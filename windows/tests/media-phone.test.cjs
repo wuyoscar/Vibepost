@@ -31,8 +31,20 @@ test('phone sessions expose only their explicit files, previews, text, ZIP and b
   assert.match(html, /<img loading="lazy"/);
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   assert.match(html, /长按文字/);
-  assert.match(html, /保存到相册请使用浏览器/);
-  assert.match(response.headers.get('content-security-policy'), /default-src 'none'/);
+  assert.match(html, /图片长按/);
+  // iPhone 的 Safari：视频要带时间片段才有第一帧；视频控件的行内样式表不能被 CSP 拦掉，脚本仍然只认 nonce
+  assert.match(html, /<video controls playsinline preload="metadata" src="[^"]+files\/0#t=0\.001">/);
+  const csp = response.headers.get('content-security-policy');
+  assert.match(csp, /default-src 'none'/);
+  assert.match(csp, /style-src 'unsafe-inline'/);
+  assert.match(csp, /script-src 'nonce-[^']+'/);
+  assert.doesNotMatch(csp, /script-src[^;]*unsafe-inline/);
+  // 到期时间由页面按手机的时区写成几点几分，不把 UTC 的 ISO 串直接给人看
+  assert.match(html, /<time id="expires" datetime="[^"]+Z">/);
+  assert.doesNotMatch(html, /链接到期时间：\d{4}-/);
+  // App 自带浏览器（微信等）里下载会被拦：有一条默认藏着的提示
+  assert.match(html, /<p id="inapp" hidden>/);
+  assert.match(html, /MicroMessenger/);
   const file = await fetch(`${url}files/0`, { headers: { Range: 'bytes=2-5' } });
   assert.equal(file.status, 206);
   assert.equal(file.headers.get('content-type'), 'video/mp4');
@@ -54,6 +66,34 @@ test('phone sessions expose only their explicit files, previews, text, ZIP and b
   await assert.rejects(fetch(url));
   assert.deepEqual(await fsp.readdir(path.join(dir, 'phone-transfer')), []);
   assert.deepEqual(await service.stop(result.session), { stopped: false });
+});
+
+// 只有文件头的 PNG：页面按 IHDR 里的宽高认长图
+function pngHeader(width, height) {
+  const data = Buffer.alloc(33);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(data);
+  data.writeUInt32BE(13, 8);
+  data.write('IHDR', 12, 'latin1');
+  data.writeUInt32BE(width, 16);
+  data.writeUInt32BE(height, 20);
+  return data.toString('base64');
+}
+
+test('long images preview their top instead of shrinking into a sliver', async (t) => {
+  const { service } = await setup(t);
+  const result = await service.start({ files: [
+    { name: '01.png', data: pngHeader(1728, 2304) },
+    { name: '长图.png', data: pngHeader(1728, 9000) },
+    { name: '照片.jpg', data: Buffer.from('not measured').toString('base64') },
+  ] });
+  const html = await (await fetch(result.addresses.find((address) => address.includes('127.0.0.1')))).text();
+  const articles = html.split('<article>').slice(1);
+  assert.equal(articles.length, 3);
+  assert.match(articles[0], /^<img loading="lazy" src="[^"]+" alt="01\.png" width="1728" height="2304">/);
+  assert.doesNotMatch(articles[0], /class="long"/);
+  assert.match(articles[1], /^<div class="long"><img [^>]*width="1728" height="9000"><\/div>/);
+  assert.match(articles[1], /长图只预览开头/);
+  assert.match(articles[2], /^<img loading="lazy" src="[^"]+" alt="照片\.jpg">/);
 });
 
 test('expiry and disposal close servers and delete staged files', async (t) => {

@@ -194,7 +194,8 @@ test('successful image responses consume quota even when returned bytes cannot b
   await assert.rejects(service.generateImage(owner, { ...args, count: 1 }), /最多生成 8/); assert.equal(calls, 2);
 });
 
-test('npm wrappers resolve literal targets without invoking a shell; unsafe wrapper rejected', async t => {
+// .cmd 包装脚本只有 Windows 有（里面的路径用反斜杠），在别的系统上不跑
+test('npm wrappers resolve literal targets without invoking a shell; unsafe wrapper rejected', { skip: process.platform !== 'win32' }, async t => {
   const { data } = await setup(t); const folder = path.join(data, 'node_modules', '@fixture', 'cli'); await fs.mkdir(folder, { recursive: true });
   const entry = path.join(folder, 'cli.cjs'); await fs.writeFile(entry, '');
   const cmd = path.join(data, 'fixture.cmd'); await fs.writeFile(cmd, '@echo off\n"%_prog%" "%dp0%\\node_modules\\@fixture\\cli\\cli.cjs" %*\n');

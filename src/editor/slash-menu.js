@@ -76,7 +76,7 @@
           option.append(glyph, command.label);
           if (command.keys) {
             const keys = document.createElement("kbd");
-            keys.textContent = command.keys;
+            keys.textContent = window.MediaCraftPlatform.keys(command.keys);
             option.append(keys);
           }
           option.addEventListener("click", () => this.pick(index));

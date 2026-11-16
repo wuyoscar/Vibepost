@@ -233,7 +233,7 @@
       const source = draft[field];
       await mc.drafts.update({ [field]: `${source.slice(0, item.from)}${item.suggest}${source.slice(item.to)}` });
       const done = item.suggest ? `已把「${item.text}」改成「${item.suggest}」` : `已删掉「${item.text}」`;
-      notify(field === "markdown" ? `${done}（⌘Z 撤销）` : done);
+      notify(field === "markdown" ? `${done}（${root.MediaCraftPlatform.keys("⌘Z")} 撤销）` : done);
       // 改标题、正文栏不出图：自己再查一遍
       if (field !== "markdown") refreshLater();
     }

@@ -188,7 +188,7 @@
 
     // ⌘F / ⌥⌘F / ⌘G / ⇧⌘G：对话框开着时不管
     window.addEventListener("keydown", (event) => {
-      if (event.defaultPrevented || !event.metaKey || event.ctrlKey) return;
+      if (event.defaultPrevented || !window.MediaCraftPlatform.mod(event)) return;
       if (document.querySelector(".modal:not(.hidden)")) return;
       const key = event.key.toLowerCase();
       if (key === "f" && !event.shiftKey) {

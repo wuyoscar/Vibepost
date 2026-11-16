@@ -11,7 +11,7 @@ function setup(platform = 'windows', cards = [false, true]) {
   const calls = [];
   const packages = [];
   const controllers = [];
-  const canvases = cards.map((live, index) => ({ index, live, toBlob: (callback) => callback(new Blob([`card-${index}`], { type: 'image/png' })) }));
+  const canvases = cards.map((live, index) => ({ index, live, width: 1728, height: 2304, toBlob: (callback) => callback(new Blob([`card-${index}`], { type: 'image/png' })) }));
   const native = {
     saveFile: async (blob, name) => { saved.push({ blob, name }); return { name }; },
     livePhoto: async (request) => { calls.push({ native: 'live', request }); return { movie: new Blob(['MOV']), photo: new Blob(['JPG']), metadata: new Blob(['plist']) }; },

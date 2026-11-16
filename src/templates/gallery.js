@@ -323,7 +323,7 @@
   async function removeTemplate(summary) {
     const confirmed = await root.MediaCraftConfirm({
       title: `删除模板「${summary.name}」？`,
-      message: "这套模板的文件夹（模板.md 与图片）会从这台 Mac 上删掉，删除后找不回来。用它新建过的稿子不受影响。",
+      message: "这套模板的文件夹（模板.md 与图片）会从这台电脑上删掉，删除后找不回来。用它新建过的稿子不受影响。",
       okLabel: "删除",
       danger: true,
     });

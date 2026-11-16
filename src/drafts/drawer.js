@@ -108,7 +108,7 @@
     meta.append(kind, summary.builtIn ? (summary.mode === "article" ? "长文" : "图文") : formatTime(summary.updatedAt));
     open.append(name, meta);
     open.title = windows ? "⌘ 点按在新窗口打开" : "";
-    open.addEventListener("click", (event) => void (event.metaKey && windows ? openInWindow(summary) : openDraft(summary)));
+    open.addEventListener("click", (event) => void (root.MediaCraftPlatform.mod(event) && windows ? openInWindow(summary) : openDraft(summary)));
     row.addEventListener("contextmenu", (event) => showMenu(event, summary));
     row.append(open);
 
@@ -282,7 +282,7 @@
   async function removeDraft(summary) {
     const confirmed = await ask({
       title: `删除《${summary.title}》？`,
-      message: "这篇稿子连同它的图片、实况视频与 AI 的工作副本会从这台 Mac 上删掉，删除后找不回来。Claude Code、Codex 自己的会话记录不在此列。",
+      message: "这篇稿子连同它的图片、实况视频与 AI 的工作副本会从这台电脑上删掉，删除后找不回来。Claude Code、Codex 自己的会话记录不在此列。",
       okLabel: "删除",
       danger: true,
     });

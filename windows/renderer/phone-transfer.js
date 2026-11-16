@@ -40,7 +40,7 @@
     address.addEventListener('focus', () => address.select());
     const status = element('p', 'phone-transfer-status');
     status.setAttribute('role', 'status');
-    const notes = element('p', 'phone-transfer-help', '下载由手机浏览器处理。保存到相册请在手机上使用分享或保存；ZIP 通常进入「文件」或「下载」。文字复制失败时，可在手机页面长按选中文字。');
+    const notes = element('p', 'phone-transfer-help', '用手机自带的浏览器扫码（微信里扫出来的页面多半下载不了）。图片在手机上长按就能存进相册；视频和 ZIP 点下载，之后在「文件」或「下载」里找。文字复制失败时，可在手机页面长按选中文字。');
     const alternatives = element('details', 'phone-transfer-alternatives');
     alternatives.append(element('summary', '', '扫码打不开：查看其他网络地址'));
     for (const url of result.addresses || []) {

@@ -17,7 +17,11 @@
       button.type = 'button';
       button.className = 'pill-button';
       button.dataset.motionExport = format;
-      button.textContent = `导出 ${format.toUpperCase()}`;
+      // 「导出」放在 span 里：窗口窄时顶栏的按钮只留图标（styles.css 把 span 藏起来），这两个就只剩 MP4 / GIF
+      const prefix = document.createElement('span');
+      prefix.textContent = '导出 ';
+      button.append(prefix, format.toUpperCase());
+      button.setAttribute('aria-label', `导出 ${format.toUpperCase()}`);
       button.title = format === 'gif' ? '完整动态卡片，15 fps GIF，宽 864 像素，无声音' : '完整动态卡片，1440 × 1920，30 fps MP4，可带声音';
       button.addEventListener('click', () => { mc.output.exportMotion(format).catch(() => undefined); });
       container.insertBefore(button, send);
