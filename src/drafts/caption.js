@@ -40,7 +40,20 @@
     show();
     drafts.saveSoon();
   });
-  field.addEventListener("toggle", grow);
+  // 自己点开的（点这一行，或焦点在这一行上按回车 / 空格）：光标直接进输入框，不用再点一次。
+  // 别处展开的（稿子换了、focus() 跳过来）各管各的焦点。
+  // 收起时焦点还在输入框里：还给这一行，不留在看不见的框里。
+  const summary = field.querySelector("summary");
+  let openedByHand = false;
+  summary.addEventListener("click", () => {
+    openedByHand = !field.open;
+  });
+  field.addEventListener("toggle", () => {
+    grow();
+    if (field.open && openedByHand) input.focus();
+    else if (!field.open && document.activeElement === input) summary.focus();
+    openedByHand = false;
+  });
   mc.on("change", show);
 
   // 展开、聚焦正文栏，给了范围就选中那几个字

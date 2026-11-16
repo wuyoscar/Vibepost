@@ -155,6 +155,29 @@
     };
   }
 
+  // 用键盘走菜单（「样式」「插入」）：开着时 ↓ ↑ 在各项之间走、到头绕回去，Home / End 到第一项、最后一项。
+  // 焦点还在按钮上时 ↓ 进到第一项（「样式」是进到现在的那一项），↑ 进到最后一项；Esc 收起、焦点回按钮在 src/workspace/menus.js。
+  // 「图片或 PDF」「实况视频」两项是连着文件选择框的 label，焦点落在里面的选择框上
+  function bindMenuKeys(menu) {
+    const items = () => [...menu.querySelectorAll(".menu-item")].filter((item) => !item.disabled && item.getClientRects().length > 0);
+    menu.addEventListener("keydown", (event) => {
+      if (!menu.open || event.metaKey || event.ctrlKey || event.altKey) return;
+      const list = items();
+      if (!list.length) return;
+      const index = list.findIndex((item) => item.contains(document.activeElement));
+      const move = {
+        ArrowDown: () => (index === -1 ? list.find((item) => item.getAttribute("aria-checked") === "true") ?? list[0] : list[(index + 1) % list.length]),
+        ArrowUp: () => (index === -1 ? list.at(-1) : list[(index - 1 + list.length) % list.length]),
+        Home: () => list[0],
+        End: () => list.at(-1),
+      }[event.key];
+      if (!move) return;
+      event.preventDefault();
+      const next = move();
+      (next.matches("label") ? next.querySelector("input") : next).focus();
+    });
+  }
+
   // 格式条：「样式」、加粗等行内格式、插入、源码
   function bindFormatBar(editor, bar) {
     const sourceToggle = bar.querySelector("[data-source-toggle]");
@@ -165,6 +188,7 @@
     });
     fillInsertMenu(bar.querySelector("[data-insert-items]"));
     const syncStyle = bindStyleMenu(editor, bar.querySelector("#styleMenu"));
+    for (const menu of bar.querySelectorAll("details.pop-menu:not(.emoji-menu)")) bindMenuKeys(menu);
     bar.querySelectorAll("[data-mark]").forEach((button) => run(button, () => editor.command("toggleInline", button.dataset.mark)));
     bar.querySelectorAll("[data-insert]").forEach((button) => run(button, () => editor.insert(button.dataset.insert)));
     run(sourceToggle, () => editor.setSourceMode(!editor.sourceMode()));

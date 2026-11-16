@@ -173,8 +173,9 @@
             <button type="button" data-draft-filter="cards" aria-pressed="false">图文</button>
             <button type="button" data-draft-filter="article" aria-pressed="false">长文</button>
           </div>
+          <!-- 没找到、这一类还没有：写在列表该在的地方（列表这时是空的），不沉到抽屉底下 -->
+          <p id="draftSearchEmpty" class="draft-list-empty" hidden>没有找到这篇稿件</p>
           <div id="draftList" class="draft-list" role="list"></div>
-          <p id="draftSearchEmpty" class="drawer-note" hidden>没有找到这篇稿件</p>
           <p class="drawer-note">稿件只存在这台电脑上，改动自动保存。</p>
         </aside>
 
