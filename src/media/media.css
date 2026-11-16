@@ -169,7 +169,9 @@
   padding: 3px;
   border: 1px solid var(--ui-border);
   border-radius: 10px;
-  background: var(--ui-popover);
+  background: var(--ui-popover-glass);
+  -webkit-backdrop-filter: var(--ui-material);
+  backdrop-filter: var(--ui-material);
   box-shadow: var(--ui-popover-shadow);
   pointer-events: auto;
   transform: translate(-50%, calc(-100% - 10px));
