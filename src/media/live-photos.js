@@ -172,6 +172,7 @@
       load: (videos) => library.load(videos),
       // 预览里删掉一段实况（stored 为 false）或撤销回来：本机存储里的视频跟着删掉或写回
       keepStored(id, record, stored) {
+        if (!stored) stage.release(id);
         library.keepStored(keyOf(id, record), stored).catch(() => undefined);
       },
       // 删掉后再也撤销不回来了：放掉内存里的视频

@@ -182,6 +182,13 @@
   // storage：{ put(key, blob), remove(key), read(key) }，都返回 Promise
   function createLibrary(storage) {
     const items = new Map(); // key → { blob, url }
+    const queue = new Map(); // key → 这段视频排着队的删与写回（按先后来，前一个出错不拦后一个）
+
+    function enqueue(key, work) {
+      const next = (queue.get(key) ?? Promise.resolve()).catch(() => undefined).then(work);
+      queue.set(key, next);
+      return next;
+    }
 
     function drop(key) {
       const item = items.get(key);
@@ -218,10 +225,19 @@
         return storage.put(String(key), blob);
       },
       // 预览里删掉实况（stored 为 false）时从本机存储删掉，内存里留着等撤销；撤销回来时再写回
+      // 从本机存储读出来的 Blob 背后就是存储里的那个文件：记录一删，它可能就读不出来了，撤销时也就写不回去。
+      // 所以删之前先把内容整个读进内存，换成不靠存储的一份；读不出来就不删（宁可多留一份）
       keepStored(key, stored) {
-        const item = items.get(String(key));
-        if (stored) return item ? storage.put(String(key), item.blob) : Promise.resolve();
-        return storage.remove(String(key));
+        key = String(key);
+        return enqueue(key, async () => {
+          const item = items.get(key);
+          if (stored) return item ? storage.put(key, item.blob) : undefined;
+          if (item) {
+            const copy = new Blob([await item.blob.arrayBuffer()], { type: item.blob.type });
+            if (items.get(key) === item) hold(key, copy);
+          }
+          return storage.remove(key);
+        });
       },
       // 再也撤销不回来了：放掉内存里的这一份
       release: (key) => drop(String(key)),

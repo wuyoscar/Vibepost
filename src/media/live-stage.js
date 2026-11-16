@@ -23,7 +23,7 @@
     badge.className = "stage-live-badge";
     badge.textContent = window.MediaCraftNative?.capabilities?.motionExport?.includes("mp4") ? "动态" : "LIVE";
     element.append(badge);
-    if (!source) return { element, playOnce() {}, setHover() {}, stop() {} };
+    if (!source) return { element, imageId: hit.imageId, playOnce() {}, setHover() {}, stop() {} };
 
     const video = document.createElement("video");
     video.className = "stage-live-video";
@@ -39,6 +39,7 @@
     let clip = null;
     let looping = false;
     let playing = false;
+    let stopped = false;
     let timer = 0;
 
     // 取景框按图片框的比例居中铺满（和卡片上画封面一样）
@@ -78,6 +79,7 @@
     }
 
     function play() {
+      if (stopped) return;
       if (!clip) {
         element.dataset.pending = "true";
         return;
@@ -93,6 +95,7 @@
 
     return {
       element,
+      imageId: hit.imageId,
       playOnce() {
         looping = false;
         play();
@@ -101,7 +104,10 @@
         looping = on;
         if (on) play();
       },
+      // 放掉视频：先清掉地址再 load()，还在加载的也是干净地中止（不报错）。可以重复调
       stop() {
+        if (stopped) return;
+        stopped = true;
         rest();
         video.removeAttribute("src");
         video.load();
@@ -148,7 +154,13 @@
       });
     }).observe(pagesRoot, { childList: true });
 
-    return { attachPage };
+    // 这张实况要删了：现在就放掉舞台上它的视频，不等下一次出图。
+    // 接下来本机存储里的视频会被删掉，这时还在加载的视频会断在半路报错
+    function release(imageId) {
+      for (const entry of attached) entry.wells.forEach((well) => well.imageId === imageId && well.stop());
+    }
+
+    return { attachPage, release };
   }
 
   window.MediaCraftMedia.createLiveStage = createStage;

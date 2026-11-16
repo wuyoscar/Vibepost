@@ -33,6 +33,22 @@ struct DataSafetyTests {
         window.modalOpen = () => ui.alert() !== null;
     """
 
+    /// 本机存储里那段实况视频真的读得出多少字节（记录里的大小不算数：文件没了，大小照样报）
+    static let storedVideoBytes = """
+        const db = await new Promise((resolve, reject) => {
+          const open = indexedDB.open("mediacraft");
+          open.onsuccess = () => resolve(open.result);
+          open.onerror = () => reject(open.error);
+        });
+        const items = await new Promise((resolve) => {
+          const all = db.transaction("media").objectStore("media").getAll();
+          all.onsuccess = () => resolve(all.result);
+        });
+        db.close();
+        const video = items.find((item) => item.kind === "video");
+        return video ? await video.data.arrayBuffer().then((buffer) => buffer.byteLength, (error) => `读不出来：${error.name}`) : "没有视频";
+    """
+
     static let imageShown = "(await previewBox(imageId))"
     static let imageGone = "!(await markdown()).includes(imageId) && !(await window.mediacraft.media.get(imageId)) && !anyPreviewBox()"
 
@@ -201,6 +217,7 @@ extension SendLivePhotoTests {
         let reopened = try await harness.waitForPage(
             "(await window.mediacraft.media.video(videoKey)).memoryBytes === videoSize && ui.find('选择实况')"
         )
+        let readable = try await harness.evaluate(DataSafetyTests.storedVideoBytes)
 
         _ = try await harness.evaluate("""
             window.imageId = (await imageTags())[0];
@@ -226,8 +243,60 @@ extension SendLivePhotoTests {
         #expect(inserted && deleted)
         #expect(restored && stored, "⌘Z 后实况图回来，视频重新写回本机存储")
         #expect(reopened, "重新打开后实况视频还在")
+        #expect(readable as? Int == video?["size"] as? Int, "存回本机的视频读得出来：\(String(describing: readable))")
         #expect(deletedAgain)
         #expect(released == ["cache": false, "stored": false, "back": false], "切换稿子后这次删除不能再撤销，视频随之释放")
+        #expect(harness.pageErrors == [])
+    }
+
+    @Test("重新打开之后再删实况、再 ⌘Z：写回本机存储的视频读得出来，再打开一次舞台上还能播")
+    func undoAfterReopenKeepsVideoReadable() async throws {
+        let harness = ShellHarness()
+        try await harness.load()
+        _ = try await harness.evaluate(DataSafetyTests.helpers + """
+            const mc = window.mediacraft;
+            await mc.drafts.create({ markdown: "第一段" });
+            const video = await (await fetch("/macos/Tests/Fixtures/live-h264.mp4")).blob();
+            await mc.media.insertLivePhoto(new File([video], "海边.mp4", { type: "video/mp4" }), { at: "第一段".length, duration: 3 });
+        """)
+        _ = try await harness.waitForPage("(await imageTags()).length === 1 && ui.find('选择实况')")
+        let video = try await harness.evaluate("""
+            window.imageId = (await imageTags())[0];
+            window.videoKey = (await window.mediacraft.media.get(imageId)).live.videoKey;
+            window.videoSize = (await window.mediacraft.media.video(videoKey)).memoryBytes;
+            return { id: imageId, key: videoKey, size: videoSize };
+        """) as? [String: Any]
+        let saved = try await harness.waitForPage("(await window.mediacraft.media.video(videoKey)).storedBytes === videoSize")
+
+        // 重新打开：这时内存里的那一份是从本机存储读出来的
+        let reopen = DataSafetyTests.helpers + "window.imageId = id; window.videoKey = key; window.videoSize = size;"
+        try await harness.load()
+        _ = try await harness.evaluate(reopen, arguments: video ?? [:])
+        let reopened = try await harness.waitForPage(
+            "(await window.mediacraft.media.video(videoKey)).memoryBytes === videoSize && ui.find('选择实况')"
+        )
+        _ = try await harness.evaluate("await deleteInPreview(imageId)")
+        let deleted = try await harness.waitForPage(DataSafetyTests.imageGone)
+        let removed = try await harness.waitForPage("(await window.mediacraft.media.video(videoKey)).storedBytes === null")
+        _ = try await harness.evaluate("pressOutsideEditor('z')")
+        let restored = try await harness.waitForPage(DataSafetyTests.imageShown)
+        let stored = try await harness.waitForPage("(await window.mediacraft.media.video(videoKey)).storedBytes === videoSize")
+
+        // 再打开一次：存回去的是不是真的视频，看舞台上的预览读不读得出画面
+        try await harness.load()
+        _ = try await harness.evaluate(reopen, arguments: video ?? [:])
+        let playable = try await harness.waitForPage("""
+            (() => {
+              const video = document.querySelector(".stage-live-video");
+              return Boolean(video) && video.readyState >= 1 && video.videoWidth > 0;
+            })()
+        """)
+        await harness.tearDown()
+
+        #expect(saved && reopened)
+        #expect(deleted && removed, "预览里删掉后，本机存储里的视频跟着删掉")
+        #expect(restored && stored, "⌘Z 后实况图回来，视频重新写回本机存储")
+        #expect(playable, "写回去的视频读得出来")
         #expect(harness.pageErrors == [])
     }
 }

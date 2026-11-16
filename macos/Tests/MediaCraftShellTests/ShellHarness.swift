@@ -351,7 +351,8 @@ final class ShellHarness: NSObject {
       // 「ResizeObserver loop completed with undelivered notifications」不是页面脚本出错：观察回调里尺寸又变了，
       // 剩下的通知按规范挪到下一帧送，出不出现要看这一帧机器忙不忙
       const benign = /^ResizeObserver loop completed with undelivered notifications/;
-      window.addEventListener("error", (event) => benign.test(event.message || "") || post("error", event.message || `${event.target?.tagName}#${event.target?.id || ""}.${event.target?.className || ""} in ${event.target?.parentElement?.id || ""}.${event.target?.parentElement?.className || ""} ${event.target?.src || event.target?.href || ""}`), true);
+      window.addEventListener("error", (event) => benign.test(event.message || "") || post("error", event.message || `${event.target?.tagName}#${event.target?.id || ""}.${event.target?.className || ""} in ${event.target?.parentElement?.id || ""}.${event.target?.parentElement?.className || ""} ${event.target?.src || event.target?.href || ""}${event.target?.error ? ` [媒体错误 ${event.target.error.code} ${event.target.error.message || ""}，${event.target.isConnected ? "还在页面上" : "已撤下"}${window.__harnessLeaving ? "，页面正在离开" : ""}，readyState ${event.target.readyState}，networkState ${event.target.networkState}]` : ""}`), true);
+      window.addEventListener("pagehide", () => { window.__harnessLeaving = true; });
       window.addEventListener("unhandledrejection", (event) => post("unhandledrejection", String(event.reason)));
       // 内容安全策略（index.html）挡下的每一次：哪条规则、挡了什么
       document.addEventListener("securitypolicyviolation", (event) => post("csp", `${event.effectiveDirective} ${event.blockedURI || "(inline)"} ${event.sourceFile || ""}:${event.lineNumber || 0}`), true);
