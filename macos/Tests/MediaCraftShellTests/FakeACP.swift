@@ -86,6 +86,12 @@ final class FakeACP {
         return (calls[index]["responses"] as? [String: Any])?[String(requestId)] as? [String: Any]
     }
 
+    /// 第 index 次调用里，它经挂上的 MCP 服务（App 的工具）发的消息得到的回答，按先后（JSON-RPC 的整条回答）
+    func mcpReplies(_ index: Int) -> [[String: Any]] {
+        let calls = calls()
+        return index < calls.count ? calls[index]["mcp"] as? [[String: Any]] ?? [] : []
+    }
+
     /// 页面对一个权限请求选了哪个选项（optionId）
     func chosen(_ index: Int, _ requestId: Int) -> String? {
         (response(index, requestId)?["outcome"] as? [String: Any])?["optionId"] as? String
@@ -133,6 +139,19 @@ final class FakeACP {
     /// 它的一个请求（权限……）：发出去，等页面回答再往下走
     static func request(_ id: Int, _ method: String, _ params: [String: Any]) -> String {
         "#request " + line(["jsonrpc": "2.0", "id": id, "method": method, "params": params])
+    }
+
+    /// 经挂上的 MCP 服务发一条消息（握手、列工具、调工具）；id 为 nil 的是通知
+    static func mcp(_ id: Int?, _ method: String, _ params: [String: Any]? = nil) -> String {
+        var message: [String: Any] = ["jsonrpc": "2.0", "method": method]
+        message["id"] = id
+        message["params"] = params
+        return "#mcp " + line(message)
+    }
+
+    /// 调 App 的一个工具
+    static func appTool(_ id: Int, _ name: String, _ arguments: [String: Any] = [:]) -> String {
+        mcp(id, "tools/call", ["name": name, "arguments": arguments])
     }
 
     /// 要做一个操作，问能不能（选项像 OpenCode 的：once / always / reject）

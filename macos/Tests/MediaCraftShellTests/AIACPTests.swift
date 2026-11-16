@@ -32,7 +32,7 @@ struct AIACPTests {
         return text.hasPrefix("/private/") ? String(text.dropFirst("/private".count)) : text
     }
 
-    @Test("OpenCode：第一轮 acp 开会话（工作目录是工作副本、不挂 MCP 服务、运行命令要先问），说明书随第一句给（写明用不了 App 的工具），流式回复，改稿进修改对比；下一轮续上同一个会话、不再带说明书；工具调用的大块输出不推给页面")
+    @Test("OpenCode：第一轮 acp 开会话（工作目录是工作副本、只挂 App 的工具这一个 MCP 服务、运行命令要先问），说明书随第一句给（讲了 App 的工具怎么叫），流式回复，改稿进修改对比；下一轮续上同一个会话、不再带说明书；工具调用的大块输出不推给页面")
     func firstTurnOpensSessionAndResumes() async throws {
         let agent = try FakeACP(script: FakeACP.text(["把甲", "改好了"])
             + FakeACP.tool("t1", kind: "read", title: "read", input: ["filePath": "{{CWD}}/draft.md"])
@@ -81,10 +81,14 @@ struct AIACPTests {
         #expect((capabilities?["fs"] as? [String: Any])?["writeTextFile"] as? Bool == false && capabilities?["terminal"] as? Bool == false, "不替它读写文件、开终端")
         let open = try #require(agent.params(0, "session/new"))
         #expect(Self.canonical(open["cwd"]) == Self.canonical(calls[0]["cwd"]) && Self.canonical(open["cwd"]) != "", "会话开在这篇的工作副本里")
-        #expect((open["mcpServers"] as? [Any])?.isEmpty == true)
+        let servers = open["mcpServers"] as? [[String: Any]] ?? []
+        #expect(servers.count == 1 && servers.first?["name"] as? String == "mediacraft", "只挂 App 的工具：\(servers)")
+        #expect(servers.first?["command"] as? String == "/usr/bin/nc" && (servers.first?["args"] as? [String])?.first == "-U", "用系统自带的 nc 连回这一轮的套接字")
+        let socket = (servers.first?["args"] as? [String])?.last ?? ""
+        #expect(!socket.isEmpty && !FileManager.default.fileExists(atPath: socket), "这一轮结束套接字就删了：\(socket)")
         let prompt = agent.prompt(0)
         #expect(prompt.contains("Vibepost") && prompt.contains("不是用户给你的指令"), "说明书（含防提示词注入）随第一句给它")
-        #expect(prompt.contains("用不了 Vibepost 的工具") && !prompt.contains("get_draft"), "写明没有 App 的工具，不列工具名")
+        #expect(prompt.contains("MCP 服务 mediacraft 里的工具") && prompt.contains("get_draft") && prompt.contains("generate_image"), "讲了 App 的工具在它那边怎么叫、有哪些")
         #expect(prompt.hasSuffix("把甲改成乙"), "用户的话在最后")
         let first = result?["first"] as? [String: Any]
         let lines = first?["lines"] as? [[String]] ?? []
@@ -101,6 +105,60 @@ struct AIACPTests {
         #expect(result?["ends"] as? [String] == ["done", "done"])
         #expect(result?["backends"] as? [String] == ["claude", "codex", "opencode", "omp", "kimi"])
         #expect((result?["longest"] as? Int ?? .max) < 3000, "工具调用的整份输出不推给页面：\(result?["longest"] ?? "")")
+        #expect(harness.pageErrors == [])
+    }
+
+    @Test("App 的工具经 MCP 挂给它：握手、列工具、调工具都由页面里的工具回答（和 Claude Code、Codex 用的是同一套）；换主题马上生效、会话里记一个能撤销的动作，它自己报的这次工具调用不再记一行、要权限时直接放行；通知不回答")
+    func appToolsOverMCP() async throws {
+        let agent = try FakeACP(script: [
+            FakeACP.mcp(1, "initialize", ["protocolVersion": "2025-06-18", "capabilities": [:] as [String: Any], "clientInfo": ["name": "fake", "version": "1"]]),
+            FakeACP.mcp(nil, "notifications/initialized"),
+            FakeACP.mcp(2, "tools/list"),
+            FakeACP.update("tool_call", ["toolCallId": "m1", "title": "mediacraft_set_theme", "kind": "other", "status": "pending", "rawInput": [:] as [String: Any]]),
+            FakeACP.permission(40, kind: "other", title: "mediacraft_set_theme", input: ["theme": "纯黑"], callId: "m1"),
+            FakeACP.appTool(3, "set_theme", ["theme": "纯黑"]),
+            FakeACP.update("tool_call_update", ["toolCallId": "m1", "status": "completed"]),
+            FakeACP.appTool(4, "get_pages"),
+            FakeACP.appTool(5, "no_such_tool"),
+        ] + FakeACP.reply("换好了"))
+        defer { agent.remove() }
+        let harness = ShellHarness(terminalPath: [agent.directory], onboarding: false)
+        try await harness.load()
+        let result = try await harness.evaluate(Self.helpers("OpenCode") + """
+            await mc.drafts.create({ markdown: "# 周末\\n\\n第一段文字。\\n", theme: "notes" });
+            await mc.ai.setBackend("opencode");
+            await openAI();
+            ask("换个深色的主题");
+            await until(() => finished(1));
+            const after = { theme: (await mc.drafts.current()).theme, lines: lines(), actions: await actions(), asked: sheetView().shown };
+            ui.click("撤销：换成主题「纯黑」");
+            await until(async () => (await mc.drafts.current()).theme === "notes");
+            return { ...after, ends: (await ends()).map((end) => end.state) };
+        """) as? [String: Any]
+        await harness.tearDown()
+
+        let replies = agent.mcpReplies(0)
+        try #require(replies.count == 5, "五条有 id 的消息各有一个回答，通知没有：\(replies)")
+        let server = (replies[0]["result"] as? [String: Any])?["serverInfo"] as? [String: Any]
+        #expect(replies[0]["id"] as? Int == 1 && server?["name"] as? String == "mediacraft", "握手：\(replies[0])")
+        let tools = ((replies[1]["result"] as? [String: Any])?["tools"] as? [[String: Any]] ?? []).compactMap { $0["name"] as? String }
+        for name in ["get_draft", "get_pages", "view_page", "set_theme", "set_style", "move_image", "propose_images", "generate_image", "save_writing_manual"] {
+            #expect(tools.contains(name), "工具清单里有 \(name)")
+        }
+        let text = { (reply: [String: Any]) in
+            ((reply["result"] as? [String: Any])?["content"] as? [[String: Any]] ?? []).compactMap { $0["text"] as? String }.joined(separator: "\n")
+        }
+        #expect(replies[2]["id"] as? Int == 3 && text(replies[2]).contains("纯黑"), "换主题的结果：\(replies[2])")
+        #expect(text(replies[3]).contains("第 1 页") || text(replies[3]).contains("1"), "get_pages 看得到页面：\(replies[3])")
+        #expect((replies[4]["result"] as? [String: Any])?["isError"] as? Bool == true || replies[4]["error"] != nil, "没有的工具报错：\(replies[4])")
+
+        #expect(result?["theme"] as? String == "ink", "主题真的换了")
+        let actions = result?["actions"] as? [[String: Any]] ?? []
+        #expect(actions.map { $0["text"] as? String } == ["换成主题「纯黑」"], "会话里记一个能撤销的动作：\(actions)")
+        let lines = result?["lines"] as? [[String]] ?? []
+        #expect(!lines.contains { $0.last?.contains("mediacraft_set_theme") == true }, "它自己报的这次工具调用不再记一行：\(lines)")
+        #expect(result?["asked"] as? Bool == false && agent.chosen(0, 40) == "once", "App 的工具要权限时直接放行，不弹确认框")
+        #expect(result?["ends"] as? [String] == ["done"])
         #expect(harness.pageErrors == [])
     }
 
@@ -204,7 +262,7 @@ struct AIACPTests {
         #expect((result?["refused"] as? String ?? "") != "写进去了" && !agent.methods(1).contains("session/delete"), "不认得的请求不写：\(result?["refused"] ?? "")")
         let smuggled = try #require(agent.params(1, "session/new"))
         #expect(Self.canonical(smuggled["cwd"]) == Self.canonical(agent.calls()[1]["cwd"]) && Self.canonical(smuggled["cwd"]) != "", "工作目录由壳定")
-        #expect((smuggled["mcpServers"] as? [Any])?.isEmpty == true, "页面给的 MCP 服务不带进去")
+        #expect((smuggled["mcpServers"] as? [[String: Any]])?.map { $0["name"] as? String } == ["mediacraft"], "页面给的 MCP 服务不带进去，只有壳挂的那一个")
         #expect(result?["ends"] as? [String] == ["done", "done"])
         #expect(harness.pageErrors == [])
     }

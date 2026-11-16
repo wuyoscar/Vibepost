@@ -23,6 +23,8 @@ protocol AIBackend: Sendable {
     func generatedImages(in line: [String: Any]) -> GeneratedImages?
     /// 推给页面之前把这一行削薄（去掉页面用不上的大块内容）；原样推时为 nil
     func slim(_ line: [String: Any]) -> [String: Any]?
+    /// App 的工具要不要经一个这一轮的 MCP 服务挂给它（见 AIToolServer；Claude Code、Codex 各有自己的通道，不用）
+    var mountsTools: Bool { get }
 }
 
 /// 一轮里壳自己记着的几样（读输出与写 stdin 在不同线程上，加锁）
@@ -40,6 +42,7 @@ extension AIBackend {
     func validate(_ request: AISessions.TurnRequest) throws {}
     func generatedImages(in line: [String: Any]) -> GeneratedImages? { nil }
     func slim(_ line: [String: Any]) -> [String: Any]? { nil }
+    var mountsTools: Bool { false }
 }
 
 /// 后端自己生成的图：壳读到时直接存成这篇的配图候选（是后端自己画的，不用再问用户；原图不动），

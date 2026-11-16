@@ -732,7 +732,7 @@
                         <button id="aiPathSaveBtn" class="primary-button" type="button" data-path-save>保存</button>
                       </div>
                     </div>
-                    <!-- 说 ACP 的后端（src/ai/backends/acp.js）：它们各自接着很多家的模型，能选的模型由它们自己报；用不了 App 的工具。平时收着，这篇正用着其中一个时展开（src/ai/panel.js） -->
+                    <!-- 说 ACP 的后端（src/ai/backends/acp.js）：它们各自接着很多家的模型，能选的模型由它们自己报；App 的工具经 MCP 挂给它们。平时收着，这篇正用着其中一个时展开（src/ai/panel.js） -->
                     <details id="aiMoreBackends" class="ai-more-backends">
                       <summary>
                         <svg class="icon icon-small" aria-hidden="true"><use href="#i-chevron-right" /></svg>
@@ -816,7 +816,7 @@
                         </div>
                       </div>
                     </details>
-                    <!-- 生图（用 Claude Code 时 App 的工具 generate_image，走 OpenAI）：哪个模型，密钥取终端环境里的（src/ai/panel.js）；Codex 用它自带的 -->
+                    <!-- 生图（App 的工具 generate_image，走 OpenAI）：哪个模型，密钥取终端环境里的（src/ai/panel.js）；Codex 用它自带的 -->
                     <div class="ai-image-settings" role="group" aria-labelledby="aiImageTitle">
                       <h2 id="aiImageTitle" class="section-label">生图</h2>
                       <label class="field">

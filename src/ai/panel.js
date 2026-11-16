@@ -1058,7 +1058,7 @@
     void syncImageSettings();
   });
 
-  // ===== 生图的设置（用 Claude Code 时的 generate_image，走 OpenAI）：模型（空为默认），存在本机 =====
+  // ===== 生图的设置（App 的工具 generate_image，走 OpenAI；Codex 用它自带的）：模型（空为默认），存在本机 =====
 
   async function syncImageSettings(error = null) {
     const current = await ai.api.imageSettings();
@@ -1067,7 +1067,7 @@
     if (!error) imageModelInput.value = current.model === current.defaultModel ? "" : current.model;
     imageError.hidden = !error;
     imageError.textContent = error ?? "";
-    imageNote.textContent = `用 Claude Code 时，生图调 OpenAI 的接口，密钥用终端环境（或 ~/.env）里的 ${current.key}，不用在这里填；按张计费，记在你自己的账户上。用 Codex 时它用自带的生图，不用这里的设置；OpenCode、Oh My Pi、Kimi Code 不能生图。`;
+    imageNote.textContent = `生图调 OpenAI 的接口，密钥用终端环境（或 ~/.env）里的 ${current.key}，不用在这里填；按张计费，记在你自己的账户上。用 Codex 时它用自带的生图，不用这里的设置。`;
   }
 
   async function saveImageSettings() {

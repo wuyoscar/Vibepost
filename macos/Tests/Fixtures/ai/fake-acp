@@ -23,6 +23,8 @@
   #write ["文件", "内容"]          在工作目录里写文件（像它自己改文件）
   #request {"id": …, "method": …, "params": {…}}   发一个请求（权限……），等到它的回答再往下走
   #hang                            一直不结束，等着被停止
+  #mcp {"id": …, "method": …}      经挂上的 MCP 服务（App 的工具，session/new 的 mcpServers[0]）发一条 MCP 消息：像真的 Agent 一样
+                                   把它当 stdio 程序启动（一轮里只起一次），有 id 的等到回答、记进 mcp，再往下走
   #stderr "文字"                   往 stderr 写一行
   #stderr-env "变量名"             往 stderr 写这个环境变量的值（像出错信息里带出了密钥）
   #error {"code": …, "message": …} 这一轮以出错结束（session/prompt 回答 error）
@@ -32,6 +34,7 @@
 import json
 import os
 import signal
+import subprocess
 import sys
 import threading
 import time
@@ -74,6 +77,8 @@ record = {
     "caption": read_file("caption.txt"),
     "stdin": [],
     "responses": {},
+    "mcpServers": None,
+    "mcp": [],
     "signals": [],
     "stdinClosed": False,
 }
@@ -156,6 +161,32 @@ signal.signal(signal.SIGINT, on_signal)
 signal.signal(signal.SIGTERM, on_signal)
 
 
+mcp_process = None
+
+
+def mcp_send(message):
+    """经挂上的 MCP 服务发一条消息；有 id 的等它的回答"""
+    global mcp_process
+    servers = record["mcpServers"] or []
+    if not servers:
+        reply = {"error": "没有挂 MCP 服务"}
+    else:
+        if mcp_process is None:
+            server = servers[0]
+            env = {**os.environ, **{item["name"]: item["value"] for item in server.get("env", [])}}
+            mcp_process = subprocess.Popen([server["command"], *server.get("args", [])], stdin=subprocess.PIPE,
+                                           stdout=subprocess.PIPE, env=env, text=True, bufsize=1)
+        mcp_process.stdin.write(json.dumps(message, ensure_ascii=False) + "\n")
+        mcp_process.stdin.flush()
+        if "id" not in message:
+            return
+        line = mcp_process.stdout.readline()
+        reply = json.loads(line) if line.strip() else {"error": "连接断了"}
+    with lock:
+        record["mcp"].append(reply)
+        save()
+
+
 def fill(text):
     return text.replace("{{SESSION}}", state["session"] or "").replace("{{CWD}}", os.getcwd())
 
@@ -189,6 +220,8 @@ def replay():
                 with answered:
                     while str(request["id"]) not in record["responses"] and not record["stdinClosed"]:
                         answered.wait(0.1)
+            elif action == "mcp":
+                mcp_send(json.loads(fill(rest)))
             elif action == "hang":
                 while not record["stdinClosed"] and not state["done"]:
                     time.sleep(0.1)
@@ -248,6 +281,7 @@ for raw in sys.stdin:
             respond(message["id"], error={"code": -32000, "message": "Authentication required"})
             continue
         state["session"] = str(uuid.uuid4())
+        record["mcpServers"] = params.get("mcpServers")
         store_session()
         respond(message["id"], {"sessionId": state["session"], "configOptions": config_options()})
     elif method in ("session/resume", "session/load"):
@@ -264,6 +298,7 @@ for raw in sys.stdin:
             respond(message["id"], error={"code": -32603, "message": "Internal error: service failure"})
             continue
         state["session"] = session
+        record["mcpServers"] = params.get("mcpServers")
         state["settings"] = json.loads(saved)
         if method == "session/load":
             send({"method": "session/update", "params": {"sessionId": session, "update": {

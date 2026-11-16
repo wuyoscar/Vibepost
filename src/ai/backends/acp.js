@@ -4,8 +4,10 @@
 // 壳只写开头的 initialize；这里接着说：握手回来开会话或续会话，按这篇选的换模型、推理强度，再发这一轮的话。
 // 流式的回复、它用的工具、权限请求都在这里翻成会话核心（src/ai/session.js）的动作；回答经壳写回 stdin。
 // session/prompt 的回答就是说完了（壳随即关上 stdin，它就退出）。
-// 这类后端用不了 App 的工具（没有挂进去的办法），只改工作副本里的文件；说明书在新会话的第一句里给它
-// （ACP 没有系统提示词这一项，工作副本里的 AGENTS.md 它们自己会读）。
+// App 的工具经 MCP 挂给它：壳每一轮开一个只给这一轮用的 MCP 服务（开会话时写进 mcpServers，macOS AIToolServer.swift，
+// Windows windows/lib/ai.cjs 的 _toolEndpoint），Agent 发来的 MCP 消息壳原样推过来（method 是 vibepost/mcp 的一行），
+// 这里交给 src/ai/tools.js 回答，回答经壳写回那条连接。所以只有 API 的模型套上这些 Agent 之后，既能改文件也能操作 App。
+// 说明书在新会话的第一句里给它（ACP 没有系统提示词这一项，工作副本里的 AGENTS.md 它们自己会读）。
 // 再加一个说 ACP 的 Agent：在下面的 AGENTS 里登记一行，壳里 AISessions 的 backends / locators 各加一项（docs/app-api.md 的「加一个后端」）。
 (function (root) {
   "use strict";
@@ -21,6 +23,10 @@
 
   // 我们发出的请求的 id：握手（壳写的）、开或续会话、发这一轮；换模型、推理强度从 10 数起
   const ID = { initialize: 1, session: 2, prompt: 3, option: 10 };
+
+  // App 的工具挂给它时那组工具的名字（和 Claude Code 里的一样）；壳推过来的 MCP 消息那一行的 method
+  const TOOL_SERVER = "mediacraft";
+  const TOOL_METHOD = "vibepost/mcp";
 
   const file = (path) => String(path || "").split("/").pop();
   const request = (id, method, params) => ({ jsonrpc: "2.0", id, method, params });
@@ -46,6 +52,14 @@
       command: typeof input.command === "string" ? input.command : null,
       url: typeof input.url === "string" ? input.url : null,
     };
+  }
+
+  // 这个工具调用是不是 App 的工具（各家写法不一样：OpenCode 的标题是 mediacraft_<工具>，Oh My Pi 的在 rawInput.path 里
+  // 写 xd://mcp__mediacraft_<工具>）。App 的工具执行时自己记一行、要问的自己问，这里不再记、不再问
+  function isAppTool(call) {
+    const input = call?.rawInput && typeof call.rawInput === "object" ? call.rawInput : {};
+    const names = [call?.title, input.path, input.name, input.tool].filter((value) => typeof value === "string");
+    return names.some((name) => new RegExp(`(^|mcp__)${TOOL_SERVER}(_|\\.|:)`).test(name));
   }
 
   // 会话里记一行：它做了什么。读文件、查找、思考不记（太碎）；没成功的写明
@@ -206,6 +220,11 @@
         core.reply(turn, id, null, `Vibepost 不支持 ${method}`);
         return;
       }
+      // App 的工具不在这里问（该问的工具自己问）
+      if (isAppTool(params.toolCall)) {
+        core.reply(turn, id, backends[agent.id].permissionReply({ input: params }, "allow").response);
+        return;
+      }
       const { key, scopeText, ...view } = permissionView(params);
       const rule = key ? `acp:${JSON.stringify(key)}` : null;
       // 每轮是新进程，请求 id 会重复：确认框用带上这一轮的 id，回答时用它原来的 id
@@ -247,7 +266,7 @@
         if (call.logged || !["completed", "failed"].includes(call.status)) return;
         call.logged = true;
         const refused = denied.delete(`${turn.sessionId}:${change.toolCallId}`);
-        const line = refused ? null : describeCall(call);
+        const line = refused || isAppTool(call) ? null : describeCall(call);
         if (line) core.tool(turn, line);
       }
     }
@@ -268,7 +287,26 @@
         }
       } else if (message.method === "session/update") {
         update(turn, message.params ?? {}, core);
+      } else if (message.method === TOOL_METHOD) {
+        // 它经挂上的 MCP 服务发来的一条消息（握手、列工具、调工具）：交给 App 的工具回答，一次执行一个（核心排队）。
+        // 通知（没有 id）不用回答
+        const { connection, message: call } = message.params ?? {};
+        if (!call || call.id === undefined || call.id === null || turn.result) return;
+        endText(turn, core);
+        core.runTool(turn, { mcp: connection, id: call.id }, (context) => core.tools.handle(call, context));
       }
+    }
+
+    // 给它的回答：对它的请求（权限）的是一条 JSON-RPC 回答，写进 stdin；对 MCP 消息的（requestId 是 { mcp, id }）
+    // 是工具给的整条 JSON-RPC 回答，壳写回那条连接
+    function reply(requestId, result, error = null) {
+      if (requestId && typeof requestId === "object") {
+        const message = error ? { jsonrpc: "2.0", id: requestId.id, error: { code: -32603, message: error } } : result;
+        return { mcp: { connection: requestId.mcp, message } };
+      }
+      return error
+        ? { jsonrpc: "2.0", id: requestId, error: { code: -32601, message: error } }
+        : { jsonrpc: "2.0", id: requestId, result: result ?? {} };
     }
 
     return {
@@ -280,9 +318,10 @@
       program: agent.program,
       install: agent.install,
       login: agent.login,
-      // 用不了 App 的工具，也不能生图（说明书里照这个写，见 session.js 的 systemPrompt）
-      toolNames: null,
-      imagePrompt: "",
+      // App 的工具在它那边是 MCP 服务 mediacraft 里的工具（各家显示的名字不一样，多半带着 mediacraft 前缀）
+      toolNames: `MCP 服务 ${TOOL_SERVER} 里的工具，名字可能带着 ${TOOL_SERVER} 前缀`,
+      // 生图怎么做（写进给它的说明）：和 Claude Code 一样用 App 的 generate_image
+      imagePrompt: backends.claude?.imagePrompt ?? "",
       // 会话 id 由 Agent 起，答过一次之后下一轮接着
       session: (ai) => (ai.resumable && ai.sessionId ? { sessionId: ai.sessionId, resume: true } : { sessionId: null, resume: false }),
       // 壳只起 `<program> acp`：开会话、续会话、换模型都由这里经 stdin 发
@@ -294,9 +333,7 @@
         calls: {}, streaming: false, segment: "", reply: null, lost: false, replaying: false, startedAt: Date.now(),
       }),
       read,
-      reply: (requestId, result, error = null) => (error
-        ? { jsonrpc: "2.0", id: requestId, error: { code: -32601, message: error } }
-        : { jsonrpc: "2.0", id: requestId, result: result ?? {} }),
+      reply,
       // 用户的回答 → 它给的选项里的一个。「本次会话都允许」对它也只答「允许这一次」，规则由这边记着
       // （它自己的「总是允许」范围各家不一样，往往比这一条命令宽；它每轮是新进程，也记不到下一轮）
       permissionReply(asked, decision) {

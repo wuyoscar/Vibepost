@@ -178,6 +178,13 @@ final class AISessions: @unchecked Sendable {
     private func respond(_ request: [String: Any], window: String) async -> NativeBridge.Reply {
         guard let message = request["message"] as? [String: Any] else { return .failure(400, "AI 回应的字段不对") }
         guard let turn = runningTurn(request, window: window) else { return .ok(["delivered": false]) }
+        // 页面里的工具对 Agent 的一条 MCP 消息的回答：写回它来的那条连接（见 AIToolServer）
+        if let mcp = message["mcp"] as? [String: Any] {
+            guard let tools = turn.tools, let connection = mcp["connection"] as? Int, let reply = mcp["message"] as? [String: Any] else {
+                return .failure(400, "AI 回应的字段不对")
+            }
+            return .ok(["delivered": tools.send(reply, to: connection)])
+        }
         guard let outgoing = turn.backend.outgoing(message, directory: turn.directory, context: turn.context),
               let line = try? JSONSerialization.data(withJSONObject: outgoing)
         else { return .failure(400, "AI 回应的字段不对") }
@@ -484,6 +491,8 @@ final class AISessions: @unchecked Sendable {
 
         /// 这一轮给了进程的密钥（在 App 里填的接口）：出错信息给页面之前打码
         let secrets: [String]
+        /// 这一轮挂给 Agent 的 MCP 服务（App 的工具）；只有说 ACP 的后端有。起进程之前设好，之后只读
+        var tools: AIToolServer?
 
         init(
             request: TurnRequest, window: String, backend: any AIBackend, process: Process, input: FileHandle, directory: URL,
@@ -589,8 +598,27 @@ final class AISessions: @unchecked Sendable {
             request: request, window: window, backend: backend, process: process, input: input.fileHandleForWriting, directory: directory,
             secrets: extra.secrets
         )
+        if backend.mountsTools {
+            // App 的工具：这一轮开一个套接字，Agent 发来的 MCP 消息原样推给页面（和它的输出行走同一条路）。
+            // 开不了时不挂，它照样能改文件
+            turn.tools = try? AIToolServer { [weak self] connection, message in
+                let line: [String: Any] = ["jsonrpc": "2.0", "method": AIToolServer.method, "params": ["connection": connection, "message": message]]
+                guard let data = try? JSONSerialization.data(withJSONObject: line) else { return }
+                self?.emit(
+                    ["type": "lines", "turnId": request.turnId, "draftId": request.draftId, "lines": [String(decoding: data, as: UTF8.self)]],
+                    to: window
+                )
+            }
+            turn.context[ACPBackend.toolSocket] = turn.tools?.path
+        }
 
-        let readers = try launch(turn, epoch: epoch)
+        let readers: DispatchGroup
+        do {
+            readers = try launch(turn, epoch: epoch)
+        } catch {
+            turn.tools?.close()
+            throw error
+        }
         for line in backend.openingLines(for: request) {
             turn.enqueue(try JSONSerialization.data(withJSONObject: line) + Data("\n".utf8))
         }
@@ -760,6 +788,7 @@ final class AISessions: @unchecked Sendable {
     /// 进程退出、输出读完：把工作副本读回来一起交给页面（页面决定怎样套用到稿子上）。
     private func finish(_ turn: Turn) {
         turn.closeInput()
+        turn.tools?.close()
         images.cancel(draftId: turn.request.draftId)
         turn.process.terminationHandler = nil
         approvals.endTurn(turn.request.turnId)

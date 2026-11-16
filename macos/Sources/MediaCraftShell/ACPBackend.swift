@@ -4,7 +4,8 @@ import Foundation
 /// 一个实现管几个程序（OpenCode、Oh My Pi、Kimi Code），各自只差程序名、子命令与另加的环境变量。
 /// 壳只写开头的 initialize（说明这边不提供读写文件、终端：它用自己的工具）；开会话或续会话、换模型与推理强度、发这一轮、
 /// 回答它的权限请求，都由页面的适配器（src/ai/backends/acp.js）写好经 `ai/respond` 送进来，壳只放行这几种，
-/// 会话的工作目录由壳定、不给它挂 MCP 服务。收到这一轮 session/prompt 的回答就是说完了：关上 stdin，它读到 EOF 就退出。
+/// 会话的工作目录由壳定；挂给它的 MCP 服务只有一个，也由壳定：App 的工具（这一轮的套接字，见 AIToolServer）。
+/// 收到这一轮 session/prompt 的回答就是说完了：关上 stdin，它读到 EOF 就退出。
 struct ACPBackend: AIBackend {
     let id: String
     /// 起 ACP 服务的参数（都是 `acp`）
@@ -25,6 +26,10 @@ struct ACPBackend: AIBackend {
     static let requests: Set<String> = ["session/new", "session/resume", "session/load", "session/set_config_option", "session/prompt"]
     /// 推给页面的会话更新：流式的回复、工具调用；别的（思考、可用的命令、会话设置的更新、用量……）页面用不上，有的一条几十 KB
     static let forwarded: Set<String> = ["agent_message_chunk", "tool_call", "tool_call_update"]
+    /// 这一轮工具套接字的路径记在 context 里的名字
+    static let toolSocket = "toolSocket"
+
+    let mountsTools = true
 
     func arguments(for request: AISessions.TurnRequest) -> [String] { command }
 
@@ -45,7 +50,7 @@ struct ACPBackend: AIBackend {
     ]
 
     /// 页面写的：对它的请求（权限）的回答，或开会话、续会话、换设置、发这一轮。
-    /// 会话的工作目录由壳定，不挂 MCP 服务；这一轮只带文字。
+    /// 会话的工作目录、挂哪个 MCP 服务由壳定（页面给的不算）；这一轮只带文字。
     func outgoing(_ message: [String: Any], directory: URL, context: TurnContext) -> [String: Any]? {
         guard let id = message["id"], !(id is NSNull) else { return nil }
         guard let method = message["method"] as? String else {
@@ -63,7 +68,7 @@ struct ACPBackend: AIBackend {
                 kept["sessionId"] = session
             }
             kept["cwd"] = directory.path
-            kept["mcpServers"] = [Any]()
+            kept["mcpServers"] = context[Self.toolSocket].map { [AIToolServer.entry(socket: $0)] } ?? [Any]()
         case "session/set_config_option":
             guard let session = params["sessionId"] as? String, let option = params["configId"] as? String,
                   let value = params["value"] as? String
