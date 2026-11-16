@@ -150,7 +150,17 @@
     const found = drafts.search(query, filter);
     const shown = [...found.filter((summary) => !summary.builtIn), ...found.filter((summary) => summary.builtIn)].map(rowFor);
     const children = listRoot.children;
-    if (shown.length !== children.length || shown.some((row, index) => children[index] !== row)) listRoot.replaceChildren(...shown);
+    if (shown.length !== children.length || shown.some((row, index) => children[index] !== row)) {
+      // 焦点在列表里（用键盘打开了一篇，这一行因为成了当前稿而重建）：换完还给同一篇的同一个按钮，不掉到页面上
+      const held = listRoot.contains(document.activeElement) ? document.activeElement : null;
+      const heldId = held?.closest(".draft-row")?.dataset.draftId;
+      const heldPart = held?.classList.contains("draft-row-delete") ? ".draft-row-delete" : ".draft-row-open";
+      listRoot.replaceChildren(...shown);
+      if (heldId && !listRoot.contains(document.activeElement)) {
+        const row = shown.find((item) => item.dataset.draftId === heldId);
+        (row?.querySelector(heldPart) ?? row?.querySelector(".draft-row-open"))?.focus({ preventScroll: true });
+      }
+    }
     for (const id of rows.keys()) if (!drafts.get(id)) rows.delete(id);
     emptyNote.textContent = query ? "没有找到这篇稿件" : "这一类还没有稿件";
     emptyNote.hidden = shown.length > 0;
@@ -313,6 +323,34 @@
       report(error.message);
     }
   }
+
+  // 用键盘走列表：↓ ↑ 在各篇之间走（到头不绕），Home / End 到第一篇、最后一篇；在搜索框里按 ↓ 进到第一篇，
+  // 在第一篇上按 ↑ 回到搜索框。右键菜单开着时方向键归菜单（上面）。
+  const rowButtons = () => [...listRoot.querySelectorAll(".draft-row-open")];
+
+  function focusRow(button) {
+    button?.focus({ preventScroll: true });
+    button?.scrollIntoView({ block: "nearest" });
+  }
+
+  listRoot.addEventListener("keydown", (event) => {
+    if (!menu.hidden || event.metaKey || event.ctrlKey || event.altKey) return;
+    const buttons = rowButtons();
+    const index = buttons.indexOf(event.target.closest(".draft-row")?.querySelector(".draft-row-open"));
+    if (index === -1) return;
+    const target = { ArrowDown: buttons[index + 1], ArrowUp: index === 0 ? searchInput : buttons[index - 1], Home: buttons[0], End: buttons.at(-1) }[event.key];
+    if (!Object.hasOwn({ ArrowDown: 1, ArrowUp: 1, Home: 1, End: 1 }, event.key)) return;
+    event.preventDefault();
+    if (target === searchInput) searchInput.focus();
+    else focusRow(target);
+  });
+  searchInput.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowDown" || event.isComposing) return;
+    const first = rowButtons()[0];
+    if (!first) return;
+    event.preventDefault();
+    focusRow(first);
+  });
 
   toggle.addEventListener("click", () => setOpen(!isOpen()));
   newButton.addEventListener("click", () => void createDraft());
