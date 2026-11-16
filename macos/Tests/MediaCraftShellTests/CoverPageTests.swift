@@ -309,7 +309,12 @@ struct CoverPageTests {
         let shown = try await harness.waitForPage("document.querySelectorAll('#filmstrip .film-meter').length === \(ready)")
         let result = try await harness.evaluate("""
             const pages = await mc.render.pages();
-            return [...document.querySelectorAll("#filmstrip .film-thumb")].map((thumb, index) => {
+            // 每出一次图胶片重画一遍，字数条过一会儿（停笔后）才补上：上面等到之后要是又出了一次图，这里再等它补齐
+            const thumbsOf = () => [...document.querySelectorAll("#filmstrip .film-thumb")];
+            for (let tries = 0; tries < 100 && thumbsOf().some((thumb) => !thumb.querySelector(".film-meter")); tries += 1) {
+              await new Promise((resolve) => setTimeout(resolve, 50));
+            }
+            return thumbsOf().map((thumb, index) => {
               const meter = thumb.querySelector(".film-meter");
               return {
                 label: thumb.getAttribute("aria-label"), note: thumb.title, density: meter.dataset.density,
