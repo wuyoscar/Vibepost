@@ -108,6 +108,60 @@ test('ACP model discovery opens a throwaway session outside any draft and return
   await assert.rejects(service.models('nope'), /不认识/);
 });
 
+test('Providers filled in the app: keys never come back, reach only OpenCode through an inline config, and are redacted from stderr', async t => {
+  const theirs = JSON.stringify({ theme: 'dark', provider: { theirs: { options: { timeout: 5 } } } });
+  const { service, events, messages, data } = await setup(t, { environment: { AI_FIXTURE_ECHO_KEYS: '1', OPENCODE_CONFIG_CONTENT: theirs } });
+  const custom = { provider: 'my-api', name: '公司的接口', baseURL: 'https://api.example.com/v1', models: ['model-a', 'org/model-b'] };
+  const saved = await service.saveProviders([{ provider: 'deepseek', name: 'DeepSeek', key: 'sk-deepseek-secret-1' }, { ...custom, key: 'sk-custom-secret-2' }]);
+  assert.deepEqual(saved.providers, [{ provider: 'deepseek', name: 'DeepSeek', baseURL: null, models: [], hasKey: true }, { ...custom, hasKey: true }]);
+  assert.doesNotMatch(JSON.stringify(await service.providers()), /secret/);
+  assert.match(await fs.readFile(path.join(data, 'AI', 'providers.json'), 'utf8'), /sk-custom-secret-2/);
+  // 没带密钥的沿用已存的；换了接口地址的那一项不沿用
+  assert.deepEqual((await service.saveProviders([{ provider: 'deepseek', name: 'DeepSeek' }, custom])).providers.map(value => value.hasKey), [true, true]);
+  assert.deepEqual((await service.saveProviders([{ provider: 'deepseek', name: 'DeepSeek' }, { ...custom, baseURL: 'https://other.example.com/v1' }])).providers.map(value => value.hasKey), [true, false]);
+  for (const [bad, message] of [
+    [[{ provider: 'Bad Id', name: 'x', key: 'k' }], /服务商不对/],
+    [[{ provider: 'my-x', name: 'x', baseURL: 'ftp://example.com', models: ['m'], key: 'k' }], /接口地址不对/],
+    [[{ provider: 'my-x', name: 'x', baseURL: 'https://user:pass@example.com/v1', models: ['m'], key: 'k' }], /接口地址不对/],
+    [[{ provider: 'my-x', name: 'x', baseURL: 'https://example.com/v1', models: [], key: 'k' }], /至少一个模型名/],
+    [[{ provider: 'my-x', name: 'x', baseURL: 'https://example.com/v1', models: ['has space'], key: 'k' }], /模型名不对/],
+    [[{ provider: 'my-x', name: 'x', baseURL: 'https://example.com/v1', models: ['m'], key: 'two words' }], /密钥不对/],
+    [[{ provider: 'deepseek', name: '一', key: 'k' }, { provider: 'deepseek', name: '二', key: 'k' }], /已经有一个/],
+    ['不是列表', /字段不对/],
+  ]) await assert.rejects(service.saveProviders(bad), message);
+  assert.deepEqual((await service.providers()).providers.map(value => value.hasKey), [true, false]);
+  await service.saveProviders([{ provider: 'deepseek', name: 'DeepSeek' }, { ...custom, key: 'sk-custom-secret-2' }]);
+
+  // 问模型、起一轮：OpenCode 拿到内联配置（并进用户原有的）与各家的密钥
+  await service.models('opencode');
+  const job = request('provider-one', 'opencode');
+  const lines = () => events.flatMap(value => (value.event.lines || []).map(line => JSON.parse(line)));
+  await service.send(owner, job);
+  await waitFor(() => lines().some(line => line.id === 1));
+  await service.respond(owner, { ...job, message: { jsonrpc: '2.0', id: 2, method: 'session/new', params: {} } });
+  await waitFor(() => lines().some(line => line.id === 2));
+  await service.respond(owner, { ...job, message: { jsonrpc: '2.0', id: 3, method: 'session/prompt', params: { sessionId: 'fixture-session', prompt: [{ type: 'text', text: '写作' }] } } });
+  await waitFor(() => lines().some(line => line.id === 77));
+  await service.respond(owner, { ...job, message: { jsonrpc: '2.0', id: 77, result: { outcome: { outcome: 'selected', optionId: 'once' } } } });
+  const exit = await waitFor(() => events.find(value => value.event.type === 'exit'));
+  assert.match(exit.event.stderr, /request failed: …/); assert.doesNotMatch(exit.event.stderr, /secret/);
+  const launches = (await messages()).filter(value => value.kind === 'launch' && value.args[0] === 'acp');
+  assert.equal(launches.length, 2);
+  for (const launch of launches) {
+    const config = JSON.parse(launch.config);
+    assert.equal(config.theme, 'dark'); assert.deepEqual(config.provider.theirs, { options: { timeout: 5 } });
+    assert.deepEqual(config.provider.deepseek, { options: { apiKey: '{env:VIBEPOST_API_KEY_1}' } });
+    assert.deepEqual(config.provider['my-api'], { npm: '@ai-sdk/openai-compatible', name: '公司的接口', options: { baseURL: 'https://api.example.com/v1', apiKey: '{env:VIBEPOST_API_KEY_2}' }, models: { 'model-a': { name: 'model-a' }, 'org/model-b': { name: 'org/model-b' } } });
+    assert.deepEqual(launch.keys, { VIBEPOST_API_KEY_1: 'sk-deepseek-secret-1', VIBEPOST_API_KEY_2: 'sk-custom-secret-2' });
+    assert.doesNotMatch(launch.config, /secret/); assert.match(launch.permission, /"bash":"ask"/);
+  }
+
+  // 别的后端拿不到：用户自己环境里的那份原样在
+  await service.models('codex');
+  const codex = (await messages()).find(value => value.kind === 'launch' && value.args[0] === 'app-server');
+  assert.equal(codex.config, theirs); assert.deepEqual(codex.keys, {});
+});
+
 test('Codex model discovery handshakes without creating a model turn', async t => {
   const { service, messages } = await setup(t);
   assert.deepEqual(await service.models('codex'), { ok: true, models: [{ id: 'gpt-fixture', name: 'Fixture', isDefault: true, efforts: ['high', 'low'], defaultEffort: 'high' }] });

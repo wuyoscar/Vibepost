@@ -5,6 +5,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const transport = require('./ai-process.cjs');
 const images = require('./ai-images.cjs');
+const { AIProviders, CONFIG_VARIABLE, redact: redactSecrets } = require('./ai-providers.cjs');
 const { failure } = transport;
 const safeId = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,120}$/.test(value) && !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(value);
 const modelId = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:@/\[\]-]{0,99}$/.test(value);
@@ -46,8 +47,15 @@ class AiService {
     this.turns = new Map(); this.epochs = new Map(); this.closed = new Set(); this.removing = new Set();
     this.tickets = new Map(); this.scopes = new Map(); this.draftOwners = new Map(); this.jobs = new Map(); this.generating = new Map();
     this.cache = new Map(); this.pendingStatus = new Map(); this.lookupVersions = new Map(); this.settingsQueue = Promise.resolve(); this.operations = new Set(); this.exchanges = new Set(); this.disposed = false;
+    // 在 App 里填的接口（经 OpenCode 使用，见 ai-providers.cjs）
+    this.providerStore = new AIProviders(this.root);
     this.ready = this._initialize();
   }
+
+  async providers() { await this.ready; return { ok: true, providers: await this.providerStore.list() }; }
+  async saveProviders(list) { await this.ready; return { ok: true, providers: await this.providerStore.save(list) }; }
+  // 在 App 里填的接口只给 OpenCode：另加的环境变量（内联配置、各家的密钥）与要打码的密钥
+  async _providerEnv(backend, env) { return backend === 'opencode' ? this.providerStore.launch(env[CONFIG_VARIABLE]) : { env: {}, secrets: [] }; }
 
   async _initialize() {
     await fs.mkdir(this.temp, { recursive: true });
@@ -150,8 +158,9 @@ class AiService {
   async _acpOptions(backend, located) {
     const directory = path.join(this.root, '.acp-models');
     await fs.mkdir(directory, { recursive: true });
+    const extra = await this._providerEnv(backend, located.env);
     return this._track(new Promise((resolve, reject) => {
-      const child = transport.launch(located.program, ['acp'], { env: { ...located.env, ...(ACP_ENV[backend] || {}) }, cwd: directory });
+      const child = transport.launch(located.program, ['acp'], { env: { ...located.env, ...(ACP_ENV[backend] || {}), ...extra.env }, cwd: directory });
       this.exchanges.add(child);
       let done = false;
       const end = (error, reply) => {
@@ -234,7 +243,9 @@ class AiService {
       if (!this._current(owner) || turn.cancelled || this.removing.has(request.draftId)) throw failure('这个窗口已经关闭或重新载入', 409);
       await this._prepare(turn);
       if (!this._current(owner) || turn.cancelled) throw failure('这个窗口已经关闭或重新载入', 409);
-      const env = { ...located.env, ...(request.backend === 'claude' ? { CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1' } : {}), ...(ACP_ENV[request.backend] || {}) };
+      const extra = await this._providerEnv(request.backend, located.env);
+      turn.secrets = extra.secrets;
+      const env = { ...located.env, ...(request.backend === 'claude' ? { CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1' } : {}), ...(ACP_ENV[request.backend] || {}), ...extra.env };
       turn.child = transport.launch(located.program, this._arguments(request), { cwd: turn.directory, env });
       turn.child.stdin.on('error', () => {});
       turn.child.stderr.on('data', chunk => { turn.stderr = (turn.stderr + chunk.toString('utf8')).slice(-8192); });
@@ -453,7 +464,7 @@ class AiService {
     this._forgetTickets(turn);
     const [markdown, title, caption] = await Promise.all(['draft.md', 'title.txt', 'caption.txt'].map(name => this._safeRead(turn.directory, name)));
     if (this.turns.get(turn.request.draftId) === turn) this.turns.delete(turn.request.draftId);
-    this._event(turn, { type: 'exit', status, signal, cancelled: turn.cancelled, stderr: this._redact(turn.stderr), markdown, title, caption });
+    this._event(turn, { type: 'exit', status, signal, cancelled: turn.cancelled, stderr: redactSecrets(this._redact(turn.stderr), turn.secrets || []), markdown, title, caption });
     turn.resolveDone();
   }
   async workFile(owner, fields) {

@@ -333,7 +333,14 @@ ipcMain.handle(
         throw new Error("请求不合规");
       if (
         action.startsWith("ai/") &&
-        !["ai/status", "ai/settings", "ai/models", "ai/remove"].includes(action)
+        ![
+          "ai/status",
+          "ai/settings",
+          "ai/models",
+          "ai/providers",
+          "ai/providers-save",
+          "ai/remove",
+        ].includes(action)
       )
         owned(owner, params.draftId);
       switch (action) {
@@ -348,6 +355,10 @@ ipcMain.handle(
           return await ai.setPath(params.path, params.backend);
         case "ai/models":
           return await ai.models(params.backend);
+        case "ai/providers":
+          return await ai.providers();
+        case "ai/providers-save":
+          return await ai.saveProviders(params.providers);
         case "ai/send":
           return await ai.send(owner, params);
         case "ai/respond":

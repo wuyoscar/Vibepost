@@ -6,7 +6,9 @@ const args = process.argv.slice(2);
 if (args[0] === '--version') { console.log('fixture-cli 1.2.3'); process.exit(0); }
 if (args[0] === 'login') process.exit(process.env.AI_FIXTURE_LOGIN_FAIL ? 1 : 0);
 const record = value => { if (process.env.AI_FIXTURE_LOG) fs.appendFileSync(process.env.AI_FIXTURE_LOG, JSON.stringify(value) + '\n'); };
-record({ kind: 'launch', args, cwd: process.cwd(), temp: process.env.TEMP, backgroundDisabled: process.env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS, permission: process.env.OPENCODE_PERMISSION });
+record({ kind: 'launch', args, cwd: process.cwd(), temp: process.env.TEMP, backgroundDisabled: process.env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS, permission: process.env.OPENCODE_PERMISSION, config: process.env.OPENCODE_CONFIG_CONTENT, keys: Object.fromEntries(Object.entries(process.env).filter(([name]) => name.startsWith('VIBEPOST_API_KEY_'))) });
+// 像出错信息里带出了密钥（在 App 里填的接口）
+if (process.env.AI_FIXTURE_ECHO_KEYS) process.stderr.write('request failed: ' + (process.env.VIBEPOST_API_KEY_1 || '') + '\n');
 const write = value => process.stdout.write(JSON.stringify(value) + '\n');
 let initialized = false, acpPrompt = null;
 const input = readline.createInterface({ input: process.stdin });

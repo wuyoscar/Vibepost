@@ -36,6 +36,8 @@ const ai = {
     call("ai/status", { refresh, backend }),
   setPath: (path, backend = "claude") => call("ai/settings", { path, backend }),
   models: (backend) => call("ai/models", { backend }),
+  providers: () => call("ai/providers", {}),
+  saveProviders: (providers) => call("ai/providers-save", { providers }),
   send: (request) => call("ai/send", request),
   cancel: (draftId) => call("ai/cancel", { draftId }),
   respond: (draftId, turnId, message) =>
