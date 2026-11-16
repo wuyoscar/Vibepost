@@ -322,4 +322,50 @@ struct WritingPolishTests {
         #expect(result?["cardInside"] as? Bool == true)
         #expect(harness.pageErrors == [])
     }
+
+    @Test("菜单里指着的那一项看得出来：「/」菜单 ↑↓ 选着的一项、下拉菜单悬停的一项，底色都和菜单的底不一样（浅色、深色）", arguments: [false, true])
+    func menuHighlightShowsAgainstMenu(dark: Bool) async throws {
+        let harness = ShellHarness(onboarding: false)
+        harness.setAppearance(dark: dark)
+        try await harness.load()
+        let result = try await harness.evaluate(Self.helpers + """
+            await mc.drafts.create({ markdown: "第一段\\n" });
+            await mc.render.pages();
+            await mc.editor.select("第一段\\n".length);
+            document.querySelector("#markdownEditor [contenteditable]").focus();
+            document.execCommand("insertText", false, "/");
+            const menu = await until(() => document.querySelector('[role="listbox"][aria-label="快速插入"]:not([hidden])'));
+            const fill = (node) => getComputedStyle(node).backgroundColor;
+            const options = () => [...menu.querySelectorAll('[role="option"]')];
+            const selected = () => options().findIndex((option) => option.getAttribute("aria-selected") === "true");
+            const first = { index: selected(), fill: fill(options()[0]), other: fill(options()[1]) };
+            press("ArrowDown", document.querySelector("#markdownEditor [contenteditable]"));
+            await until(() => selected() === 1);
+            const second = { fill: fill(options()[1]), other: fill(options()[0]) };
+            // 悬停没法在测试里摆出来：把悬停那条规则的底色放到菜单里的一个小块上量
+            const rules = [...document.styleSheets].flatMap((sheet) => [...sheet.cssRules]);
+            const hover = rules.find((rule) => (rule.selectorText || "").split(",").some((part) => part.trim() === ".menu-item:hover"));
+            const probe = document.createElement("div");
+            probe.style.background = hover.style.background;
+            menu.append(probe);
+            const hoverFill = fill(probe);
+            probe.remove();
+            press("Escape", document.querySelector("#markdownEditor [contenteditable]"));
+            return { panel: fill(menu), first, second, hoverFill };
+        """) as? [String: Any]
+        await harness.tearDown()
+
+        let panel = result?["panel"] as? String
+        let clear = "rgba(0, 0, 0, 0)"
+        let first = result?["first"] as? [String: Any]
+        #expect(first?["index"] as? Int == 0)
+        #expect(first?["fill"] as? String != panel && first?["fill"] as? String != clear, "选着的一项有自己的底色：\(first ?? [:])，菜单 \(panel ?? "")")
+        #expect(first?["other"] as? String == clear, "别的项没有底色")
+        let second = result?["second"] as? [String: Any]
+        #expect(second?["fill"] as? String == first?["fill"] as? String && second?["other"] as? String == clear, "按 ↓ 底色跟到下一项：\(second ?? [:])")
+        let hover = result?["hoverFill"] as? String
+        #expect(hover != nil && hover != panel && hover != clear, "悬停的底色和菜单的底分得开：\(hover ?? "")")
+        #expect(hover != first?["fill"] as? String, "悬停比选着的浅一档，认得出回车插入哪个")
+        #expect(harness.pageErrors == [])
+    }
 }

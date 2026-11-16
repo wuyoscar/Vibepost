@@ -1413,10 +1413,11 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   cursor: pointer;
 }
 
+/* 悬停、键盘焦点的底色要和菜单的底分得开：菜单的底（--ui-popover）和 --ui-layer 是同一个颜色，用它就看不出指着哪一项 */
 .menu-item:hover,
 .menu-item:focus-visible,
 .menu-item:has(:focus-visible) {
-  background: var(--ui-layer);
+  background: var(--ui-hover);
   outline: none;
 }
 
@@ -1644,10 +1645,6 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   color: var(--ui-text-2);
   font-size: 11px;
   font-weight: 600;
-}
-
-.menu-item:hover .menu-glyph {
-  background: var(--ui-window);
 }
 
 .title-field {
@@ -2233,8 +2230,9 @@ body[data-layout-mode="article"] .caption-field {
   font-size: 11px;
 }
 
+/* ↑↓ 选着的那一项：比悬停深一档，鼠标扫过别的项时还认得出回车会插入哪个 */
 .slash-menu .menu-item[aria-selected="true"] {
-  background: var(--ui-layer);
+  background: var(--ui-pressed);
 }
 
 /* 审阅 AI 的修改（src/ai/review.js、src/editor/review.js）：编辑器上方一条汇总，正文里逐处标出删改。
