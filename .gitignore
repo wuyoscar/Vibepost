@@ -22,3 +22,7 @@ windows/resources/
 windows/.stage/
 windows/test-results/
 windows/data/
+
+# 演示视频：无声版和要重录的旧教程只留在本机（主视频 vibepost.mp4 与封面进 git）
+docs/screenshots/*-silent.mp4
+docs/screenshots/tutorial.mp4

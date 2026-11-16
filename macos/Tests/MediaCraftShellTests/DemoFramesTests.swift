@@ -12,7 +12,7 @@ import WebKit
 /// 段：`basics`（写、排、封面、检查、手机预览、发送；不用 AI）；其余几段用**本机真的 Claude Code**
 /// （`DEMO_AGENT_BIN=claude 所在的目录`，用的是这台机器的登录与额度，回复每次不一样）：
 /// `polish`（写好的长文一键润色、一键排版）、`paste`（把一篇长文贴进对话框，排成图文）、`topic`（找最近的热点写成一篇）、
-/// `manuals`（内置写作手册、复制一份来改、把这篇存成我的写作手册）、`agent`（终端里的 Claude Code 经 MCP 连进来写一篇）。
+/// `tune`（排好的稿子自己换主题、换尺寸、拖字号；不用 AI）、`manuals`（内置写作手册、复制一份来改、把这篇存成我的写作手册）、`agent`（终端里的 Claude Code 经 MCP 连进来写一篇）。
 /// 隔空投送的接收端是假的，其余都是页面和 Agent 真实的样子。
 @MainActor
 struct DemoFramesTests {
@@ -536,6 +536,124 @@ struct DemoFramesTests {
             try? FileManager.default.copyItem(at: folder.appendingPathComponent(name), to: recorder.directory.appendingPathComponent("手册-" + name))
         }
         await harness.tearDown()
+        #expect(recorder.frames.count > 20)
+    }
+
+    // MARK: - 主视频：排好以后自己动手调（不用 AI）
+
+    /// collab 那一段排好以后的稿子；`{1}`–`{3}` 换成导入的三张配图（那一段里 Agent 生成的，录之前放在 `docs/demo/assets/brunch-N.png`）
+    static let brunchDone = """
+        ## 周末早午餐，三道 15 分钟能做完的
+        上周末朋友来家里，我只有半个小时，最后做了三道，大家都说好吃，记一下做法。
+        ### 第一道是牛油果溏心蛋吐司。
+        [[图片:{1}]]
+
+        :::步骤
+        - 吐司烤两分钟，牛油果压成泥，加一点盐和柠檬汁抹上去。
+        - 鸡蛋冷水下锅，水开后煮 6 分半，过冷水剥壳，切开放在上面，撒黑胡椒。
+        :::
+
+        :::提示
+        我踩过的坑：第一次煮蛋煮了 8 分钟，蛋黄全熟了，没有流心。
+        :::
+
+        [[分页]]
+
+        ### 第二道是番茄芝士烤蛋。
+        [[图片:{2}]]
+
+        :::步骤
+        - 小烤碗里放切碎的番茄，打两个蛋，撒马苏里拉，烤箱 200 度烤 10 分钟。
+        - 蛋白凝固、蛋黄还会流就可以了。
+        :::
+
+        [[分页]]
+
+        ### 第三道是酸奶水果碗。
+        [[图片:{3}]]
+
+        :::步骤
+        - 希腊酸奶铺底，放蓝莓、草莓、香蕉片和一勺格兰诺拉，最后淋一点蜂蜜。
+        :::
+        顺序很重要：先煮蛋，煮蛋的时候烤番茄，最后做酸奶碗，三道一起上桌。
+        """
+
+    @Test("主视频：排好的稿子，自己换主题、换尺寸、拖字号", .enabled(if: enabled("tune")))
+    func recordTune() async throws {
+        let harness = try await Self.start(real: false)
+        let recorder = try Recorder(harness, part: "tune")
+        recorder.track = ["stage": "#previewPanel", "inspector": ".inspector", "page": "@page", "photo": "@photo", "control": "@control"]
+        try await recorder.run(Self.helpers + """
+            demoTargets.control = () => window.demoControl ?? null;  // 正在动的那个控件：镜头跟着它
+            await blank();
+            const ids = [];
+            for (const number of [1, 2, 3]) {
+              const blob = await fetch(`docs/demo/assets/brunch-${number}.png`).then((response) => response.blob());
+              ids.push((await mc.media.import([new File([blob], `brunch-${number}.png`, { type: "image/png" })]))[0]);
+            }
+            const theme = (await mc.themes.list()).find((item) => item.name === "清新");
+            // 字号和图片高照 collab 那一段里 Agent 定的（26、320），这样分页和那一段一样是三页
+            await mc.drafts.update({ theme: theme.id, colors: theme.colors, tunedColors: [], fontSize: 26, imageMaxHeight: 320, markdown: text.replace(/\\{(\\d)\\}/g, (_, number) => ids[number - 1]) });
+            ui.click("样式");
+            await settle(600);
+            while (!ui.find("下一张", { within: "预览" }).disabled) { ui.click("下一张", { within: "预览" }); await sleep(150); }
+            await settle(400);
+        """, arguments: ["text": Self.brunchDone])
+
+        recorder.chapter = "tune"
+        recorder.step = "start"
+        try await recorder.frame(1.0)
+
+        // 换两个主题，再换回来
+        for (order, name) in ["杂志", "撞色", "清新"].enumerated() {
+            recorder.step = "theme-\(order + 1)"
+            try await recorder.run("window.demoControl = ui.find(name, { within: '主题' }); demoControl.scrollIntoView({ block: 'center' }); await sleep(150);", arguments: ["name": name])
+            try await recorder.click(name, within: "主题", lead: 0.5, hold: 0.9)
+        }
+
+        // 图文尺寸：换成竖屏 9:16，再换回 3:4（下拉菜单是系统画的，截不到：这里只记点之前、选之后）
+        for (order, value) in ["1536", "1152"].enumerated() {
+            recorder.step = "size-\(order + 1)"
+            let point = try await recorder.run("window.demoControl = document.getElementById('cardHeightInput'); demoControl.scrollIntoView({ block: 'center' }); await sleep(150); return spot(demoControl);") as? [Double]
+            try await recorder.frame(0.5, cursor: point, click: true)
+            try await recorder.run("""
+                demoControl.value = value;
+                demoControl.dispatchEvent(new Event("input", { bubbles: true }));
+                demoControl.dispatchEvent(new Event("change", { bubbles: true }));
+                await settle(300);
+            """, arguments: ["value": value])
+            try await recorder.frame(0.9, cursor: point)
+        }
+
+        // 字号、图片高：按着滑块拖大，再拖回来
+        let thumb = """
+            const box = demoControl.getBoundingClientRect();
+            const ratio = (demoControl.value - demoControl.min) / (demoControl.max - demoControl.min);
+            return [Math.round(box.left + 8 + ratio * (box.width - 16)), Math.round(box.top + box.height / 2)];
+        """
+        for (name, input, reach, count) in [("font", "fontSizeInput", 8.0, 8.0), ("image", "imageHeightInput", 280.0, 8.0)] {
+            recorder.step = name
+            let values = try await recorder.run("""
+                window.demoControl = document.getElementById(input);
+                demoControl.scrollIntoView({ block: "center" });
+                await sleep(150);
+                const now = Number(demoControl.value), top = Math.min(Number(demoControl.max), now + reach), up = [];
+                for (let index = 1; index <= count; index++) up.push(Math.round(now + (top - now) * index / count));
+                return [...up, ...up.slice(0, -1).reverse(), now];
+            """, arguments: ["input": input, "reach": reach, "count": count]) as? [Double] ?? []
+            try await recorder.frame(0.5, cursor: try await recorder.run(thumb) as? [Double], click: true)
+            for value in values {
+                try await recorder.run("demoControl.value = value; demoControl.dispatchEvent(new Event('input', { bubbles: true })); await mc.render.pages();", arguments: ["value": value])
+                try await recorder.frame(0.07, cursor: try await recorder.run(thumb) as? [Double])
+            }
+            try await recorder.run("demoControl.dispatchEvent(new Event('change', { bubbles: true })); await settle(300);")
+            recorder.step = name + "-done"
+            try await recorder.frame(1.0, cursor: try await recorder.run(thumb) as? [Double])
+        }
+
+        try await recorder.finish()
+        await harness.tearDown()
+        #expect(harness.pageErrors == [])
         #expect(recorder.frames.count > 20)
     }
 

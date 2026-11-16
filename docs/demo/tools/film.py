@@ -4,12 +4,12 @@
 # ///
 """主视频「你写，Agent 排」：把录到的帧合成一条 HyperFrames 片子。在 docs/demo 里运行：
 
-    uv run tools/film.py <帧目录> [--partial]     # 读 <帧目录>/collab 与 <帧目录>/agent，写 index.html、cues.json、assets/
-    uv run tools/sound.py . 96                    # 配乐与点击声（assets/track.wav）
+    uv run tools/film.py <帧目录> [--partial]     # 读 <帧目录>/collab、agent、tune，写 index.html、cues.json、assets/
+    uv run tools/sound.py .                       # 配乐与点击声（assets/track.wav）
     npx hyperframes@0.9.55 check --json && npx hyperframes@0.9.55 render
 
 帧是 `DemoFramesTests` 的 collab（App 里的 Agent）和 agent（终端里的 Agent 经 MCP）两段录的：每一帧带着「段 + 步」、
-指针位置和几样东西在页面上的位置。分镜见 SPEC.md；每个镜头的长度按 96 BPM 的拍子算，点击落在拍子上。
+指针位置和几样东西在页面上的位置。分镜见 SPEC.md；每个镜头的长度按拍子算（成片 120 BPM），点击落在拍子上。
 --partial：素材只录到一半时，录到哪合成到哪（看前面的镜头用）。
 """
 import json
@@ -21,7 +21,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from filmkit import FPS, FULL, PAGE_W, Film, frame
+from filmkit import FPS, FULL, PAGE_W, PLAY, Film, frame
 
 TOOLS = Path(__file__).resolve().parent
 HERE = TOOLS.parent
@@ -32,10 +32,27 @@ PARTIAL = "--partial" in sys.argv
 BEAT = 60 / 96
 
 
+# 分镜里的拍号是初稿的，后来有的镜头加长、有的是插进来的：每一段（拍号 起, 止）排在片子里从第几拍起。
+# 排的时候按 96 BPM、一秒 24 帧算，放的时候一秒 30 帧，所以成片是 120 BPM（见 filmkit 的 FPS / PLAY）。
+SEGMENTS = [
+    (0, 12, 0),       # 开头
+    (12, 16, 14),     # 亮名字（前一句说明多留两拍）
+    (16, 48, 20),     # 说一句、Agent 动手、你点头
+    (400, 415, 52),   # 配图：三张各五拍，落下以后在那一页上停住
+    (60, 66, 67),     # 之前 / 现在
+    (300, 310, 73),   # 自己动手调
+    (66, 131, 83),    # 卡片样式、写作手册、终端、发到手机、片尾
+]
+
+
 def at(beats):
-    """第几拍 → 秒（取到整帧）。分镜里的拍号是初稿的；后来给开头两句说明各多留了两拍（来得及读），从第 12、16 拍起顺延。"""
-    beats += 0 if beats < 12 else 2 if beats < 16 else 4
-    return round(beats * BEAT * FPS) / FPS
+    """第几拍 → 秒（取到整帧）。正好落在一段末尾的拍号，算那一段的结尾。"""
+    for first, last, start in SEGMENTS:
+        if first <= beats < last:
+            break
+    else:
+        first, last, start = next(segment for segment in SEGMENTS if beats == segment[1])
+    return round((start + beats - first) * BEAT * FPS) / FPS
 
 
 class Take:
@@ -78,6 +95,7 @@ class Take:
 ASSETS.mkdir(exist_ok=True)
 collab = Take("collab")
 agent = Take("agent") if (SOURCE / "agent" / "timeline.json").exists() else None
+tune = Take("tune") if (SOURCE / "tune" / "timeline.json").exists() else None
 
 TOTAL = 130  # 拍
 film = Film(at(TOTAL))
@@ -207,7 +225,7 @@ def caption(beat, words, until):
 
 def fast(beat, until, real):
     """快进的角标：倍数是真实的（录制时每帧记了时刻）。"""
-    times = max(2, round(real / (at(until) - at(beat))))
+    times = max(2, round(real / ((at(until) - at(beat)) * FPS / PLAY)))
     node = film.text(f"快进 ×{times}", 1792, 1022, "fast", ax=1, ay=0.5)
     node.o.to(at(beat), 0.15, 1, "linear")
     node.o.to(at(until), 0.2, 0, "linear")
@@ -257,7 +275,7 @@ def tension():
     A.place(at(8), WORK, 0.75, r=18, ry=0, rx=0)
     A.look(at(8), FULL)
     A.look(at(8.8), region("page", pad=36), zmax=1.55)
-    caption(8.8, "没排过版的样子：一整页的字。", 12)
+    caption(8.2, "没排过版的样子：一整页的字。", 12)
     cursor.go(at(9.6), None, (2040, 1180), 0.01)
     cursor.show(at(9.7))
     click_frames(at(11), A, collab, "hook", "next", travel=0.8)
@@ -297,7 +315,7 @@ def work():
 def review():
     show(at(40), collab, collab.one("review", "marks"))
     A.look(at(40), EDITOR, zmax=2.0)  # 修改对比的那一条在编辑器顶上，逐处的标注在正文里
-    caption(40.1, "改了哪里，逐处标给你看。", 44.5)
+    caption(40.0, "改了哪里，逐处标给你看。", 44.5)
     caption(44.6, "你点头，才算数。", 48)
     click_frames(at(45.5), "auto", collab, "review", "accept", travel=0.7)
 
@@ -305,32 +323,55 @@ def review():
 # ===== 48–60 拍：配图，点一张就放进那一页 =====
 @section
 def photos():
-    A.look(at(48), region("page", pad=30), zmax=1.7)
-    B.look(at(48), candidate_view, zmax=2.7)
-    caption(48.3, "它生成的配图，点一张就放进那一页。", 60)
+    A.look(at(400), region("page", pad=30), zmax=1.7)
+    B.look(at(400), candidate_view, zmax=2.7)
+    caption(400.3, "它生成的配图，点一张就放进那一页。", 415)
     picks = [number for number in (1, 2, 3) if collab.find("photos", f"pick-{number}")]
     flights = []
     for order, number in enumerate(picks):
-        base = 48.6 + order * 3.6
+        base = 400.2 + order * 5  # 一张五拍：翻到那一页、点、飞进去，然后在带图的那一页上停两拍多
         show(at(base), collab, collab.find("photos", f"caret-{number}")[-1])
         lead, result = collab.find("photos", f"pick-{number}")[:2]
-        show(at(base + 0.8), collab, lead)
-        moment = at(base + 2.2)
+        show(at(base + 0.4), collab, lead)
+        moment = at(base + 1.6)
         press(moment, B, collab.cursor(lead), travel=0.6)
         landing = moment + 0.5
         show(landing, collab, result)
         photo = collab.near(result, "photo")
         source = collab.crop(result, photo, f"photo-{number}.jpg")
         flights.append((moment, landing, collab.near(lead, "candidate"), photo, source))
-    show(at(59), collab, collab.one("photos", "placed"))
+    show(at(414.9), collab, collab.one("photos", "placed"))
     return flights
 
 
 # ===== 60–66 拍：同一篇，之前和现在 =====
 @section
 def wipe():
-    caption(60.3, "同一篇稿子：左边是之前，右边是现在。", 66)
+    caption(60.3, "同一篇稿子：左边是之前，右边是现在。", 65.99)
     return at(60.6), at(62.2), at(64.4), at(65.2)
+
+
+# ===== 插在这里的十拍：自己动手调（主题、尺寸、图片大小） =====
+@section
+def hands():
+    if not tune:
+        raise IndexError("没有 tune 这一段")
+    show(at(300), tune, tune.one("tune", "start"))
+    A.look(at(300), region("page", pad=30), zmax=1.7)
+    B.look(at(300), beside("control"), zmax=2.7)
+    caption(300.2, "想自己动手也行：主题、尺寸、图片大小，都能调。", 310)
+    for order, beat in enumerate((301, 302.1, 303.2)):
+        click_frames(at(beat), B, tune, "tune", f"theme-{order + 1}", travel=0.6 if order == 0 else 0.35)
+    for order, beat in enumerate((304.5, 305.6)):
+        click_frames(at(beat), B, tune, "tune", f"size-{order + 1}", travel=0.45 if order == 0 else 0.2)
+    scrub = tune.find("tune", "image")
+    begin, end = at(306.8), at(309)
+    press(begin, B, tune.cursor(scrub[0]), travel=0.45)
+    each = (end - begin) / (len(scrub) - 1)
+    for order, index in enumerate(scrub[1:], 1):  # 按着滑块拖过去再拖回来：每一格是真出的一帧
+        show(begin + order * each, tune, index)
+        cursor.go(begin + order * each, B, tune.cursor(index), each)
+    show(end + each, tune, tune.one("tune", "image-done"))
 
 
 # ===== 66–80 拍：让它写一套卡片样式 =====
@@ -672,8 +713,7 @@ if "claim" in built:
     icon.move(at(122) + 0.2, 0.45, s=1, ease="back")
     icon.move(at(122) + 0.6, 0.7, x=960, y=330)
     film.text("Vibepost", 960, 560, "brandname", ax=0.5, ay=0.5).stamp(at(123.4))
-    film.text("用 Markdown 写小红书的桌面 App · macOS 与 Windows", 960, 690, "sub", ax=0.5, ay=0.5).rise(at(124.2))
-    film.text("github.com/wuyoscar/Vibepost", 960, 790, "url", ax=0.5, ay=0.5).rise(at(124.8))
+    film.text("github.com/wuyoscar/Vibepost", 960, 700, "url", ax=0.5, ay=0.5).rise(at(124.2))
 
 # ===== 录屏：按上面排好的每一帧合成一条视频 =====
 listing, previous, length = [], None, 0
@@ -686,14 +726,21 @@ for position in range(film.count):
     previous, length = file, length + 1
 listing.append((previous, length))
 concat = ASSETS / "screen.txt"
-concat.write_text("".join(f"file '{file}'\nduration {length / FPS:.6f}\n" for file, length in listing) + f"file '{listing[-1][0]}'\n")
+concat.write_text("".join(f"file '{file}'\nduration {length / PLAY:.6f}\n" for file, length in listing) + f"file '{listing[-1][0]}'\n")
 signature = concat.read_text()
 stamp = ASSETS / "screen.signature"
 if not (ASSETS / "screen.mp4").exists() or not stamp.exists() or stamp.read_text() != signature:
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(concat),
-                    "-vf", f"fps={FPS},scale=2880:1620:flags=lanczos,format=yuv420p", "-c:v", "libx264", "-crf", "15", "-preset", "medium",
-                    "-g", str(FPS), "-movflags", "+faststart", "-t", f"{film.duration:.3f}", str(ASSETS / "screen.mp4")], check=True)
+                    "-vf", f"fps={PLAY},scale=2880:1620:flags=lanczos,format=yuv420p", "-c:v", "libx264", "-crf", "15", "-preset", "medium",
+                    "-g", str(PLAY), "-movflags", "+faststart", "-t", f"{film.length:.3f}", str(ASSETS / "screen.mp4")], check=True)
     stamp.write_text(signature)
 
 film.write(HERE, style=style_css, extra_script="\n".join(extra))
-print(f"{film.duration:.2f} 秒，{len(listing)} 段画面，{len(film.clicks)} 次点击；镜头：", ", ".join(built))
+# 配乐要知道几个镜头从第几拍起（成片的拍子）
+beats = lambda moment: round(moment / BEAT, 2)
+cues = json.loads((HERE / "cues.json").read_text())
+cues["bpm"] = round(60 / BEAT * PLAY / FPS)
+cues["marks"] = {"reveal": beats(at(12)), "ask": beats(at(16)), "photos": beats(at(400)), "wipe": beats(at(60)), "hands": beats(at(300)),
+                 "style": beats(at(66.01)), "terminal": beats(at(88)), "payoff": beats(at(102)), "claim": beats(at(116)), "end": beats(at(122))}
+(HERE / "cues.json").write_text(json.dumps(cues, ensure_ascii=False))
+print(f"{film.length:.2f} 秒，{len(listing)} 段画面，{len(film.clicks)} 次点击；镜头：", ", ".join(built))

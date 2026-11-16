@@ -1,7 +1,7 @@
 """主视频的合成工具。画面上每样东西（面板、面板里的镜头、光标、字、飞的图）在每一帧的位置都在这里算好，
 页面（HyperFrames）里只有一条时钟补间，照着表把东西摆到位。这样任何一帧都能单独重出，改一个镜头不用碰页面脚本。
 
-    film = Film(72.5)
+    film = Film(92)                           # 排的时候的秒数；放出来是 92 × FPS / PLAY 秒
     pane = film.pane("a")                     # 一块显示录屏的面板，有自己的镜头
     pane.place(0, (128, 28, 1664, 936))       # 面板在画面上的位置
     pane.look(4.0, region)                    # 从 4 秒起镜头对着哪块（页面坐标的矩形，或每帧给矩形的函数）
@@ -15,7 +15,8 @@ import json
 import math
 from pathlib import Path
 
-FPS = 30
+FPS = 24   # 排的时候一秒算几帧
+PLAY = 30  # 放的时候一秒几帧：每一帧都算、都放，所以整条片子（弹簧、光标、字的来去都在内）快 PLAY / FPS 倍
 W, H = 1920, 1080
 PAGE_W, PAGE_H = 1440, 810  # 录屏时页面的大小（CSS 像素）
 
@@ -126,7 +127,7 @@ class Node:
         visible = [index for index, value in enumerate(self.o.v) if value > 0.001]
         if not visible:
             return None
-        return max(0, visible[0] - 1) / FPS, (visible[-1] + 2 - max(0, visible[0] - 1)) / FPS
+        return max(0, visible[0] - 1) / PLAY, (visible[-1] + 2 - max(0, visible[0] - 1)) / PLAY
 
     def data(self):
         out = {"id": self.id, "kind": "node", "ax": self.ax, "ay": self.ay, "x": self.x.packed(), "y": self.y.packed(),
@@ -287,6 +288,7 @@ class Film:
     def __init__(self, duration):
         self.duration = round(duration * FPS) / FPS
         self.count = frame(self.duration) + 1
+        self.length = (self.count - 1) / PLAY  # 放出来有多长（秒）
         self.panes, self.nodes, self.clicks = [], [], []
         self.cursor = Cursor(self)
         self.serial = 0
@@ -317,7 +319,7 @@ class Film:
         for pane in self.panes:
             body.append(
                 f'<div class="pane" id="{pane.id}" style="z-index:{pane.z}" data-layout-ignore><div class="clipper"><div class="cam">'
-                f'<video id="{pane.id}-video" class="clip" data-start="0" data-duration="{self.duration:.3f}" data-track-index="0" '
+                f'<video id="{pane.id}-video" class="clip" data-start="0" data-duration="{self.length:.3f}" data-track-index="0" '
                 f'src="{video}" muted playsinline></video></div></div></div>')
         track = 2
         for node in self.nodes:
@@ -327,7 +329,7 @@ class Film:
                 if not span:
                     continue
                 track += 1
-                body.append(f'<div class="clip holder" data-start="{span[0]:.3f}" data-duration="{min(span[1], self.duration - span[0]):.3f}" '
+                body.append(f'<div class="clip holder" data-start="{span[0]:.3f}" data-duration="{min(span[1], self.length - span[0]):.3f}" '
                             f'data-track-index="{track}" style="z-index:{node.z}">{inner}</div>')
             else:
                 body.append(inner.replace('class="node', 'data-layout-ignore class="node', 1))
@@ -335,15 +337,15 @@ class Film:
         body.append(f'<svg id="cursor" data-layout-ignore viewBox="0 0 24 24" width="{Cursor.SIZE}" height="{Cursor.SIZE}">'
                     '<path d="M5 3l14 8.2-6.3 1.5-3 6z"/></svg>')
         if audio:
-            body.append(f'<audio id="bed" class="clip" data-start="0" data-duration="{self.duration:.3f}" data-track-index="1" '
+            body.append(f'<audio id="bed" class="clip" data-start="0" data-duration="{self.length:.3f}" data-track-index="1" '
                         f'src="{audio}" data-volume="1"></audio>')
-        data = {"fps": FPS, "duration": self.duration, "count": self.count, "items": items}
+        data = {"fps": PLAY, "duration": self.length, "count": self.count, "items": items}
         html = TEMPLATE.replace("/*STYLE*/", style).replace("<!--BODY-->", "\n".join(body)) \
             .replace("/*DATA*/", json.dumps(data, ensure_ascii=False, separators=(",", ":"))) \
-            .replace("/*EXTRA*/", extra_script).replace("{DURATION}", f"{self.duration:.3f}")
+            .replace("/*EXTRA*/", extra_script).replace("{DURATION}", f"{self.length:.3f}")
         folder = Path(folder)
         (folder / "index.html").write_text(html)
-        (folder / "cues.json").write_text(json.dumps({"total": self.duration, "clicks": sorted(self.clicks)}))
+        (folder / "cues.json").write_text(json.dumps({"total": self.length, "clicks": sorted(frame(moment) / PLAY for moment in self.clicks)}))
         return html
 
 
