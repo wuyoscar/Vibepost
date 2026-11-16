@@ -1,0 +1,11 @@
+# 素材由 tools/ 里的脚本从截帧结果拷进来、合成出来，成片在 renders/，都不进 git（主视频在这一层，详细教程在 tutorial/）
+**/assets/
+**/renders/
+**/.hyperframes/
+node_modules/
+**/cues.json
+# 主视频的合成页是 tools/film.py 从帧算出来的（每一帧的位置表，约 1 MB），不进 git
+/index.html
+# HyperFrames 登记表里装来参考的组件（主视频没用到）
+compositions/
+hyperframes.lock.json

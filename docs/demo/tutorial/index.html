@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, height=1080">
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+<style>
+@font-face { font-family: "PF"; src: local("PingFangSC-Regular"), local("PingFang SC"); font-weight: 400; }
+@font-face { font-family: "PF"; src: local("PingFangSC-Medium"); font-weight: 500; }
+@font-face { font-family: "PF"; src: local("PingFangSC-Semibold"); font-weight: 700; }
+:root { --ground: #f2f2f4; --ink: #16171a; --muted: #5d6068; --sans: "PF", sans-serif; --mono: "JetBrains Mono", monospace; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--ground); }
+#root { width: 1920px; height: 1080px; position: relative; overflow: hidden; background: var(--ground); font-family: var(--sans); color: var(--ink); }
+#cam { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+#poster, .shot { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; object-fit: contain; }
+.cap { position: absolute; left: 0; right: 0; bottom: 112px; height: 84px; text-align: center; }
+.cap span { display: inline-block; height: 84px; padding: 0 28px; border-radius: 12px; background: var(--ink); color: #fff; font: 700 44px/84px var(--sans); white-space: nowrap; box-shadow: 0 10px 30px rgba(0, 0, 0, .18); }
+#hook { height: 112px; bottom: 150px; }
+#hook span { height: 112px; padding: 0 38px; border-radius: 16px; font: 700 62px/112px var(--sans); }
+.fast { position: absolute; left: 0; right: 0; bottom: 208px; height: 52px; text-align: center; }
+.fast span { display: inline-block; height: 52px; padding: 0 18px; border-radius: 10px; background: var(--ink); color: #fff; font: 500 28px/52px var(--sans); white-space: nowrap; }
+#end { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+#end-icon { width: 232px; height: 232px; border-radius: 52px; box-shadow: 0 24px 60px -18px rgba(0, 0, 0, .35); opacity: 0; }
+#end h1 { margin-top: 54px; font: 700 132px/1 var(--sans); letter-spacing: -.01em; }
+.ec { display: inline-block; opacity: 0; }
+#end-line { margin-top: 40px; font: 500 46px/1.3 var(--sans); color: var(--ink); opacity: 0; }
+#end-url { margin-top: 46px; font: 400 32px/1 var(--mono); color: var(--muted); opacity: 0; }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="121.767" data-width="1920" data-height="1080">
+<div id="cam" data-layout-ignore>
+<img id="poster" class="clip" data-start="0" data-duration="2.6" data-track-index="0" src="assets/poster.jpg" alt="">
+<video id="v-basics" class="clip shot" data-start="2.6" data-duration="40.0" data-track-index="0" src="assets/basics.mp4" muted playsinline></video>
+<video id="v-polish" class="clip shot" data-start="42.6" data-duration="23.6" data-track-index="0" src="assets/polish.mp4" muted playsinline></video>
+<video id="v-paste" class="clip shot" data-start="66.2" data-duration="22.2" data-track-index="0" src="assets/paste.mp4" muted playsinline></video>
+<video id="v-manuals" class="clip shot" data-start="88.4" data-duration="28.967" data-track-index="0" src="assets/manuals.mp4" muted playsinline></video>
+</div>
+<div class="cap clip" id="hook" data-start="0" data-duration="2.5" data-track-index="2"><span id="hook-in">Vibepost：一篇小红书笔记，从写到发</span></div>
+<div class="cap clip" id="cap-0" data-start="2.95" data-duration="5.75" data-track-index="2"><span id="cap-0-in">左边写 Markdown，中间就是排好的卡片</span></div>
+<div class="cap clip" id="cap-1" data-start="9.05" data-duration="3.75" data-track-index="2"><span id="cap-1-in">行首输入 / ，插图片、分页和组件</span></div>
+<div class="cap clip" id="cap-2" data-start="13.15" data-duration="10.15" data-track-index="2"><span id="cap-2-in">12 个主题，卡片结构、配色和字体一起换</span></div>
+<div class="cap clip" id="cap-3" data-start="23.65" data-duration="3.15" data-track-index="2"><span id="cap-3-in">首页做封面，标题取自标题框</span></div>
+<div class="cap clip" id="cap-4" data-start="27.15" data-duration="9.95" data-track-index="2"><span id="cap-4-in">发之前：检查用词，看看在手机上的样子</span></div>
+<div class="cap clip" id="cap-5" data-start="37.45" data-duration="5.15" data-track-index="2"><span id="cap-5-in">发送到 iPhone：按页序隔空投送，正文进剪贴板</span></div>
+<div class="cap clip" id="cap-6" data-start="42.95" data-duration="7.55" data-track-index="2"><span id="cap-6-in">场景一：稿子写好了，让 AI 润色</span></div>
+<div class="cap clip" id="cap-7" data-start="50.85" data-duration="5.95" data-track-index="2"><span id="cap-7-in">改动标在正文里，逐处接受或拒绝</span></div>
+<div class="cap clip" id="cap-8" data-start="57.15" data-duration="9.05" data-track-index="2"><span id="cap-8-in">再点「一键排版」：只动版式，不改字</span></div>
+<div class="cap clip" id="cap-9" data-start="66.55" data-duration="3.35" data-track-index="2"><span id="cap-9-in">场景二：手上有一篇写好的长文，照片已经拖进稿子</span></div>
+<div class="cap clip" id="cap-10" data-start="70.25" data-duration="4.95" data-track-index="2"><span id="cap-10-in">整篇贴进对话框，让 AI 排成图文卡片</span></div>
+<div class="cap clip" id="cap-11" data-start="75.55" data-duration="12.85" data-track-index="2"><span id="cap-11-in">卡片、标题、小红书正文一起出来</span></div>
+<div class="cap clip" id="cap-12" data-start="88.75" data-duration="7.35" data-track-index="2"><span id="cap-12-in">AI 设置里有两个内置技能和四份内置写作手册</span></div>
+<div class="cap clip" id="cap-13" data-start="96.45" data-duration="4.85" data-track-index="2"><span id="cap-13-in">想改成自己的：复制一份来改</span></div>
+<div class="cap clip" id="cap-14" data-start="101.65" data-duration="10.017" data-track-index="2"><span id="cap-14-in">也可以让 AI 把这篇的写法存成你的写作手册</span></div>
+<div class="cap clip" id="cap-15" data-start="112.017" data-duration="5.35" data-track-index="2"><span id="cap-15-in">保存前给你确认；之后同类的稿子照它写</span></div>
+<div class="fast clip" id="fast-0" data-start="48.8" data-duration="1.7" data-track-index="3"><span>快进 ×8</span></div>
+<div class="fast clip" id="fast-1" data-start="58.3" data-duration="3.3" data-track-index="3"><span>快进 ×8</span></div>
+<div class="fast clip" id="fast-2" data-start="72.7" data-duration="2.5" data-track-index="3"><span>快进 ×8</span></div>
+<div class="fast clip" id="fast-3" data-start="102.8" data-duration="2.4" data-track-index="3"><span>快进 ×8</span></div>
+<div id="end" class="clip" data-start="117.367" data-duration="4.4" data-track-index="4">
+<img id="end-icon" src="assets/icon.png" alt="">
+<h1><span class="ec">V</span><span class="ec">i</span><span class="ec">b</span><span class="ec">e</span><span class="ec">p</span><span class="ec">o</span><span class="ec">s</span><span class="ec">t</span></h1>
+<p id="end-line">用 Markdown 写小红书的桌面 App</p>
+<p id="end-url">github.com/wuyoscar/Vibepost</p>
+</div>
+<audio id="bed" class="clip" data-start="0" data-duration="121.767" data-track-index="5" src="assets/track.wav" data-volume="1"></audio>
+</div>
+<script>
+const SHOTS = [[0.0, [1.0, 0.0, 0.0], false], [2.6, [1.3091, 0.0, -110.4], false], [12.8, [1.34, -652.8, -125.7], false], [26.8, [1.0, 0.0, 0.0], false], [50.5, [1.3091, 0.0, -110.4], false], [56.8, [1.0, 0.0, 0.0], false], [61.6, [1.34, -652.8, -125.7], false], [66.2, [1.0, 0.0, 0.0], true], [81.1, [1.34, -652.8, -125.7], false]];
+const CAPS = ["cap-0", "cap-1", "cap-2", "cap-3", "cap-4", "cap-5", "cap-6", "cap-7", "cap-8", "cap-9", "cap-10", "cap-11", "cap-12", "cap-13", "cap-14", "cap-15"];
+const OUT = 117.367, TOTAL = 121.767;
+const tl = gsap.timeline({ paused: true });
+const ft = (sel, from, to, t) => tl.fromTo(sel, from, Object.assign({ immediateRender: false }, to), t);
+const blurIn = (sel, t, d = 0.3) => ft(sel, { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: d, ease: "power2.out" }, t);
+
+/* 镜头：机位变了才动，推近和平移是同一种走法；换段时直接切 */
+gsap.set("#cam", { transformOrigin: "0 0", scale: 1, x: 0, y: 0, opacity: 1 });
+for (let i = 1; i < SHOTS.length; i++) {
+  const [, [s0, x0, y0]] = SHOTS[i - 1], [t, [s1, x1, y1], cut] = SHOTS[i];
+  ft("#cam", { scale: s0, x: x0, y: y0 }, { scale: s1, x: x1, y: y1, duration: cut ? 0.001 : 0.6, ease: cut ? "none" : "power3.inOut" }, t);
+}
+
+/* 字幕：墨色块从左到右擦出来，落定后不动；到点由下一句顶掉 */
+for (const id of CAPS) {
+  const start = Number(document.getElementById(id).dataset.start);
+  ft(`#${id}-in`, { clipPath: "inset(0 100% 0 0 round 12px)" }, { clipPath: "inset(0 0% 0 0 round 12px)", duration: 0.27, ease: "power2.out" }, start);
+}
+
+/* 片尾：界面退后，图标落定，名字逐字出现 */
+ft("#cam", { opacity: 1, filter: "blur(0px)" }, { opacity: 0, filter: "blur(16px)", duration: 0.45, ease: "power2.in" }, OUT - 0.45);
+ft("#end-icon", { opacity: 0, scale: 0.84, filter: "blur(12px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.55, ease: "expo.out" }, OUT + 0.1);
+tl.fromTo(".ec", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.22, ease: "power2.out", stagger: 0.05, immediateRender: false }, OUT + 0.35);
+blurIn("#end-line", OUT + 0.9);
+blurIn("#end-url", OUT + 1.25);
+tl.set({}, {}, TOTAL);
+window.__timelines["main"] = tl;
+tl.seek(0);
+</script>
+</body>
+</html>
