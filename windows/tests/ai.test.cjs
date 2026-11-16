@@ -20,6 +20,7 @@ async function setup(t, extra = {}) {
   t.after(async () => { await service.dispose(); await fs.rm(data, { recursive: true, force: true }); });
   await service.setPath(path.join(__dirname, 'ai-fixture.cjs'), 'claude');
   await service.setPath(path.join(__dirname, 'ai-fixture.cjs'), 'codex');
+  await service.setPath(path.join(__dirname, 'ai-fixture.cjs'), 'opencode');
   return { service, data, log, events, messages: async () => (await fs.readFile(log, 'utf8')).trim().split('\n').map(JSON.parse) };
 }
 test.before(async () => { await fs.mkdir(path.resolve(__dirname, '..', '..', '.scratch'), { recursive: true }); });
@@ -63,6 +64,48 @@ test('Codex handshake precedes thread opening; sandbox filtering and unrelated c
   const turn = recorded.find(value => value.method === 'turn/start'); assert.deepEqual(turn.params.input, [{ type: 'text', text: '写作' }]); assert(!('cwd' in turn.params));
   assert(!events.some(value => value.event.lines?.some(line => JSON.parse(line).method === 'account/updated')));
   assert(events.some(value => value.event.lines?.some(line => JSON.parse(line).params?.delta === '完成 🐈')));
+});
+
+test('ACP (OpenCode): handshake, shell-owned session params, filtered updates, permission reply and EOF', async t => {
+  const { service, events, messages } = await setup(t);
+  const job = request('acp-one', 'opencode');
+  const lines = () => events.flatMap(value => (value.event.lines || []).map(line => JSON.parse(line)));
+  await service.send(owner, job);
+  await waitFor(() => lines().some(line => line.id === 1));
+  await assert.rejects(service.respond(owner, { ...job, message: { jsonrpc: '2.0', id: 2, method: 'session/delete', params: {} } }), /不支持/);
+  await service.respond(owner, { ...job, message: { jsonrpc: '2.0', id: 2, method: 'session/new', params: { cwd: 'C:\\', mcpServers: [{ name: 'evil', command: 'cmd' }] } } });
+  await waitFor(() => lines().some(line => line.id === 2));
+  await assert.rejects(service.respond(owner, { ...job, message: { jsonrpc: '2.0', id: 3, method: 'session/prompt', params: { sessionId: 'other-session', prompt: [{ type: 'text', text: '写作' }] } } }), /对不上/);
+  await service.respond(owner, { ...job, message: { jsonrpc: '2.0', id: 10, method: 'session/set_config_option', params: { sessionId: 'fixture-session', configId: 'model', value: 'fixture/large', extra: true } } });
+  await service.respond(owner, { ...job, message: { jsonrpc: '2.0', id: 3, method: 'session/prompt', params: { sessionId: 'fixture-session', prompt: [{ type: 'text', text: '写作', unsafe: true }, { type: 'image', data: 'secret' }], cwd: 'C:\\' } } });
+  await waitFor(() => lines().some(line => line.id === 77));
+  await assert.rejects(service.respond(owner, { ...job, message: { jsonrpc: '2.0', id: 78, result: {} } }), /没有对应/);
+  await service.respond(owner, { ...job, message: { jsonrpc: '2.0', id: 77, result: { outcome: { outcome: 'selected', optionId: 'once' } } } });
+  const exit = await waitFor(() => events.find(value => value.event.type === 'exit'));
+  assert.equal(exit.event.markdown, 'ACP 改稿'); assert.equal(exit.event.status, 0);
+  const recorded = await messages(), launch = recorded.find(value => value.kind === 'launch');
+  assert.deepEqual(launch.args, ['acp']); assert.match(launch.permission, /"bash":"ask"/);
+  assert.deepEqual(recorded.filter(value => value.method).map(value => value.method), ['initialize', 'session/new', 'session/set_config_option', 'session/prompt']);
+  const initialize = recorded.find(value => value.method === 'initialize');
+  assert.equal(initialize.params.clientCapabilities.terminal, false); assert.equal(initialize.params.clientCapabilities.fs.writeTextFile, false);
+  const opened = recorded.find(value => value.method === 'session/new');
+  assert.deepEqual(opened.params, { cwd: path.join(service.root, job.draftId), mcpServers: [] });
+  assert.deepEqual(recorded.find(value => value.method === 'session/set_config_option').params, { sessionId: 'fixture-session', configId: 'model', value: 'fixture/large' });
+  assert.deepEqual(recorded.find(value => value.method === 'session/prompt').params, { sessionId: 'fixture-session', prompt: [{ type: 'text', text: '写作' }] });
+  assert(recorded.find(value => value.kind === 'eof'));
+  const updates = lines().filter(line => line.method === 'session/update').map(line => line.params.update);
+  assert.deepEqual(updates.map(update => update.sessionUpdate), ['agent_message_chunk', 'tool_call_update']);
+  assert.deepEqual(updates[1], { sessionUpdate: 'tool_call_update', toolCallId: 'call-1', kind: 'edit', status: 'completed', rawInput: { filePath: 'draft.md' } });
+});
+
+test('ACP model discovery opens a throwaway session outside any draft and returns its config options', async t => {
+  const { service, messages } = await setup(t);
+  const result = await service.models('opencode');
+  assert.deepEqual(result.models, []); assert.equal(result.configOptions[0].currentValue, 'fixture/large');
+  const recorded = await messages();
+  assert.deepEqual(recorded.filter(value => value.method).map(value => value.method), ['initialize', 'session/new']);
+  assert.equal(recorded.find(value => value.method === 'session/new').params.cwd, path.join(service.root, '.acp-models'));
+  await assert.rejects(service.models('nope'), /不认识/);
 });
 
 test('Codex model discovery handshakes without creating a model turn', async t => {
