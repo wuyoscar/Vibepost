@@ -35,7 +35,7 @@ Windows 的 MP4 使用完整的 1440 × 1920 卡片画面、30 fps、H.264、`yu
 
 ## 从源码构建
 
-需要 Windows x64、PowerShell、Node.js 24、npm 和 Python 3。Electron、PDF.js 和打包工具的版本固定在 `windows/package-lock.json`。构建会联网下载已固定版本、核对哈希的 Electron / FFmpeg / 字体；首次准备时间取决于网络。
+需要 Windows x64、PowerShell、Node.js 24、npm 和 [uv](https://docs.astral.sh/uv/)（Python 脚本用它跑，它自己备好 Python）。Electron、PDF.js 和打包工具的版本固定在 `windows/package-lock.json`。构建会联网下载已固定版本、核对哈希的 Electron / FFmpeg / 字体；首次准备时间取决于网络。
 
 以下命令从仓库根目录运行。先设置缓存和临时目录，再安装依赖，可以让准备过程留在仓库所在的磁盘：
 
@@ -50,7 +50,7 @@ New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
 
 npm ci
 npm run build:codemirror
-python scripts/fetch-fonts.py
+uv run scripts/fetch-fonts.py
 
 Set-Location windows
 npm ci

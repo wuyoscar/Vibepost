@@ -49,7 +49,7 @@ else
   if [[ -f "$REPO/fonts/manifest.json" ]]; then
     cp -R "$REPO/fonts" "$WEB/"
   else
-    echo "warning: 没有 fonts/，这次打出的 App 不含内置字体（只能用系统字体）。先运行 python3 scripts/fetch-fonts.py" >&2
+    echo "warning: 没有 fonts/，这次打出的 App 不含内置字体（只能用系统字体）。先运行 uv run scripts/fetch-fonts.py" >&2
   fi
 fi
 

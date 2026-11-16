@@ -7,7 +7,7 @@
 构建与测试的命令在 README 的[从源码构建](README.md#从源码构建)，Windows 的在 [docs/windows.md](docs/windows.md)。最短的路：
 
 ```sh
-python3 scripts/fetch-fonts.py        # 第一次要下载打包字体
+uv run scripts/fetch-fonts.py         # 第一次要下载打包字体
 macos/build-app.sh debug              # 开发用的 App：直接读仓库里的网页，改完 ⌘R 生效
 macos/run-tests.sh --filter Guides 120
 ```

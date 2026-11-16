@@ -1,7 +1,13 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
 """下载并校验打包字体，生成仓库根目录的 fonts/（不进 git）。
 
-    python3 scripts/fetch-fonts.py
+    uv run scripts/fetch-fonts.py
+
+用 uv 跑（https://docs.astral.sh/uv/）：它自己备好合适的 Python，不往系统的 Python 里装东西。只用标准库，没有依赖。
 
 - 版本全部固定：npm 包按 registry 的 dist.integrity（sha512）校验，GitHub 发布包按 sha256 校验。
 - 下载缓存在 ~/Library/Caches/MediaCraft/fonts/，重复执行、在别的 worktree 里执行都直接复用。
