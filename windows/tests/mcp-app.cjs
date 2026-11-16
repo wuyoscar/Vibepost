@@ -40,7 +40,7 @@ async function run({ application, page, data }) {
     const initialized = await request('initialize', { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'Windows MCP App smoke', version: '1' } });
     assert.equal(initialized.result.protocolVersion, '2025-11-25'); assert.equal(initialized.result.serverInfo.name, 'mediacraft');
     const listing = (await request('tools/list')).result.tools;
-    assert.equal(listing.length, 30); assert.equal(listing.at(-1).name, 'send_to_phone');
+    assert.equal(listing.length, 31); assert.equal(listing.at(-1).name, 'send_to_phone');
     assert.ok(listing.every(tool => tool.inputSchema.type === 'object' && tool.description));
     assert.ok(!listing.some(tool => tool.name === 'send_to_iphone'));
     assert.deepEqual(listing.find(tool => tool.name === 'export').inputSchema.properties.format.enum, ['zip', 'png', 'long', 'mp4', 'gif']);
