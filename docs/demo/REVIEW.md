@@ -1,6 +1,6 @@
 # 主视频「你写，Agent 排」：交付说明（2026-11-16，第三版）
 
-成片：`docs/screenshots/vibepost.mp4`（配乐）与 `docs/screenshots/vibepost-silent.mp4`（无声，不进 git），1920 × 1080、30 fps、H.264 yuv420p、faststart，56.5 秒，12.5 MB。README 顶上自动播放的是同一条片子的无声动图 `docs/screenshots/vibepost.webp`（GitHub 的页面不播放仓库里的 mp4，文件页也不播）。封面：`docs/screenshots/vibepost-cover.png`（1920 × 1080）与 `vibepost-cover-3x4.png`（1242 × 1656）。分镜与规格见 `SPEC.md`。
+成片：`docs/screenshots/vibepost.mp4`（配乐）与 `docs/screenshots/vibepost-silent.mp4`（无声，不进 git），1920 × 1080、30 fps、H.264 yuv420p、faststart，56.5 秒，12.5 MB。README 顶上放的是传到 GitHub 的带声音的那一份（9.4 MB，crf 24；地址怎么来的见 `docs/release.md`），GitHub 的页面不播放仓库里的 mp4。封面：`docs/screenshots/vibepost-cover.png`（1920 × 1080）与 `vibepost-cover-3x4.png`（1242 × 1656）。分镜与规格见 `SPEC.md`。
 
 ## 第三版改了什么
 
@@ -37,7 +37,7 @@
 
 - `npx hyperframes check`：通过，没有错误，没有读不完的字。剩下的警告：`dead_stretch`（它只看页面元素，不看录屏里的变化；那几段录屏在动）、`font_face_local_only`（苹方、SF Mono 只在这台 Mac 上有，只在本机渲染）、`duplicate_media_discovery_risk`（两块面板用的是同一条录屏，有意的）、两类结构建议。
 - 抽帧（`hyperframes snapshot` 三轮共 50 帧：每段开头、每次描边亮的那一下、配图停留、片尾）：首帧有主体，最后一帧是片尾；描边、推近、打勾都落在卡片变样的那一帧。
-- 体积：渲染出来 25 MB，再压一遍到 12.5 MB（libx264 crf 21，和渲染结果比 PSNR 48.6 dB）。README 的动图 `vibepost.webp`：960 × 540、一秒 12 帧、7.9 MB（`uv run tools/webp.py renders/film.mp4 ../screenshots/vibepost.webp`）。
+- 体积：渲染出来 25 MB，再压一遍到 12.5 MB（libx264 crf 21，和渲染结果比 PSNR 48.6 dB）。要做成动图时用 `uv run tools/webp.py renders/film.mp4 <输出>.webp`（960 × 540、一秒 12 帧，整条约 7.9 MB）。
 - 声音：-16.8 LUFS，峰值 -5.1 dBTP。**配乐没试听过，请听一遍**（这一版拍点全挪了，开头三个音、结尾三个和弦、卡片变样时的高音都跟着新的时刻）。
 
 ## 没做的、要知道的

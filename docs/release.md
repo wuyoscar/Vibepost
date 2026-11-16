@@ -6,19 +6,31 @@
 
 1. 改仓库根目录的 `VERSION`（只写在这里；`build-app.sh` 把它写进 App 的 Info.plist）。
 2. 跑全量测试：`caffeinate -dimu macos/run-tests.sh 3600`（约 36 分钟，默认的 300 秒超时不够；不防睡眠的话显示器一睡，测试会被节流到超时）。
-3. 打 DMG：`scripts/make-dmg.sh`（有 Developer ID 时加 `--sign` / `--notarize`，见脚本开头）。得到
+3. 打 Mac 的 DMG：`scripts/make-dmg.sh`（有 Developer ID 时加 `--sign` / `--notarize`，见脚本开头）。得到
    - `dist/Vibepost-<版本>.dmg`
    - `dist/Vibepost-<版本>.dmg.sha256`
-4. 提交、打 tag、推送，建 Release 并附上这两个文件：
+4. 打 Windows 的安装包：要在真的 Windows 上。把带着新 `VERSION` 的提交推上去，在 GitHub Actions 里手动触发 `windows.yml` 并勾上 build（`gh workflow run windows.yml --ref main -f build=true`；这个工作流平时是停用的，先 `gh workflow enable windows.yml`，用完 `gh workflow disable windows.yml`）。它在 Windows 上跑完测试和冒烟才打包，产物在这次运行的 `Vibepost-Windows-unsigned` 里：`gh run download <运行号> -n Vibepost-Windows-unsigned -D dist/windows-ci`。
+5. 各拷一份名字不带版本号的，README 上的两个下载按钮指着它们（`releases/latest/download/<名字>`）：
 
    ```bash
-   gh release create v<版本> dist/Vibepost-<版本>.dmg dist/Vibepost-<版本>.dmg.sha256 --title "Vibepost <版本>" --notes-file 更新说明.md
+   cp dist/Vibepost-<版本>.dmg dist/Vibepost-macOS.dmg
+   cp dist/windows-ci/Vibepost-<版本>-Windows-Setup.exe dist/Vibepost-Windows-Setup.exe
+   ```
+
+6. 打 tag、推送，建 Release 并附上这些文件：
+
+   ```bash
+   gh release create v<版本> dist/Vibepost-<版本>.dmg dist/Vibepost-<版本>.dmg.sha256 \
+     dist/Vibepost-macOS.dmg dist/Vibepost-Windows-Setup.exe dist/windows-ci/Vibepost-<版本>-Windows-Setup.exe \
+     --title "Vibepost <版本>" --notes-file 更新说明.md
    ```
 
 ## 约定（App 照这些找新版本）
 
 - tag 是 `v<版本>`，版本号按数字段比较（`0.6.0` > `0.5.10`）；只看最新的那个正式 Release（草稿、预发布不算）。
 - 附件名必须是 `Vibepost-<版本>.dmg` 与 `Vibepost-<版本>.dmg.sha256`；少了哪个都不装。
+- `Vibepost-macOS.dmg` 与 `Vibepost-Windows-Setup.exe` 是给 README 的下载按钮用的，App 的更新不看它们；少了的话按钮会 404。
+- README 顶上的视频是传到 GitHub 的附件（`https://github.com/user-attachments/assets/…`，在任何一个 issue 的输入框里拖进 mp4 就得到地址，不用真的提交；单个文件 10 MB 以内）。仓库里的 mp4 在 GitHub 的页面上不播放。
 - Release 的正文就是 App 里弹窗显示的「更新说明」（前 600 字）。
 - 仓库名写在 App 的 Info.plist（`MCUpdateRepository`，`build-app.sh` 写入，默认 `wuyoscar/Vibepost`）。
 

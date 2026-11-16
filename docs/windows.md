@@ -73,7 +73,7 @@ npm run build
 
 设置 FFmpeg 测试变量可确保实际编码检查执行；二进制不存在时相关测试会明确跳过。默认输出为根目录 `dist/windows/`，包含 `win-unpacked/` 与 `Vibepost-<版本>-Windows-Setup.exe`。`VIBEPOST_OUTPUT_DIR` 可改成其他绝对目录。NSIS 安装器允许选择安装位置。
 
-当前构建流程没有配置 Windows 代码签名证书，不能把产物称为已签名或已发布的正式版本。未签名程序可能触发 SmartScreen 或公司设备管理限制；应核对文件来源和构建记录，具体放行由设备用户决定。
+Release 里的 `Vibepost-Windows-Setup.exe` 是 GitHub Actions 在 Windows 上跑完测试和冒烟后打的（步骤见 [发版](release.md)），没有代码签名。未签名的程序第一次运行会被 SmartScreen 拦下（点「更多信息」→「仍要运行」），公司管理的设备可能不让装；具体放行由设备用户决定。
 
 ## AI 的准备与模型
 
