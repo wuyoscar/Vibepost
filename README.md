@@ -36,7 +36,7 @@ Windows 版发到手机用的是扫码，带视频的卡片导出成 MP4 / GIF�
 
 **想用 AI 排版（可选）**
 
-AI 助手用的是你电脑上的 Claude Code 或 Codex。装一个，在终端里登录一次：
+AI 助手用的是你电脑上的 Claude Code 或 Codex（想用别家的模型，也可以是 OpenCode、Oh My Pi、Kimi Code，见[接别家的模型](docs/ai-assistant.md#接别家的模型)）。装一个，在终端里登录一次：
 
 ```sh
 npm install -g @anthropic-ai/claude-code   # 装好后运行一次 claude

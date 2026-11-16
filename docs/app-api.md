@@ -513,7 +513,7 @@ Claude 用它们直接操作 App（工具全名 `mcp__mediacraft__<名字>`）�
 | --- | --- | --- |
 | `ai/status` | `{ refresh, backend }`（`backend` 没给时是 `"claude"`） | `AIStatus` |
 | `ai/settings` | `{ backend, path }`（`null` 恢复自动查找；旧的 `{ claudePath }` 也认） | `AIStatus` |
-| `ai/models` | `{ backend }` | Codex：起一次 `codex app-server`，握手后问 `model/list` 就关上，`{ models: [{ id, name, isDefault }] }`；别的后端 `{ models: [] }` |
+| `ai/models` | `{ backend }` | Codex：起一次 `codex app-server`，握手后问 `model/list` 就关上，`{ models: [{ id, name, isDefault }] }`；说 ACP 的后端：`{ models: [], configOptions }`（见「加一个后端」里的「说 ACP 的 Agent」）；Claude Code `{ models: [] }` |
 | `ai/send` | `{ turnId, draftId, backend, prompt, markdown, title, caption, systemPrompt, agentsFile, … }`（`agentsFile`：写进工作副本 `AGENTS.md` 的两份内置技能全文（`MediaCraftSkills.agentsFile()`，操作手册在前、写作在后）加内置写作手册全文（`MediaCraftManualLibrary.agentsSection()`），壳在后面接上写作手册的目录、把写作手册拷进 `写作手册/`，每轮重写），后面是这个后端要的：Claude Code 是 `sessionId, resume, model, allowedTools`（`model`：这篇选的模型，`null` 不传 `--model`，格式不对时 `ok: false`；`allowedTools`：这篇的会话里「本次会话都允许」过的规则），Codex 不要别的（线程由页面经 stdin 开） | 进程启动后立即返回 `{ ok }`；找不到这个后端、缺了它要的字段、这篇已在跑时 `ok: false` 带原因 |
 | `ai/cancel` | `{ draftId }` | `{ cancelled }` |
 | `ai/respond` | `{ draftId, turnId, message }`：`message` 是一整行（Claude Code 是 `control_response`；Codex 是对服务端请求的回答，或 `thread/start`、`thread/resume`、`turn/start`、`turn/interrupt`，壳按上面「Codex」里说的填好工作目录、沙箱与审批、去掉别的字段），不是这个后端认得的样子时不写、`ok: false` | 写进那一轮的 stdin，真写进去了才回 `{ delivered: true }`；这一轮已经结束、stdin 已关时 `{ delivered: false }`；写失败时 `ok: false` 带原因 |
@@ -533,7 +533,7 @@ Claude 用它们直接操作 App（工具全名 `mcp__mediacraft__<名字>`）�
 
 ### 加一个后端
 
-目前只有 Claude Code 和 Codex 两个后端。后端不是插件，没有配置文件能加一个，要改代码。只是想让别的 Agent 操作 Vibepost 时不用加后端，走 MCP 就行（[mcp.md](mcp.md)）。
+现在有 Claude Code、Codex，和说 ACP 的三个（OpenCode、Oh My Pi、Kimi Code，共用一个适配器，见下面的「说 ACP 的 Agent」）。后端不是插件，没有配置文件能加一个，要改代码。只是想让别的 Agent 操作 Vibepost 时不用加后端，走 MCP 就行（[mcp.md](mcp.md)）。
 
 一个命令行 Agent 要能当后端，得满足这几条：能不带界面地运行，在 stdin / stdout 上用按行的 JSON 说话；能接着上一轮的会话；要用户授权的操作能发给宿主来答。能把宿主的工具挂进去更好（App 的工具才用得上），没有也能只改工作副本里的文件。
 
@@ -566,16 +566,35 @@ Claude 用它们直接操作 App（工具全名 `mcp__mediacraft__<名字>`）�
 | `outgoing(_:directory:context:)` | 页面要写进 stdin 的一行：不认得的不写，工作目录、沙箱、审批这类由壳填 |
 | `generatedImages(in:)` | 这一行里它自己生成的图（没有就不实现） |
 
+`slim(_:)`（可选）在推给页面之前把一行削薄（ACP 的工具调用带着整份文件）。
+
 再在 `AgentLocator.swift` 里给它一个 `AgentProgram`（可执行文件名、设置里指定路径的键、可选的登录检查），加进 `AISessions` 的 `locators`。
 
 **还按名字写着的地方**，加第三个后端时要一起改：
 
-- `src/ai/session.js`：能选的模型（`models()`）与推理强度（`effortChoices()`）按后端分支；从没选过时的默认后端是「有 Codex 用 Codex，否则 Claude Code」。
-- `src/ai/panel.js`：找不到、运行不起来、没登录时的指引（`GUIDES`），和「改用另一个后端」的按钮。
-- `index.html`：AI 设置里每个后端一组的「指定路径」。
-- 壳的 `ai/models`：只有 Codex 会去问模型列表。
-- Windows 的壳（`windows/lib/ai.cjs`）没有 `AIBackend` 这样的协议，启动参数、开头几行、哪行算说完都是按 `claude` / `codex` 分支写的。
-- 测试：照 `macos/Tests/Fixtures/ai/fake-claude`、`fake-codex` 写一个假的命令行程序，测试不调真的 Agent。
+- `src/ai/session.js`：能选的模型（`models()`）与推理强度（`effortChoices()`）按后端分支（Claude Code 一种、适配器上 `protocol: "acp"` 的一种、其余照 Codex）；从没选过时的默认后端是「有 Codex 用 Codex，否则 Claude Code」；适配器的 `toolNames` 为 `null` 时说明书换成没有 App 工具的那一版。
+- `src/ai/panel.js`：找不到、运行不起来、没登录时的指引（`GUIDES`；没写的照适配器上的 `program` / `install` / `login` 拼一份），和「改用另一个后端」的按钮。
+- `index.html`：AI 设置里每个后端一组的「指定路径」，后端选单的选项。
+- 壳的 `ai/models`：Codex 问 `model/list`，ACP 的开一个会话。
+- Windows 的壳（`windows/lib/ai.cjs`）没有 `AIBackend` 这样的协议，启动参数、开头几行、哪行算说完都是按 `claude` / ACP 的几个 / `codex` 分支写的。
+- 测试：照 `macos/Tests/Fixtures/ai/fake-claude`、`fake-codex`、`fake-acp` 写一个假的命令行程序，测试不调真的 Agent。
+
+**说 ACP 的 Agent**（[ADR 0009](adr/0009-acp-backends.md)）：OpenCode、Oh My Pi、Kimi Code 都是 `<程序> acp`（Agent Client Protocol，stdio 上的 JSON-RPC），页面一个适配器（`src/ai/backends/acp.js`）、壳一个 `ACPBackend`（`ACPBackend.swift`）。再加一个说 ACP 的：`acp.js` 的 `AGENTS` 里登记一行（id、名字、程序名、安装与登录的命令），`AISessions.swift` 的 `backends`、`locators` 与 `AgentLocator.swift` 各加一项，`windows/lib/ai.cjs` 的 `ACP` 里加上 id，`index.html` 加选项与路径组。
+
+一轮是这样走的：
+
+| 谁写 | 写什么 |
+| --- | --- |
+| 壳 | `initialize`（id 1）：`protocolVersion: 1`，`clientCapabilities` 里读写文件、终端都是 `false`（它用自己的工具） |
+| 页面 | `session/new`，或续上次的 `session/resume`（它没有这个能力时 `session/load`，重放的历史不看；两样都没有就每轮新会话）。壳填 `cwd`（工作副本）与 `mcpServers: []`，页面给的不算 |
+| 页面 | 这篇选的模型、推理强度和它现在用的不一样时：`session/set_config_option`（`configId` 是它 `configOptions` 里 category 为 `model` / `thought_level` 的那个选单） |
+| 页面 | `session/prompt`：这一轮的话（只有文字）。新会话的这一句前面带着说明书（ACP 没有系统提示词），续上的不带 |
+
+它发来的：`session/update` 通知里壳只推 `agent_message_chunk`（流式的回复）、`tool_call` / `tool_call_update`（削薄成标题、种类、状态、路径、命令；读文件、查找不记进会话），别的不推；`session/request_permission` 弹确认框，回它给的选项里的一个（`allow_once` / `reject_once`；「本次会话都允许」也回 `allow_once`，规则 `acp:[种类, 命令或路径]` 由页面记着，一模一样的再来直接放行）；别的请求回「不支持」。`session/prompt` 的回答就是说完：`stopReason` 是 `max_tokens`、`max_turn_requests`、`refusal` 或回的是错误时，这一轮以出错结束。
+
+模型：`ai/models` 起一次 `<程序> acp`，握手后在 `ai/.acp-models/` 里开一个会话就关上，把它的 `configOptions` 原样返回（`{ models: [], configOptions }`），页面的 `MediaCraftAI.acpModels` 挑出模型（`{ id, name, isDefault, efforts, defaultEffort }`；ID 里有这边不收的字符的不列）。没选过推理强度时跟随它自己的；它没报档位时选单停用。
+
+这类后端没有 App 的工具（适配器的 `toolNames` 是 `null`）、不能生图。起 OpenCode 时壳带上 `OPENCODE_PERMISSION`（改文件允许，运行命令、联网、目录外的读写先问）。
 
 
 ## 窗口：一个窗口一篇稿子
