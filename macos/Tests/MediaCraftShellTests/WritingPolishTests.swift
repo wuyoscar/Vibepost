@@ -285,4 +285,41 @@ struct WritingPolishTests {
         #expect(result?["again"] == ["open": true, "focused": true, "onRow": false])
         #expect(harness.pageErrors == [])
     }
+
+    @Test("新手引导第一步说的是眼前圈着的东西：稿件栏收着时圈「稿件列表」、说点开它；点开以后圈和说明都换成栏头的两个按钮")
+    func onboardingFirstStepNamesWhatItPointsAt() async throws {
+        let harness = ShellHarness()
+        try await harness.load()
+        let result = try await harness.evaluate(Self.helpers + """
+            const tour = () => ui.dialogs().find((dialog) => dialog.textContent.includes("新手引导"));
+            const body = () => tour().querySelector(".onboarding-body").textContent;
+            const ring = () => box(document.querySelector(".onboarding-spot"));
+            const around = (nodes) => {
+              const boxes = nodes.map(box);
+              const spot = ring();
+              return boxes.every((item) => item.left >= spot.left - 1 && item.right <= spot.right + 1 && item.top >= spot.top - 1 && item.bottom <= spot.bottom + 1);
+            };
+            await until(tour);
+            const toggle = ui.find("稿件列表");
+            if (toggle.getAttribute("aria-expanded") === "true") toggle.click();
+            await until(() => body().startsWith("点这里打开稿件栏"));
+            const closed = { body: body(), around: around([toggle]), title: tour().querySelector(".onboarding-title").textContent };
+            toggle.click();
+            await until(() => body().startsWith("稿件栏里有三本"));
+            await until(() => around([ui.find("从模板新建"), ui.find("新建稿件")]));
+            const cardInside = box(tour()).left >= 0 && box(tour()).right <= innerWidth && box(tour()).bottom <= innerHeight;
+            return { closed, opened: { body: body(), step: tour().textContent.includes("1 / 4") }, cardInside };
+        """) as? [String: Any]
+        await harness.tearDown()
+
+        let closed = result?["closed"] as? [String: Any]
+        #expect(closed?["around"] as? Bool == true, "稿件栏收着时圈住的是「稿件列表」")
+        #expect((closed?["body"] as? String ?? "").contains("从模板新建"), "说明里还是讲了新建与模板")
+        #expect(closed?["title"] as? String == "新建，或从模板开始")
+        let opened = result?["opened"] as? [String: Any]
+        #expect((opened?["body"] as? String ?? "").contains("点 + 开一篇空白稿子"))
+        #expect(opened?["step"] as? Bool == true, "点开稿件栏还在第一步")
+        #expect(result?["cardInside"] as? Bool == true)
+        #expect(harness.pageErrors == [])
+    }
 }

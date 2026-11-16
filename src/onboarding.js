@@ -8,13 +8,18 @@
 
   // spot：依次试这些选择器，用第一组看得见的元素（一组里有几个就圈住它们合起来的范围）。
   // advanceOn：点了这个控件就进入下一步。
+  // body：一句说明；给一组时和 spot 一一对应（圈住的是第几组就说第几句），说的总是眼前圈着的东西。
   const STEPS = [
     {
-      // 稿件抽屉头上的两个按钮一起圈住（抽屉收着时圈「稿件列表」）；点哪个都进入下一步
+      // 稿件抽屉头上的两个按钮一起圈住；点哪个都进入下一步。抽屉收着时圈的是「稿件列表」，
+      // 那两个按钮还看不见：先说点开它，点开以后圈和说明都换成两个按钮的
       spot: ["#templateGalleryBtn, #newDraftBtn", "#draftsToggleBtn"],
       advanceOn: "#newDraftBtn, #templateGalleryBtn",
       title: "新建，或从模板开始",
-      body: "稿件栏里有三本只读的说明书，随时能翻回来看。点 + 开一篇空白稿子，或点旁边的「从模板新建」挑一套写好的改。",
+      body: [
+        "稿件栏里有三本只读的说明书，随时能翻回来看。点 + 开一篇空白稿子，或点旁边的「从模板新建」挑一套写好的改。",
+        "点这里打开稿件栏：里面有三本只读的说明书，随时能翻回来看；栏头的 + 开一篇空白稿子，旁边的「从模板新建」挑一套写好的改。",
+      ],
     },
     {
       spot: ["#markdownEditor"],
@@ -61,7 +66,7 @@
   const visible = (element) => element.getClientRects().length > 0 && getComputedStyle(element).visibility !== "hidden";
 
   function spotRect(step) {
-    for (const selector of step.spot) {
+    for (const [index, selector] of step.spot.entries()) {
       const rects = [...document.querySelectorAll(selector)].filter(visible).map((element) => element.getBoundingClientRect());
       if (!rects.length) continue;
       // 几处合起来的外框
@@ -71,9 +76,15 @@
         right: Math.max(...rects.map((rect) => rect.right)),
         bottom: Math.max(...rects.map((rect) => rect.bottom)),
       };
-      return { ...box, width: box.right - box.left, height: box.bottom - box.top };
+      return { ...box, width: box.right - box.left, height: box.bottom - box.top, index };
     }
     return null;
+  }
+
+  // 这一步现在该说的那句：圈住的是 spot 里的第几组，就说 body 里的第几句
+  function bodyOf(step, rect) {
+    const body = Array.isArray(step.body) ? step.body[rect?.index ?? 0] ?? step.body[0] : step.body;
+    return window.MediaCraftPlatform.keys(body);
   }
 
   function build() {
@@ -151,6 +162,9 @@
   function layout() {
     if (!tour) return;
     const rect = spotRect(STEPS[tour.index]);
+    // 圈住的东西换了（第一步里点开了稿件栏）：说明跟着换
+    const body = bodyOf(STEPS[tour.index], rect);
+    if (tour.ui.body.textContent !== body) tour.ui.body.textContent = body;
     tour.ui.spot.hidden = !rect;
     tour.ui.dim.style.clipPath = "";
     if (rect) {
@@ -164,13 +178,18 @@
   }
 
   // 界面动了（窗口缩放、抽屉开合、滚动）就重新对准；同一帧里只算一次。
+  // 窗口看不见时不跑 requestAnimationFrame：垫一个定时器，谁先到谁算。
   function scheduleLayout() {
     if (!tour || tour.frame) return;
-    tour.frame = requestAnimationFrame(() => {
-      if (!tour) return;
+    const run = () => {
+      if (!tour || !tour.frame) return;
+      cancelAnimationFrame(tour.frame);
+      clearTimeout(tour.timer);
       tour.frame = 0;
       layout();
-    });
+    };
+    tour.frame = requestAnimationFrame(run);
+    tour.timer = setTimeout(run, 120);
   }
 
   function show(index) {
@@ -180,7 +199,7 @@
     tour.index = index;
     ui.count.textContent = `${index + 1} / ${STEPS.length}`;
     ui.title.textContent = step.title;
-    ui.body.textContent = window.MediaCraftPlatform.keys(step.body);
+    ui.body.textContent = bodyOf(step, spotRect(step));
     ui.dots.forEach((dot, dotIndex) => dot.classList.toggle("is-current", dotIndex === index));
     // 回到第一步时「上一步」藏起来，焦点在它上面就挪到「下一步」
     const backFocused = document.activeElement === ui.back;
@@ -204,9 +223,10 @@
   function close() {
     if (!tour) return;
     remember();
-    const { ui, frame, listeners, observer, returnFocus } = tour;
+    const { ui, frame, timer, listeners, observer, returnFocus } = tour;
     const focusInside = ui.card.contains(document.activeElement);
     cancelAnimationFrame(frame);
+    clearTimeout(timer);
     for (const [target, type, listener] of listeners) target.removeEventListener(type, listener, true);
     observer.disconnect();
     ui.layer.remove();
@@ -239,7 +259,7 @@
     for (const [target, type, listener] of listeners) target.addEventListener(type, listener, true);
     const observer = new ResizeObserver(scheduleLayout);
     observer.observe(document.documentElement);
-    tour = { ui, index: 0, frame: 0, listeners, observer, returnFocus: document.activeElement };
+    tour = { ui, index: 0, frame: 0, timer: 0, listeners, observer, returnFocus: document.activeElement };
     ui.card.addEventListener("keydown", onKeydown);
     ui.skip.addEventListener("click", close);
     ui.back.addEventListener("click", () => go(-1));
