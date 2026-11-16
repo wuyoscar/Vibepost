@@ -531,6 +531,52 @@ Claude 用它们直接操作 App（工具全名 `mcp__mediacraft__<名字>`）�
 
 进程的读写都在后台线程；每一行的意思由页面里这个后端的适配解读（`src/ai/backends/`）：claude 的 stream-json 是 `system/init` 取模型与会话 id，`stream_event` 的 `text_delta` 流式显示，`assistant` 里的完整文字与 `tool_use`，`result` 取花费与用时；Codex 见上面的「Codex」。壳只认哪一行算说完（claude 的 `result`，Codex 的 `turn/completed`）。
 
+### 加一个后端
+
+目前只有 Claude Code 和 Codex 两个后端。后端不是插件，没有配置文件能加一个，要改代码。只是想让别的 Agent 操作 Vibepost 时不用加后端，走 MCP 就行（[mcp.md](mcp.md)）。
+
+一个命令行 Agent 要能当后端，得满足这几条：能不带界面地运行，在 stdin / stdout 上用按行的 JSON 说话；能接着上一轮的会话；要用户授权的操作能发给宿主来答。能把宿主的工具挂进去更好（App 的工具才用得上），没有也能只改工作副本里的文件。
+
+接缝分三层（[ADR 0008](adr/0008-ai-backend-claude-or-codex.md)）。会话核心（`src/ai/session.js`）、确认框、修改对比、版本、App 的工具都不认识具体的后端，不用动。
+
+**页面的适配器**：`src/ai/backends/<id>.js`，登记成 `MediaCraftAI.backends[id]`，在 `index.html` 里排在 `src/ai/session.js` 之前载入。照 `claude.js`、`codex.js` 写，要有这些：
+
+| 字段 | 做什么 |
+| --- | --- |
+| `id`、`name`、`label` | 请求里的名字；会话里、选单上怎么称呼它 |
+| `toolNames`、`imagePrompt` | 写进给它的说明：App 的工具在它那边叫什么，生图怎么做 |
+| `session(ai)` | 这一轮续不续上次的会话，返回 `{ sessionId, resume }` |
+| `launch(turn, { rules })` | 交给壳的、只有这个后端用得上的参数 |
+| `state()`（可选） | 这一轮里适配器自己要记的东西 |
+| `read(turn, line, core)` | 把读到的一行翻成会话核心的动作：`core.session`、`textStart` / `textDelta` / `text`、`tool`、`askPermission` / `withdraw`、`runTool`、`result`、`send`、`fail`、`generating`、`candidates` 等 |
+| `reply(requestId, response, error)` | 把核心的回答（权限、工具的结果）写成它认得的一行 |
+| `permissionReply(request, decision, deniedMessage)` | 用户对一个权限请求的回答，返回 `{ response, rules }`（`rules` 是「本次会话都允许」要记下的规则） |
+| `exitError(exit)`、`lostSession(exit, turn)` | 进程意外退出时的说明；它那边的会话是不是没了（没了下一轮开新会话） |
+
+**壳的 `AIBackend`**（`macos/Sources/MediaCraftShell/AIBackends.swift`），加进 `AISessions.swift` 里的 `backends`：
+
+| 成员 | 做什么 |
+| --- | --- |
+| `id` | 页面请求里的 `backend` |
+| `validate(_:)` | 这一轮的请求缺了它必须有的字段就抛错 |
+| `environment` | 在终端的环境变量之上另加的 |
+| `arguments(for:)` | 起进程的参数 |
+| `openingLines(for:)` | 进程起来后先写进 stdin 的几行 |
+| `classify(_:context:)` | 读到的一行要不要推给页面，这一轮是不是说完了 |
+| `outgoing(_:directory:context:)` | 页面要写进 stdin 的一行：不认得的不写，工作目录、沙箱、审批这类由壳填 |
+| `generatedImages(in:)` | 这一行里它自己生成的图（没有就不实现） |
+
+再在 `AgentLocator.swift` 里给它一个 `AgentProgram`（可执行文件名、设置里指定路径的键、可选的登录检查），加进 `AISessions` 的 `locators`。
+
+**还按名字写着的地方**，加第三个后端时要一起改：
+
+- `src/ai/session.js`：能选的模型（`models()`）与推理强度（`effortChoices()`）按后端分支；从没选过时的默认后端是「有 Codex 用 Codex，否则 Claude Code」。
+- `src/ai/panel.js`：找不到、运行不起来、没登录时的指引（`GUIDES`），和「改用另一个后端」的按钮。
+- `index.html`：AI 设置里每个后端一组的「指定路径」。
+- 壳的 `ai/models`：只有 Codex 会去问模型列表。
+- Windows 的壳（`windows/lib/ai.cjs`）没有 `AIBackend` 这样的协议，启动参数、开头几行、哪行算说完都是按 `claude` / `codex` 分支写的。
+- 测试：照 `macos/Tests/Fixtures/ai/fake-claude`、`fake-codex` 写一个假的命令行程序，测试不调真的 Agent。
+
 
 ## 窗口：一个窗口一篇稿子
 

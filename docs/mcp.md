@@ -1,14 +1,23 @@
 # MCP 服务：让外部 Agent 操作 Vibepost
 
-终端里的 Claude Code（或别的 MCP 客户端）可以直接操作正在运行的 Vibepost：列出、新建（也能照模板）、打开稿子，写卡片内容、标题与小红书正文，插片段，换主题、配色、字体与版式，从本机路径插图，出图看每一页，导出 PNG / ZIP / 长图到指定文件夹，发送到 iPhone。和 App API（[app-api.md](app-api.md)）是同一套能力与校验：工具在页面里只经 `window.mediacraft` 执行，改动马上出现在 App 里。
+Vibepost 自带一个 MCP 服务。任何会说 MCP（stdio）的 Agent 都能经它操作正在运行的 App：终端里的 Claude Code、Codex，Claude Desktop、Cursor 这类桌面客户端，或你自己写的程序。
 
-目标是这样的工作方式：Agent 收集信息、写稿，用 Vibepost 自动排版、看图检查；人在 App 里看一眼、改几个字，点发送。仓库里的 Claude Code 技能 [`skills/vibepost/SKILL.md`](../skills/vibepost/SKILL.md) 写了这套流程，装进 Claude Code：`ln -s "$PWD/skills/vibepost" ~/.claude/skills/vibepost`（在仓库根目录运行）。
+它能做的事：列出、新建（也能照模板）、打开稿子，写卡片内容、标题与小红书正文，插片段，换主题、配色、字体与版式，从本机路径插图，出图看每一页，导出 PNG / ZIP / 长图到指定文件夹，发送到 iPhone。和 App API（[app-api.md](app-api.md)）是同一套能力与校验：工具在页面里只经 `window.mediacraft` 执行，改动马上出现在 App 里。App 里的 AI 助手是另一条路（App 自己启动本机的 Claude Code 或 Codex），见 [app-api.md 的 ai 一节](app-api.md#aiai-会话本机-claude-code-或-codex)。
+
+一般的分工：Agent 收集信息、写稿，用 Vibepost 排版、看图检查；人在 App 里看一眼、改几个字，点发送。
 
 ## 接入
 
-先在 App 里打开 AI 助手 › 设置（齿轮）›「允许外部 Agent 连接」（默认是关的，见下面的「安全」）。
+| | |
+| --- | --- |
+| 服务名 | `mediacraft` |
+| 可执行文件 | `/Applications/Vibepost.app/Contents/MacOS/mediacraft-mcp`（Swift，stdio，没有参数，不依赖 Node） |
+| 开关 | AI 助手 › 设置（齿轮）› 外部 Agent（MCP）›「允许外部 Agent 连接」，默认关（见下面的「安全」） |
+| 套接字 | `~/Library/Application Support/MediaCraft/mcp.sock`，MCP 服务经它连到 App |
 
-MCP 服务是 App 里的一个小程序 `Vibepost.app/Contents/MacOS/mediacraft-mcp`（Swift，stdio，不依赖 Node）。在终端里登记一次：
+两步：先在 App 里打开开关，再在 Agent 那边把这个可执行文件登记成一个 stdio 的 MCP 服务。App 没装在「应用程序」里时路径不一样，以 App 里「复制接入命令」复制出来的为准。Windows 的写法见后面的「Windows 接入」。
+
+### Claude Code
 
 ```sh
 claude mcp add mediacraft -- "/Applications/Vibepost.app/Contents/MacOS/mediacraft-mcp"
@@ -16,7 +25,39 @@ claude mcp add mediacraft -- "/Applications/Vibepost.app/Contents/MacOS/mediacra
 
 这行也可以在 App 里复制：AI 助手 › 设置（齿轮）› 外部 Agent（MCP）›「复制接入命令」（复制的是这台 Mac 上 App 实际的位置）。`claude mcp add` 默认只在当前项目里登记（local）；想在所有项目里都能用，加 `-s user`。登记之后新开的 Claude Code 会话里就有 `mcp__mediacraft__*` 这些工具，`/mcp` 里能看到它连没连上。
 
-别的 MCP 客户端（Claude Desktop、Cursor……）按 stdio 服务配置，命令就是上面那个路径、没有参数，例如：
+仓库里有一份配套的技能 [`skills/vibepost/SKILL.md`](../skills/vibepost/SKILL.md)，写了调研、写稿、挑样式、出图检查、交给用户这一套流程。装进 Claude Code（在仓库根目录运行）：
+
+```sh
+ln -s "$PWD/skills/vibepost" ~/.claude/skills/vibepost
+```
+
+### Codex
+
+```sh
+codex mcp add mediacraft -- "/Applications/Vibepost.app/Contents/MacOS/mediacraft-mcp"
+```
+
+或者直接在 `~/.codex/config.toml` 里写：
+
+```toml
+[mcp_servers.mediacraft]
+command = "/Applications/Vibepost.app/Contents/MacOS/mediacraft-mcp"
+```
+
+Codex 调用 MCP 工具前可能先问你。`codex exec` 这样没人值守的运行里没人回答，要把这个服务的工具设成不用问（`default_tools_approval_mode`，可选 `auto`、`prompt`、`writes`、`approve`）。不想改全局配置时，两项都可以用 `-c` 只给这一次：
+
+```sh
+codex exec \
+  -c 'mcp_servers.mediacraft.command="/Applications/Vibepost.app/Contents/MacOS/mediacraft-mcp"' \
+  -c 'mcp_servers.mediacraft.default_tools_approval_mode="approve"' \
+  "用 Vibepost 新建一篇稿子，写三张卡片介绍周末出游，出图检查后导出 ZIP 到桌面"
+```
+
+这两项的写法实测过。
+
+### Claude Desktop、Cursor 与别的客户端
+
+多数客户端用同一种 JSON 写法，命令就是那个路径、没有参数：
 
 ```json
 {
@@ -25,6 +66,20 @@ claude mcp add mediacraft -- "/Applications/Vibepost.app/Contents/MacOS/mediacra
   }
 }
 ```
+
+- Claude Desktop：写进 `~/Library/Application Support/Claude/claude_desktop_config.json`（Settings › Developer › Edit Config 打开它），改完重新打开 Claude Desktop。
+- Cursor：写进项目里的 `.cursor/mcp.json`，或对所有项目生效的 `~/.cursor/mcp.json`。
+- 别的客户端：找它配置「本机 stdio MCP 服务」的地方，填上面的命令。有的客户端顶层的键不叫 `mcpServers`，或要多写一项 `"type": "stdio"`，以它自己的文档为准。
+
+### 自己写的 Agent
+
+`mediacraft-mcp` 是一个普通的 stdio MCP 服务：把它当子进程起来，在 stdin / stdout 上每行一条 JSON-RPC。用 MCP 官方 SDK 的 stdio 客户端，或任何带 MCP 客户端的 Agent 框架，命令填这个路径就行，不用别的参数或环境变量。
+
+- 握手回来的 `instructions` 里有一段通用说明，App 开着时后面还接着写作技能的短版与操作手册全文。把它放进模型的系统提示词，模型就知道 App 认哪些写法。
+- `tools/list` 给出全部工具和参数的 JSON Schema，直接交给模型当工具定义。
+- 工具结果是 MCP 的 `content`：文字（`text`），`render_pages` 另有每页的图（`image`，base64 的 PNG）。出错时 `isError` 为真，文字里是原因。
+
+下面的「一个例子」里有一份能直接跑的 Python 脚本。
 
 开发时用 Debug 构建（`macos/build-app.sh debug`）的话，路径换成 `build.noindex/Vibepost.app/Contents/MacOS/mediacraft-mcp`。环境变量 `MEDIACRAFT_MCP_SOCKET` 可以换套接字的位置（测试用）。
 
@@ -54,10 +109,96 @@ Windows 图片导入支持 PNG、JPEG、WebP、GIF、BMP，HEIC 先转换成 PNG
 
 Windows 按原生能力提供 `send_to_phone`，替代不支持的 `send_to_iphone`；其他工具顺序保持不变。`export.format` 另支持 `mp4`、`gif`：给 `page` 时导出该动效页，省略时导出全部动效页（仅一页直接保存，多页打包 ZIP，静态页不加入）；`zip` 的动效页为 MP4。不会生成 Apple `.pvt` / Live Photo。`send_to_phone` 在 App 显示有过期时间的二维码，手机同一局域网打开下载页后自行下载文件、复制小红书正文，保存进相册需由用户在手机上完成。
 
+## 一个例子：从新建稿子到出图
+
+不管哪个客户端，做一篇都是这几次工具调用：
+
+| 步 | 工具 | 参数 | 得到什么 |
+| --- | --- | --- | --- |
+| 1 | `get_writing_skill`、`get_manual` | 没有 | 两份内置技能的全文，写稿、排版之前读 |
+| 2 | `create_draft` | `{ "title": "…", "markdown": "…", "caption": "…", "theme": "备忘" }` | 新稿子开在 App 的一个新窗口里，之后的工具都改这篇 |
+| 3 | `get_pages` | 没有 | 每页放了哪些块、正文区用了多少，以及这一页的问题（⚠） |
+| 4 | `render_pages` | `{ "pages": [1, 2] }`（不给就是全部，一次最多 9 页） | 同上，并附每页的 PNG |
+| 5 | `insert_page_break`、`move_section`、`set_style`、`update_draft` … | 按第 3、4 步看到的问题调 | 每次调用都是一步可撤销的改动 |
+| 6 | `export` | `{ "format": "zip", "directory": "~/Desktop" }` | 写下的文件路径。文件夹要已经存在 |
+| 7 | `send_to_iphone` | 没有 | App 里弹出隔空投送面板，由人选设备 |
+
+在 Claude Code、Codex 里不用自己写这些调用，说一句话就行，比如「用 Vibepost 新建一篇稿子，写三张卡片介绍周末出游，出图检查后导出 ZIP 到桌面」。
+
+自己写程序时，用官方的 Python SDK 是这样（先在 App 里打开「允许外部 Agent 连接」；用 `uv run 文件名.py` 运行，依赖写在文件开头）：
+
+```python
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["mcp"]
+# ///
+import asyncio
+import base64
+import pathlib
+
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+
+SERVER = "/Applications/Vibepost.app/Contents/MacOS/mediacraft-mcp"
+OUT = pathlib.Path.home() / "Desktop"
+
+MARKDOWN = """# 周末去哪儿
+
+## 出发前准备
+
+1. 查天气
+2. 订车票
+3. 带充电宝
+
+[[分页]]
+
+## 路上
+
+:::提示
+早上七点前出发，不堵车。
+:::
+"""
+
+
+async def main():
+    async with stdio_client(StdioServerParameters(command=SERVER)) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+
+            async def call(name, **arguments):
+                return (await session.call_tool(name, arguments)).content
+
+            await call("create_draft", title="周末去哪儿", markdown=MARKDOWN,
+                       caption="周末两天的安排。 #周末 #出游", theme="备忘")
+
+            for item in await call("get_pages"):
+                if item.type == "text":
+                    print(item.text)
+
+            images = [item for item in await call("render_pages") if item.type == "image"]
+            for number, image in enumerate(images, start=1):
+                (OUT / f"周末去哪儿-预览-{number}.png").write_bytes(base64.b64decode(image.data))
+
+            for item in await call("export", format="zip", directory=str(OUT)):
+                if item.type == "text":
+                    print(item.text)
+
+
+asyncio.run(main())
+```
+
+不用 SDK 也行：在 stdin 上每行写一条 JSON-RPC。握手、通知、再调一个工具是这三行：
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"my-agent","version":"0"}}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"create_draft","arguments":{"title":"周末去哪儿","markdown":"# 周末去哪儿\n\n1. 查天气"}}}
+```
+
 ## 怎么连
 
 ```
-Claude Code ──stdio（JSON-RPC）── mediacraft-mcp ──Unix 域套接字── Vibepost.app（ExternalAgents.swift）── 页面（src/mcp/）── window.mediacraft
+Agent（MCP 客户端）──stdio（JSON-RPC）── mediacraft-mcp ──Unix 域套接字── Vibepost.app（ExternalAgents.swift）── 页面（src/mcp/）── window.mediacraft
 ```
 
 - `mediacraft-mcp` 由 Agent 启动，自己回答握手（`initialize` / `server/discover`）与 `ping`；`tools/list`、`tools/call` 经 `~/Library/Application Support/MediaCraft/mcp.sock` 交给正在运行的 App，一次一个，按收到的顺序。
