@@ -5304,13 +5304,32 @@ body[data-layout-mode="article"] .card-only {
   border-top: 1px solid var(--ui-border);
 }
 
-.ai-more-backends > .ai-path-group:first-of-type {
-  padding-top: 0;
-  border-top: 0;
-}
-
+.ai-more-backends > .ai-providers + .ai-path-group,
 .ai-more-backends > .ai-path-group + .ai-path-group {
   margin-top: 10px;
+}
+
+/* 在 App 里填的接口（src/ai/providers.js）：列表用写作手册那样的行，下面是「加一个接口」与收着的表单 */
+.ai-providers,
+.ai-provider-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ai-providers > .pill-button {
+  align-self: flex-start;
+}
+
+.ai-providers > .ai-manual-list:empty {
+  display: none;
+}
+
+.ai-provider-form {
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  background: var(--ui-layer);
 }
 
 .ai-more-backends > summary {

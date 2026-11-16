@@ -704,7 +704,7 @@
                   </summary>
                   <div class="pop-menu-panel ai-settings-popover" role="group" aria-labelledby="aiSettingsTitle" data-fit-window>
                     <h2 id="aiSettingsTitle" class="section-label">AI 设置</h2>
-                    <p class="section-note">用本机的命令行 Agent：Codex、Claude Code，或接着别家模型的 OpenCode、Oh My Pi、Kimi Code。沿用它们在终端里的账号与设置（模型、技能、MCP、权限），不用另填密钥。</p>
+                    <p class="section-note">用本机的命令行 Agent：Codex、Claude Code，或接着别家模型的 OpenCode、Oh My Pi、Kimi Code。沿用它们在终端里的账号与设置（模型、技能、MCP、权限），不用另填密钥；DeepSeek、Kimi、智谱等的密钥也可以在下面「接别家的模型」里直接填。</p>
                     <!-- 每个后端一组：现在用的是哪里的程序、指定路径（src/ai/panel.js 的 pathGroups） -->
                     <div class="ai-path-group" role="group" aria-label="Codex" data-backend="codex">
                       <h3 class="ai-path-title">Codex</h3>
@@ -739,6 +739,43 @@
                         <span>接别家的模型</span>
                         <small>OpenCode、Oh My Pi、Kimi Code</small>
                       </summary>
+                      <!-- 在 App 里填的接口（src/ai/providers.js）：一家服务商的密钥，或一个 OpenAI 兼容的接口地址。存在壳里，起 OpenCode 时带给它；密钥只进不出 -->
+                      <div id="aiProviders" class="ai-providers" role="group" aria-labelledby="aiProvidersTitle" hidden>
+                        <h3 id="aiProvidersTitle" class="ai-path-title">接口</h3>
+                        <p class="section-note">填一家服务商的密钥，或任何 OpenAI 兼容的接口地址。它们经 OpenCode 使用：先装好 OpenCode，后端选 OpenCode，模型选单里就有这几家的模型。密钥只存在这台电脑上。</p>
+                        <ul id="aiProviderList" class="ai-manual-list"></ul>
+                        <button id="aiProviderAddBtn" class="pill-button" type="button">加一个接口</button>
+                        <div id="aiProviderForm" class="ai-provider-form" role="group" aria-label="接口的设置" hidden>
+                          <label class="field">
+                            <span>服务商</span>
+                            <span class="select-field">
+                              <select id="aiProviderPreset" aria-label="服务商"></select>
+                              <svg class="icon" aria-hidden="true"><use href="#i-chevron-down" /></svg>
+                            </span>
+                          </label>
+                          <label class="field" data-custom>
+                            <span>名字</span>
+                            <input id="aiProviderName" type="text" autocomplete="off" maxlength="60" placeholder="比如：公司的接口" />
+                          </label>
+                          <label class="field" data-custom>
+                            <span>接口地址</span>
+                            <input id="aiProviderURL" type="text" spellcheck="false" autocomplete="off" placeholder="https://api.example.com/v1" />
+                          </label>
+                          <label class="field" data-custom>
+                            <span>模型名</span>
+                            <input id="aiProviderModels" type="text" spellcheck="false" autocomplete="off" placeholder="多个用逗号隔开" />
+                          </label>
+                          <label class="field">
+                            <span>密钥</span>
+                            <input id="aiProviderKey" type="password" spellcheck="false" autocomplete="off" />
+                          </label>
+                          <p id="aiProviderError" class="ai-settings-error" role="alert" hidden></p>
+                          <div class="button-pair">
+                            <button id="aiProviderCancelBtn" class="pill-button" type="button">取消</button>
+                            <button id="aiProviderSaveBtn" class="primary-button" type="button">保存接口</button>
+                          </div>
+                        </div>
+                      </div>
                       <div class="ai-path-group" role="group" aria-label="OpenCode" data-backend="opencode">
                         <h3 class="ai-path-title">OpenCode</h3>
                         <p class="section-note" data-path-found></p>
@@ -1462,6 +1499,7 @@
     <script src="src/ai/notify.js"></script>
     <script src="src/ai/history.js"></script>
     <script src="src/ai/manuals.js"></script>
+    <script src="src/ai/providers.js"></script>
     <script src="src/mcp/panel.js"></script>
   </body>
 </html>

@@ -32,6 +32,8 @@ final class AISessions: @unchecked Sendable {
     private let locators: [String: AgentLocator]
     private let candidates: AICandidates
     private let images: AIImages
+    /// 在 App 里填的接口（经 OpenCode 使用，见 AIProviders.swift）
+    private let providers: AIProviders
     private let approvals = CandidateApprovals()
     private let lock = NSLock()
     private var turns: [String: Turn] = [:]
@@ -61,6 +63,7 @@ final class AISessions: @unchecked Sendable {
         ].map { ($0, AgentLocator(program: $1, settings: settings, terminal: terminal)) })
         candidates = AICandidates(root: configuration.root)
         images = AIImages(api: configuration.imageAPI)
+        providers = AIProviders(root: configuration.root)
     }
 
     func setSink(_ sink: Sink?) {
@@ -83,6 +86,14 @@ final class AISessions: @unchecked Sendable {
             return await saveSettings(request)
         case "models":
             return await models(request)
+        case "providers":
+            return .ok(["providers": await providers.list()])
+        case "providers-save":
+            do {
+                return .ok(["providers": try await providers.save(request["providers"] as? [[String: Any]] ?? [])])
+            } catch {
+                return .failure(400, error.localizedDescription)
+            }
         case "send":
             return await start(request, window: window, epoch: epoch ?? self.epoch(window: window))
         case "cancel":
@@ -135,13 +146,22 @@ final class AISessions: @unchecked Sendable {
                 // 问模型要开一个会话：开在一个只放这个用的空目录里，不碰稿子的工作副本
                 let directory = configuration.root.appendingPathComponent(".acp-models", isDirectory: true)
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-                let options = try await agent.sessionOptions(executable: executable, environment: status.environment, directory: directory)
+                let extra = await providerEnvironment(agent, base: status.environment)
+                let options = try await agent.sessionOptions(
+                    executable: executable, environment: status.environment.merging(extra.environment) { $1 }, directory: directory
+                )
                 return .ok(["models": [Any](), "configOptions": options])
             }
             return .ok(["models": try await CodexBackend.models(executable: executable, environment: status.environment)])
         } catch {
             return .failure(500, "没能读出 \(locator.program.name) 的模型：\(error.localizedDescription)")
         }
+    }
+
+    /// 在 App 里填的接口只给 OpenCode：另加的环境变量（内联配置、各家的密钥）与要打码的密钥
+    private func providerEnvironment(_ backend: any AIBackend, base: [String: String]) async -> (environment: [String: String], secrets: [String]) {
+        guard backend.id == "opencode" else { return ([:], []) }
+        return await providers.launch(existing: base[AIProviders.configVariable])
     }
 
     private func start(_ request: [String: Any], window: String, epoch: Int) async -> NativeBridge.Reply {
@@ -462,7 +482,14 @@ final class AISessions: @unchecked Sendable {
         private var cancelledFlag = false
         private var stderrTail = Data()
 
-        init(request: TurnRequest, window: String, backend: any AIBackend, process: Process, input: FileHandle, directory: URL) {
+        /// 这一轮给了进程的密钥（在 App 里填的接口）：出错信息给页面之前打码
+        let secrets: [String]
+
+        init(
+            request: TurnRequest, window: String, backend: any AIBackend, process: Process, input: FileHandle, directory: URL,
+            secrets: [String] = []
+        ) {
+            self.secrets = secrets
             self.request = request
             self.window = window
             self.backend = backend
@@ -549,7 +576,8 @@ final class AISessions: @unchecked Sendable {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
         process.arguments = backend.arguments(for: request)
-        process.environment = status.environment.merging(backend.environment) { $1 }
+        let extra = await providerEnvironment(backend, base: status.environment)
+        process.environment = status.environment.merging(backend.environment) { $1 }.merging(extra.environment) { $1 }
         process.currentDirectoryURL = directory
         let input = Pipe()
         let output = Pipe()
@@ -557,7 +585,10 @@ final class AISessions: @unchecked Sendable {
         process.standardInput = input
         process.standardOutput = output
         process.standardError = errors
-        let turn = Turn(request: request, window: window, backend: backend, process: process, input: input.fileHandleForWriting, directory: directory)
+        let turn = Turn(
+            request: request, window: window, backend: backend, process: process, input: input.fileHandleForWriting, directory: directory,
+            secrets: extra.secrets
+        )
 
         let readers = try launch(turn, epoch: epoch)
         for line in backend.openingLines(for: request) {
@@ -744,7 +775,7 @@ final class AISessions: @unchecked Sendable {
             "status": signaled ? NSNull() : process.terminationStatus,
             "signal": signaled ? process.terminationStatus : NSNull(),
             "cancelled": turn.cancelled,
-            "stderr": turn.stderr,
+            "stderr": AIProviders.redact(turn.stderr, secrets: turn.secrets),
             "markdown": read("draft.md"),
             "title": read("title.txt"),
             "caption": read("caption.txt"),

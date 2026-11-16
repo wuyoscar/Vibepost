@@ -219,6 +219,10 @@
       setPath: (path, backend = "claude") => callJson("ai/settings", { path, backend }),
       // 后端能用的模型：{ models: [{ id, name, isDefault }] }（现在只有 Codex 有列表）
       models: (backend) => callJson("ai/models", { backend }),
+      // 在 App 里填的接口（经 OpenCode 使用）：{ providers: [{ provider, name, baseURL, models, hasKey }] }，密钥只进不出；
+      // saveProviders 存整份列表，每一项可以带 key（没带的沿用已存的）
+      providers: () => callJson("ai/providers", {}),
+      saveProviders: (providers) => callJson("ai/providers-save", { providers }),
       send: (request) => callJson("ai/send", request),
       cancel: (draftId) => callJson("ai/cancel", { draftId }),
       // 往这一轮的 stdin 写一整行（后端认得的样子：回答它的请求，或主动发的请求）。

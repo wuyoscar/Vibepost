@@ -13,6 +13,7 @@
     session/prompt → 回放脚本，放完回答 { stopReason: "end_turn" }；
     session/cancel（通知）→ 这一轮回答 { stopReason: "cancelled" }；
   读到 EOF（App 关上 stdin）才退出。
+环境变量 OPENCODE_CONFIG_CONTENT（App 里填的接口，壳起 OpenCode 时带上）里自己写了模型的服务商，模型也列进选单（<服务商>/<模型>）。
 续会话或发这一轮的进程算一次调用（序号从 1 起；只开了会话就关上的是在问模型，不算），在 calls/<序号>.json 里记下参数、工作目录、
 进程号、几个环境变量、开始时的 draft.md / title.txt / caption.txt、stdin 收到的每一行、页面对它的请求的回答（responses，按请求 id）、
 收到的信号，以及 stdin 有没有被关上。
@@ -23,6 +24,7 @@
   #request {"id": …, "method": …, "params": {…}}   发一个请求（权限……），等到它的回答再往下走
   #hang                            一直不结束，等着被停止
   #stderr "文字"                   往 stderr 写一行
+  #stderr-env "变量名"             往 stderr 写这个环境变量的值（像出错信息里带出了密钥）
   #error {"code": …, "message": …} 这一轮以出错结束（session/prompt 回答 error）
   #stop "max_tokens"               这一轮以这个 stopReason 结束
   #exit 退出码                     马上退出
@@ -65,7 +67,8 @@ record = {
     "argv": ARGS,
     "cwd": os.getcwd(),
     "pid": os.getpid(),
-    "env": {key: os.environ.get(key) for key in ("OPENCODE_PERMISSION",)},
+    "env": {key: value for key, value in os.environ.items()
+            if key in ("OPENCODE_PERMISSION", "OPENCODE_CONFIG_CONTENT") or key.startswith("VIBEPOST_API_KEY_")},
     "draft": read_file("draft.md"),
     "title": read_file("title.txt"),
     "caption": read_file("caption.txt"),
@@ -80,6 +83,11 @@ state = {"session": None, "prompt": None, "done": False, "settings": {"model": "
 SCRIPT = []
 
 MODELS = [("fake/large", "Fake Large"), ("fake/mini", "Fake Mini"), ("fake/~odd name", "名字不合规的")]
+try:
+    for provider, block in json.loads(os.environ.get("OPENCODE_CONFIG_CONTENT") or "{}").get("provider", {}).items():
+        MODELS += [(f"{provider}/{model}", f"{block.get('name', provider)}/{model}") for model in block.get("models", {})]
+except (ValueError, AttributeError):
+    pass
 EFFORTS = ["off", "low", "high"]
 
 
@@ -187,6 +195,8 @@ def replay():
                 return
             elif action == "stderr":
                 print(json.loads(rest), file=sys.stderr, flush=True)
+            elif action == "stderr-env":
+                print(f"request failed: {os.environ.get(json.loads(rest), '')}", file=sys.stderr, flush=True)
             elif action == "error":
                 finish(error=json.loads(rest))
                 return

@@ -303,6 +303,26 @@
     return structuredClone(await modelLists.get(backend));
   }
 
+  // ===== 在 App 里填的接口 =====
+  // 一家服务商的密钥，或一个 OpenAI 兼容的接口地址加模型名（设置界面在 src/ai/providers.js）。存在壳里、经 OpenCode 使用：
+  // 壳起 opencode 时把它们写成内联配置带上，所以它们的模型出现在 OpenCode 报的选单里。密钥只进不出，这里拿到的只有 hasKey。
+  // 浏览器里没有壳：providers() 为 null。
+
+  async function providers() {
+    if (!native?.providers) return null;
+    return (await native.providers()).providers ?? [];
+  }
+
+  // 存整份列表：[{ provider, name, baseURL?, models?, key? }]，没带 key 的沿用已存的；存完 OpenCode 的模型列表重新问
+  async function saveProviders(list) {
+    if (!Array.isArray(list)) throw new TypeError("接口列表需要是数组");
+    if (!native?.saveProviders) throw new Error("接口只能在 Vibepost App 里填");
+    const saved = (await native.saveProviders(list)).providers ?? [];
+    modelLists.delete("opencode");
+    emit({ type: "providers" });
+    return saved;
+  }
+
   // ===== 推理强度 =====
   // 每篇稿子各记各的（ai.effort），没选过是 medium。能选哪几档看这篇的后端与模型：Claude Code 固定 low / medium / high / xhigh / max
   // （--effort），Codex 问它自己（model/list 里每个模型的 supportedReasoningEfforts）。这篇选的那档这个模型不支持时（换了模型）
@@ -1149,6 +1169,9 @@
       setEffort,
       setBackend,
       models,
+      // 在 App 里填的接口（经 OpenCode 使用）：[{ provider, name, baseURL, models, hasKey }]，浏览器里为 null
+      providers,
+      saveProviders,
       imageSettings: async () => imageSettings(),
       setImageSettings: async (settings) => setImageSettings(settings),
       stopImages,

@@ -1128,6 +1128,9 @@
       if (event.backend === backend.id && backend.id !== "claude") void loadModels();
       syncControls();
       if (settings.open) syncSettings();
+    } else if (event.type === "providers") {
+      // 在 App 里填的接口变了：它们的模型在 OpenCode 报的选单里
+      if (backend.id === "opencode") void loadModels();
     } else if (event.draftId === draft.id) {
       if (event.type === "text") updateText(event);
       else if (event.type === "model") {
