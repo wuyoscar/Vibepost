@@ -47,6 +47,19 @@
     current?.focus();
   });
 
+  // 稿件名下面那行状态（「已插入 2 张图片」「已打开：……」）说完就退场：新的一句出现几秒后淡出、让出那一行，
+  // 稿件名滑回正中。只是看不见了，文字还留在元素里（谁写的、写了什么都不用管）；再有新的一句就重新显出来。
+  const statusLine = $("#statusText");
+  const draftHeading = $("#draftHeading");
+  const STATUS_LINGER = 6000;
+  let statusTimer = 0;
+  new MutationObserver(() => {
+    clearTimeout(statusTimer);
+    if (statusLine.classList.contains("is-settled")) motion.flip([draftHeading], () => statusLine.classList.remove("is-settled"));
+    if (!statusLine.textContent) return;
+    statusTimer = setTimeout(() => motion.flip([draftHeading], () => statusLine.classList.add("is-settled")), STATUS_LINGER);
+  }).observe(statusLine, { childList: true, characterData: true, subtree: true });
+
   async function syncDraftChrome() {
     const [draft, drafts, themes] = await Promise.all([mc.drafts.current(), mc.drafts.list(), themeList]);
     $("#draftHeading").textContent = drafts.find((item) => item.current)?.title || "未命名稿件";

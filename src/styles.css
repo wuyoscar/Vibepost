@@ -836,6 +836,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 }
 
 .draft-heading {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -857,6 +858,14 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 .draft-heading-status {
   color: var(--ui-text-3);
   font-size: 11px;
+  transition: opacity var(--motion-quick) var(--ease-standard);
+}
+
+/* 状态说完几秒后退场（src/shell.js）：淡出、不再占那一行，稿件名回到正中；文字还在，读屏照常 */
+.draft-heading-status.is-settled {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* 保存（src/drafts/save-button.js）：平时是一行灰字「已保存」，有改动时图标轻轻闪着「保存中」，没存上时变成警示色；
@@ -875,6 +884,19 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   font-size: 11px;
   line-height: 1;
   white-space: nowrap;
+  /* 和别的按钮一样的手感：变色带一点过渡，按下缩一点、松开沿弹簧回来 */
+  transition:
+    transform var(--motion-moderate) var(--ease-spring),
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    outline-color var(--motion-fast) linear,
+    outline-offset var(--motion-quick) var(--ease-spring);
+}
+
+.save-button:active {
+  transform: scale(var(--press-scale));
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--ease-standard);
 }
 
 .save-button:hover {
@@ -1168,10 +1190,14 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   color: var(--ui-danger);
 }
 
+/* 没找到、这一类还没有稿件：一句话写在列表该在的地方 */
 .draft-list-empty {
+  flex: none;
+  margin: 0;
   padding: 18px 10px;
   color: var(--ui-text-3);
   font-size: 12px;
+  line-height: 1.5;
   text-align: center;
 }
 
@@ -1530,8 +1556,27 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   line-height: 1;
 }
 
+/* 分类与格子：和别的控件一样的手感（变色带一点过渡，按下缩一点、松开沿弹簧回来） */
+.emoji-tab,
+.emoji-item {
+  transition:
+    scale var(--motion-moderate) var(--ease-spring),
+    background-color var(--motion-fast) var(--ease-standard);
+}
+
+.emoji-tab:active,
+.emoji-item:active {
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--ease-standard);
+}
+
 .emoji-tab:hover {
   background: var(--ui-hover);
+}
+
+.emoji-tab:active {
+  background: var(--ui-pressed);
+  scale: 0.94;
 }
 
 .emoji-tab[aria-selected="true"] {
@@ -1627,6 +1672,8 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   color: var(--ui-text);
   font-size: 22px;
   font-weight: 600;
+  /* 编辑区窄、标题长：没在改的时候末尾收成省略号，不把半个字切在字数前面 */
+  text-overflow: ellipsis;
 }
 
 .title-field input::placeholder {
@@ -6801,6 +6848,29 @@ button.ai-skill-tag:hover { background: var(--ui-hover); }
 
   .workspace.is-drawer-open {
     grid-template-columns: 228px var(--editor-column) minmax(0, 1fr) var(--inspector-column);
+  }
+}
+
+/* 长文多一个导出按钮，右边那组更宽；它一宽过顶栏的一半，中间的排版模式切换就被挤到左边：刚点了「长文」，
+   切换就从指针下面挪走。所以长文里手机预览（用不上，停用着）和 AI 只留图标，两个导出按钮的名字留着；
+   窗口比默认的 1440 窄一截就都只留图标 */
+body[data-layout-mode="article"] :is(#phoneButton, #aiButton) > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 1400px) {
+  body[data-layout-mode="article"] .titlebar-trailing .pill-button:not(.theme-button) > span:not(.status-dot) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 }
 
