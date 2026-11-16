@@ -24,6 +24,8 @@
   --ui-popover-glass: rgba(255, 255, 255, 0.84);
   /* 细线一律半透明：压在玻璃、纸、桌面哪一层上都是「深一点点」 */
   --ui-border: rgba(0, 0, 0, 0.1);
+  /* 能输入、能选的框：边比别的细线深一档，白底坐在白纸、白对话框上也认得出是个框 */
+  --ui-field-border: rgba(0, 0, 0, 0.17);
   --ui-text: #1c1c1e;
   --ui-text-2: #48484c;
   --ui-text-3: #717176;
@@ -60,6 +62,7 @@
   --ui-popover: #2a2a2e;
   --ui-popover-glass: rgba(42, 42, 46, 0.82);
   --ui-border: rgba(255, 255, 255, 0.1);
+  --ui-field-border: rgba(255, 255, 255, 0.17);
   --ui-text: #f5f5f7;
   --ui-text-2: #c4c4c9;
   --ui-text-3: #98989f;
@@ -178,6 +181,8 @@ body {
 body {
   background: var(--ui-chrome);
   color: var(--ui-text);
+  /* 输入光标用强调色（标题、正文、各个输入框都继承它） */
+  caret-color: var(--ui-accent);
   font: 13px/1.45 var(--font-ui);
   -webkit-font-smoothing: antialiased;
 }
@@ -224,6 +229,11 @@ summary::-webkit-details-marker {
 :focus-visible {
   outline: 3px solid var(--ui-focus);
   outline-offset: 1px;
+}
+
+/* 输入框的焦点由它的框来表示（下划线，或边变强调色加一圈光环）：里面的 <input> 自己不再画一个方方的焦点框 */
+:is(.search-field, .title-field, .unit-field, .find-field, .ai-composer, .ai-history-search, .field, .ai-model-custom) :is(input, textarea):focus-visible {
+  outline: none;
 }
 
 ::selection {
@@ -418,21 +428,22 @@ body.is-resizing-editor {
 .primary-button {
   padding: 0 14px;
   border: 0;
-  background: linear-gradient(rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0)) var(--ui-accent);
+  --button-color: var(--ui-accent);
+  background: linear-gradient(rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0)) var(--button-color);
   box-shadow:
     inset 0 0.5px 0 rgba(255, 255, 255, 0.28),
     0 0.5px 1px rgba(0, 0, 0, 0.2),
-    0 2px 6px color-mix(in srgb, var(--ui-accent) 32%, transparent);
+    0 2px 6px color-mix(in srgb, var(--button-color) 32%, transparent);
   color: var(--ui-on-accent);
   font-weight: 600;
 }
 
 .primary-button:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--ui-accent) 90%, var(--ui-text));
+  background-color: color-mix(in srgb, var(--button-color) 90%, var(--ui-text));
 }
 
 .primary-button:active:not(:disabled) {
-  background-color: color-mix(in srgb, var(--ui-accent) 80%, var(--ui-text));
+  background-color: color-mix(in srgb, var(--button-color) 80%, var(--ui-text));
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
@@ -703,7 +714,7 @@ summary[aria-disabled="true"] {
 .palette-input,
 .unit-field {
   height: 30px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-field-border);
   border-radius: var(--radius-control);
   background: var(--ui-control);
   box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.04);
@@ -1945,7 +1956,7 @@ body[data-layout-mode="article"] .caption-field {
   min-width: 0;
   height: 28px;
   padding: 0 8px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-field-border);
   border-radius: var(--radius-control);
   background: var(--ui-control);
   color: var(--ui-text-3);
@@ -3986,7 +3997,7 @@ body[data-layout-mode="article"] .card-only {
   height: 32px;
   padding: 0 28px 0 10px;
   overflow: hidden;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-field-border);
   border-radius: var(--radius-control);
   background: var(--ui-control);
   box-shadow: var(--ui-control-shadow);
@@ -4156,7 +4167,7 @@ body[data-layout-mode="article"] .card-only {
   flex: none;
   align-items: center;
   height: 24px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-field-border);
   border-radius: 6px;
   background: var(--ui-control);
   box-shadow: var(--ui-control-shadow);
@@ -5258,7 +5269,7 @@ body[data-layout-mode="article"] .card-only {
   height: 28px;
   min-width: 0;
   padding: 0 10px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-field-border);
   border-radius: var(--radius-control);
   background: var(--ui-layer);
   color: var(--ui-text);
@@ -7056,9 +7067,9 @@ button.ai-skill-tag:hover { background: var(--ui-hover); }
   margin-top: 6px;
 }
 
+/* 删除这类确认：主按钮换成警示色，字的颜色和强调色按钮上的一样（深色皮肤里警示色是浅的，白字看不清） */
 #confirmOk.is-danger {
-  background: var(--ui-danger);
-  color: #ffffff;
+  --button-color: var(--ui-danger);
 }
 
 /* ===== 窄窗口：顶栏按钮只留图标（名字仍给读屏） ===== */
@@ -7490,7 +7501,7 @@ body[data-layout-mode="article"] :is(#phoneButton, #aiButton) > span {
 .save-template-field > select {
   height: 30px;
   padding: 0 8px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-field-border);
   border-radius: var(--radius-control);
   background: var(--ui-control);
   color: var(--ui-text);
@@ -7602,9 +7613,10 @@ body[data-layout-mode="article"] :is(#phoneButton, #aiButton) > span {
   width: 100%;
   min-height: 120px;
   padding: 8px 10px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-field-border);
   border-radius: 8px;
-  background: var(--ui-field, transparent);
+  background: var(--ui-control);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.04);
   color: var(--ui-text);
   font-family: "MC JetBrains Mono", ui-monospace, monospace;
   font-size: 12px;
@@ -7629,7 +7641,7 @@ body[data-layout-mode="article"] :is(#phoneButton, #aiButton) > span {
   width: 100%;
   height: 32px;
   padding: 0 28px 0 10px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-field-border);
   border-radius: var(--radius-control);
   background: var(--ui-control);
   box-shadow: var(--ui-control-shadow);
