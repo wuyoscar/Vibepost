@@ -390,4 +390,60 @@ struct InspectorPolishTests {
         #expect((result?["text"] as? [String])?.allSatisfy { $0.count == 7 } == true)
         #expect(harness.pageErrors == [])
     }
+
+    @Test("AI 助手的会话栏：后端、模型、推理强度三个药丸按选中那一项的字宽，默认宽度的检查器里排成一行；检查器最窄时「Claude Code」也写得全；AI 设置和面板一样宽，两个「保存」只有填了新路径才是主按钮")
+    func aiSessionBarFitsOneRow() async throws {
+        let fake = try FakeClaude(script: StreamJSON.reply(["好"]))
+        defer { fake.remove() }
+        let harness = ShellHarness(terminalPath: [fake.directory], onboarding: false)
+        try await harness.load()
+        let measure = """
+            const pickers = [...document.querySelectorAll(".ai-session-bar .ai-picker")];
+            const rows = new Set(pickers.map((picker) => Math.round(picker.getBoundingClientRect().top))).size;
+            const clipped = pickers.filter((picker) => { const select = picker.querySelector("select"); return select.scrollWidth > select.clientWidth + 1; }).map((picker) => picker.querySelector("select").value);
+            const bar = document.querySelector(".ai-session-bar").getBoundingClientRect();
+            const outside = pickers.filter((picker) => picker.getBoundingClientRect().right > bar.right + 1).length;
+        """
+        let wide = try await harness.evaluate(AISessionTests.helpers + """
+            await mc.drafts.create({ title: "周末去湖边", markdown: "正文" });
+            await openAI();
+            await until(() => document.querySelector("#aiEffortSelect").style.width);
+            \(measure)
+            ui.expand("AI 设置");
+            await wait(100);
+            const popover = document.querySelector(".ai-settings-popover");
+            const head = document.querySelector(".ai-session-head");
+            const widths = [popover.offsetWidth, head.offsetWidth];
+            // 两个「保存」平时都不是主按钮；路径框里填了新的，那一组的才是
+            const saves = () => [...popover.querySelectorAll("[data-path-save]")].map((button) => button.classList.contains("primary-button"));
+            const idle = saves();
+            const path = ui.find("claude 的路径");
+            path.value = "/opt/claude";
+            path.dispatchEvent(new Event("input", { bubbles: true }));
+            const typed = saves();
+            path.value = "";
+            path.dispatchEvent(new Event("input", { bubbles: true }));
+            const cleared = saves();
+            document.querySelector("#aiSettings").open = false;
+            return { rows, clipped, outside, widths, idle, typed, cleared, inspector: Math.round(document.querySelector(".inspector").getBoundingClientRect().width) };
+        """) as? [String: Any]
+        harness.webView.window?.setContentSize(NSSize(width: 900, height: 650))
+        let narrow = try await harness.evaluate("""
+            await wait(300);
+            \(measure)
+            return { rows, clipped, outside, inspector: Math.round(document.querySelector(".inspector").getBoundingClientRect().width) };
+        """) as? [String: Any]
+        await harness.tearDown()
+
+        #expect(wide?["inspector"] as? Int == 340)
+        #expect(wide?["rows"] as? Int == 1, "默认宽度：三个药丸一行")
+        #expect(wide?["clipped"] as? [String] == [] && wide?["outside"] as? Int == 0, "字都写得全：\(wide ?? [:])")
+        let widths = wide?["widths"] as? [Int] ?? []
+        #expect(widths.count == 2 && widths[0] == widths[1] + 16, "AI 设置比会话栏两边各宽出 8：\(widths)")
+        #expect(wide?["idle"] as? [Bool] == [false, false] && wide?["cleared"] as? [Bool] == [false, false], "「保存」平时是普通按钮：\(wide?["idle"] ?? "")")
+        #expect(wide?["typed"] as? [Bool] == [false, true], "填了新路径的那一组才是主按钮：\(wide?["typed"] ?? "")")
+        #expect(narrow?["inspector"] as? Int == 280)
+        #expect(narrow?["clipped"] as? [String] == [] && narrow?["outside"] as? Int == 0, "最窄时折行、不截断：\(narrow ?? [:])")
+        #expect(harness.pageErrors == [])
+    }
 }

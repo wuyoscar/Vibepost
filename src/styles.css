@@ -4801,7 +4801,8 @@ body[data-layout-mode="article"] .card-only {
 
 .ai-backend-picker {
   flex: none;
-  max-width: 48%;
+  /* 检查器最窄（280）时「Claude Code」也写得全 */
+  max-width: 60%;
 }
 
 .ai-backend-picker > .status-dot {
@@ -4894,14 +4895,19 @@ body[data-layout-mode="article"] .card-only {
   }
 }
 
+/* AI 设置：和会话历史一样相对整个顶栏定位、和内容一样宽（从齿轮那里展开）：路径、说明这些长字少折几行 */
+.ai-session-head .ai-settings.pop-menu {
+  position: static;
+}
+
 .ai-settings-popover {
-  right: 0;
-  left: auto;
-  transform-origin: top right;
+  top: 40px;
+  right: -8px;
+  left: -8px;
+  transform-origin: calc(100% - 14px) top;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: 264px;
   /* 高度跟着窗口走（src/workspace/menus.js 按顶边量出 max-height），放不下就在里面滚动 */
   max-height: calc(100vh - 140px);
   overflow-y: auto;
