@@ -14,7 +14,10 @@ final class AISessions: @unchecked Sendable {
     /// 页面重新载入、App 退出时先 SIGTERM，过这么久还没退出的 SIGKILL
     private static let terminateGrace: DispatchTimeInterval = .milliseconds(1500)
     /// 认得的后端（页面请求里的 backend）
-    private static let backends: [String: any AIBackend] = ["claude": ClaudeBackend(), "codex": CodexBackend()]
+    private static let backends: [String: any AIBackend] = [
+        "claude": ClaudeBackend(), "codex": CodexBackend(),
+        "opencode": ACPBackend.opencode, "omp": ACPBackend.omp, "kimi": ACPBackend.kimi,
+    ]
 
     /// 往已经退出的后端进程的 stdin 写字时，默认的 SIGPIPE 会让整个进程（App、跑测试的进程）退出；
     /// 壳一建好 AI 会话就忽略它（整个进程只设这一次），写入只得到 EPIPE 错误，由这里报给页面。
@@ -25,7 +28,7 @@ final class AISessions: @unchecked Sendable {
     private let configuration: AIConfiguration
     /// 终端里的环境变量（登录 shell 读出来的），查找程序与读生图密钥共用
     private let terminal: TerminalEnvironment
-    /// 每个后端的程序在哪（claude、codex）
+    /// 每个后端的程序在哪（claude、codex、opencode、omp、kimi）
     private let locators: [String: AgentLocator]
     private let candidates: AICandidates
     private let images: AIImages
@@ -53,10 +56,9 @@ final class AISessions: @unchecked Sendable {
         let terminal = TerminalEnvironment(configuration: configuration)
         self.terminal = terminal
         let settings = AgentSettings(root: configuration.root)
-        locators = [
-            "claude": AgentLocator(program: .claude, settings: settings, terminal: terminal),
-            "codex": AgentLocator(program: .codex, settings: settings, terminal: terminal),
-        ]
+        locators = Dictionary(uniqueKeysWithValues: [
+            ("claude", AgentProgram.claude), ("codex", .codex), ("opencode", .opencode), ("omp", .omp), ("kimi", .kimi),
+        ].map { ($0, AgentLocator(program: $1, settings: settings, terminal: terminal)) })
         candidates = AICandidates(root: configuration.root)
         images = AIImages(api: configuration.imageAPI)
     }
@@ -120,15 +122,25 @@ final class AISessions: @unchecked Sendable {
         }
     }
 
-    /// 后端能用的模型（现在只有 Codex 有列表）：`{ models: [{ id, name, isDefault }] }`
+    /// 后端能用的模型。Codex：`{ models: [{ id, name, isDefault, … }] }`；说 ACP 的后端：`{ models: [], configOptions }`
+    /// （它开会话时报的设置原样给页面，页面挑出模型与推理强度）；Claude Code 没有列表
     private func models(_ request: [String: Any]) async -> NativeBridge.Reply {
-        guard (request["backend"] as? String) == "codex", let locator = locators["codex"] else { return .ok(["models": []]) }
+        let id = request["backend"] as? String ?? ""
+        guard id != "claude", let backend = Self.backends[id], let locator = locators[id] else { return .ok(["models": []]) }
         let status = await locator.status(refresh: false)
-        guard status.available, let path = status.path else { return .failure(400, status.error ?? "找不到本机 Codex") }
+        guard status.available, let path = status.path else { return .failure(400, status.error ?? "找不到本机的 \(locator.program.name)") }
+        let executable = URL(fileURLWithPath: path)
         do {
-            return .ok(["models": try await CodexBackend.models(executable: URL(fileURLWithPath: path), environment: status.environment)])
+            if let agent = backend as? ACPBackend {
+                // 问模型要开一个会话：开在一个只放这个用的空目录里，不碰稿子的工作副本
+                let directory = configuration.root.appendingPathComponent(".acp-models", isDirectory: true)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                let options = try await agent.sessionOptions(executable: executable, environment: status.environment, directory: directory)
+                return .ok(["models": [Any](), "configOptions": options])
+            }
+            return .ok(["models": try await CodexBackend.models(executable: executable, environment: status.environment)])
         } catch {
-            return .failure(500, "没能读出 Codex 的模型：\(error.localizedDescription)")
+            return .failure(500, "没能读出 \(locator.program.name) 的模型：\(error.localizedDescription)")
         }
     }
 
@@ -669,6 +681,10 @@ final class AISessions: @unchecked Sendable {
                     var annotated = generated.line
                     annotated["vibepostCandidates"] = storeGenerated(generated.sources, turn: turn)
                     guard let data = try? JSONSerialization.data(withJSONObject: annotated) else { continue }
+                    lines.append(String(decoding: data, as: UTF8.self))
+                    continue
+                }
+                if let slim = turn.backend.slim(object), let data = try? JSONSerialization.data(withJSONObject: slim) {
                     lines.append(String(decoding: data, as: UTF8.self))
                     continue
                 }

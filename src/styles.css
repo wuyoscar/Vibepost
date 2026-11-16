@@ -5298,6 +5298,62 @@ body[data-layout-mode="article"] .card-only {
   font-weight: 600;
 }
 
+/* 接别家模型的几个后端收成一行，点开才是各自的路径（这篇正用着其中一个时由 panel.js 展开） */
+.ai-more-backends {
+  padding-top: 10px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.ai-more-backends > .ai-path-group:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.ai-more-backends > .ai-path-group + .ai-path-group {
+  margin-top: 10px;
+}
+
+.ai-more-backends > summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: -3px -4px;
+  padding: 3px 4px;
+  border-radius: var(--radius-small);
+  color: var(--ui-text);
+  font-size: 12px;
+  font-weight: 600;
+  list-style: none;
+  cursor: default;
+}
+
+.ai-more-backends > summary:hover {
+  background: var(--ui-hover);
+}
+
+.ai-more-backends > summary > small {
+  overflow: hidden;
+  color: var(--ui-text-3);
+  font-size: 11px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-more-backends > summary > .icon {
+  flex: none;
+  color: var(--ui-text-3);
+  transition: rotate var(--motion-quick) var(--ease-standard);
+}
+
+.ai-more-backends[open] > summary > .icon {
+  rotate: 90deg;
+}
+
+.ai-more-backends[open] > summary {
+  margin-bottom: 7px;
+}
+
 .ai-settings-error {
   margin: 0;
   color: var(--ui-danger);
