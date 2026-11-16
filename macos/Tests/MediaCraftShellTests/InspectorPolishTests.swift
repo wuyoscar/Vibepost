@@ -375,6 +375,7 @@ struct InspectorPolishTests {
             await mc.drafts.create({ markdown: "一段" });
             await settle();
             const tiles = [...document.querySelectorAll(".color-roles .swatch-tile")];
+            document.querySelector('[data-fold="colors"]').scrollIntoView({ block: "center" });
             return {
               inspector: Math.round(document.querySelector(".inspector").getBoundingClientRect().width),
               clipped: tiles.filter((tile) => { const hex = tile.querySelector(".swatch-hex"); return hex.scrollWidth > hex.clientWidth; }).length,
