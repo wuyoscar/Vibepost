@@ -2,10 +2,13 @@
 
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const os = require('node:os');
+const net = require('node:net');
 const crypto = require('node:crypto');
 const transport = require('./ai-process.cjs');
 const images = require('./ai-images.cjs');
 const { AIProviders, CONFIG_VARIABLE, redact: redactSecrets } = require('./ai-providers.cjs');
+const { restrictNamedPipe } = require('./mcp-security.cjs');
 const { failure } = transport;
 const safeId = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,120}$/.test(value) && !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(value);
 const modelId = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:@/\[\]-]{0,99}$/.test(value);
@@ -25,6 +28,9 @@ const ACP_SESSION_METHODS = new Set(['session/new', 'session/resume', 'session/l
 const ACP_FORWARDED = new Set(['agent_message_chunk', 'tool_call', 'tool_call_update']);
 // OpenCode 默认什么都不问：改成工作副本里的文件可以改，运行命令、联网、目录外的读写先问
 const ACP_ENV = { opencode: { OPENCODE_PERMISSION: '{"edit":"allow","bash":"ask","webfetch":"ask","external_directory":"ask"}' } };
+// App 的工具挂给 ACP 后端时，Agent 那边这组工具的名字（和 Claude Code 里的一样）与页面收到的那一行的 method
+const TOOL_SERVER = 'mediacraft';
+const TOOL_METHOD = 'vibepost/mcp';
 const ACP_INITIALIZE = { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false }, clientInfo: { name: 'vibepost', title: 'Vibepost', version: 'dev' } } };
 const clip = value => String(value).slice(0, 2000);
 // 工具调用的更新里有整份文件、命令的全部输出：页面只要它是什么、动了哪里、怎么样了
@@ -37,7 +43,7 @@ function slimToolUpdate(line) {
 }
 
 class AiService {
-  constructor({ dataDir, emit = () => {}, nativeImage, environment = process.env, imageAPI = 'https://api.openai.com', exitGraceMs = 10000, cancelGraceMs = 1500, probeTimeoutMs = 10000 } = {}) {
+  constructor({ dataDir, emit = () => {}, nativeImage, environment = process.env, imageAPI = 'https://api.openai.com', exitGraceMs = 10000, cancelGraceMs = 1500, probeTimeoutMs = 10000, toolRelay = { executable: process.execPath, script: path.join(__dirname, '..', 'mcp', 'turn-relay.cjs') } } = {}) {
     if (!dataDir || !path.isAbsolute(dataDir)) throw failure('AI 数据目录必须是绝对路径');
     this.root = path.join(dataDir, 'AI');
     this.manuals = path.join(dataDir, '写作手册');
@@ -47,6 +53,8 @@ class AiService {
     this.turns = new Map(); this.epochs = new Map(); this.closed = new Set(); this.removing = new Set();
     this.tickets = new Map(); this.scopes = new Map(); this.draftOwners = new Map(); this.jobs = new Map(); this.generating = new Map();
     this.cache = new Map(); this.pendingStatus = new Map(); this.lookupVersions = new Map(); this.settingsQueue = Promise.resolve(); this.operations = new Set(); this.exchanges = new Set(); this.disposed = false;
+    // 说 ACP 的 Agent 用来连回这一轮工具的小程序（见 _toolEndpoint）
+    this.toolRelay = toolRelay; this.toolEndpoint = null; this.toolListener = null; this.toolDirectory = null;
     // 在 App 里填的接口（经 OpenCode 使用，见 ai-providers.cjs）
     this.providerStore = new AIProviders(this.root);
     this.ready = this._initialize();
@@ -154,6 +162,55 @@ class AiService {
       return [{ id, name: value.displayName || id, isDefault: !!value.isDefault, efforts, defaultEffort: effortId(value.defaultReasoningEffort) ? value.defaultReasoningEffort : null }];
     }) };
   }
+  // ===== App 的工具挂给说 ACP 的 Agent =====
+  // Claude Code 经控制通道、Codex 经动态工具拿到 App 的工具；说 ACP 的 Agent 只认开会话时挂上的 MCP 服务（mcpServers）。
+  // 所以壳开一条只有本人连得上的管道（Windows 是命名管道，别处是临时目录里的套接字；整个 App 一条，第一次用时才开），
+  // 让 Agent 把中继小程序（windows/mcp/turn-relay.cjs）当 stdio 的 MCP 服务启动：它连上管道、第一行交出这一轮的口令，
+  // 之后每行一条 MCP 消息。壳不解读：原样推给页面（和后端的输出行走同一条路），页面里的工具（src/ai/tools.js）回答，
+  // 经 ai/respond 的 { mcp: { connection, message } } 写回这条连接。Mac 壳的同一件事在 AIToolServer.swift。
+  _toolEndpoint() {
+    this.toolEndpoint ||= (async () => {
+      let address;
+      if (process.platform === 'win32') address = '\\\\.\\pipe\\vibepost-tools-' + crypto.randomUUID();
+      else { this.toolDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'vp-tools-')); address = path.join(this.toolDirectory, 't.sock'); }
+      const listener = net.createServer(socket => this._toolConnection(socket));
+      await new Promise((resolve, reject) => { listener.once('error', reject); listener.listen(address, resolve); });
+      this.toolListener = listener;
+      if (process.platform === 'win32') await restrictNamedPipe(address); else await fs.chmod(address, 0o600);
+      return address;
+    })();
+    return this.toolEndpoint;
+  }
+  _toolConnection(socket) {
+    let turn = null, connection = 0, buffer = '';
+    socket.setEncoding('utf8'); socket.on('error', () => {});
+    socket.on('close', () => { if (turn) turn.toolSockets.delete(connection); });
+    socket.on('data', chunk => {
+      buffer += chunk;
+      if (buffer.length > 64 * 1024 * 1024) return socket.destroy();
+      let newline;
+      while ((newline = buffer.indexOf('\n')) >= 0) {
+        const text = buffer.slice(0, newline); buffer = buffer.slice(newline + 1);
+        let message; try { message = JSON.parse(text); } catch { continue; }
+        if (!message || typeof message !== 'object' || Array.isArray(message)) continue;
+        if (!turn) {
+          // 第一行是口令：对得上哪一轮（还在跑的）就是哪一轮的
+          turn = typeof message.token === 'string' && message.token ? [...this.turns.values()].find(value => value.toolToken === message.token && !value.finished) || null : null;
+          if (!turn) return socket.destroy();
+          connection = ++turn.toolConnections; turn.toolSockets.set(connection, socket);
+          continue;
+        }
+        if (turn.finished) return socket.destroy();
+        this._event(turn, { type: 'lines', lines: [JSON.stringify({ jsonrpc: '2.0', method: TOOL_METHOD, params: { connection, message } })] });
+      }
+    });
+  }
+  // 这一轮挂给 Agent 的 MCP 服务（开不了管道时不挂，它照样能改文件）
+  _toolServers(turn) {
+    if (!turn.toolAddress) return [];
+    return [{ name: TOOL_SERVER, command: this.toolRelay.executable, args: [this.toolRelay.script, turn.toolAddress], env: [{ name: 'ELECTRON_RUN_AS_NODE', value: '1' }, { name: 'VIBEPOST_TOOLS_TOKEN', value: turn.toolToken }] }];
+  }
+
   // 起一次 `<程序> acp`：握手、开一个会话就关上，返回 session/new 的回答。会话开在一个只放这个用的空目录里
   async _acpOptions(backend, located) {
     const directory = path.join(this.root, '.acp-models');
@@ -245,6 +302,10 @@ class AiService {
       if (!this._current(owner) || turn.cancelled) throw failure('这个窗口已经关闭或重新载入', 409);
       const extra = await this._providerEnv(request.backend, located.env);
       turn.secrets = extra.secrets;
+      if (ACP.has(request.backend)) {
+        turn.toolSockets = new Map(); turn.toolConnections = 0; turn.toolToken = crypto.randomBytes(24).toString('hex');
+        turn.toolAddress = await this._toolEndpoint().catch(() => null);
+      }
       const env = { ...located.env, ...(request.backend === 'claude' ? { CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1' } : {}), ...(ACP_ENV[request.backend] || {}), ...extra.env };
       turn.child = transport.launch(located.program, this._arguments(request), { cwd: turn.directory, env });
       turn.child.stdin.on('error', () => {});
@@ -322,8 +383,16 @@ class AiService {
       const id = message.response?.request_id;
       if (message.type !== 'control_response' || !turn.pendingReplies.has(String(id))) throw failure('AI 回应没有对应的控制请求');
       outgoing = message; turn.pendingReplies.delete(String(id));
+    } else if (ACP.has(turn.request.backend) && message.mcp !== undefined) {
+      // 页面里的工具对 Agent 的一条 MCP 消息的回答：写回它来的那条连接
+      const { connection, message: reply } = message.mcp || {};
+      if (!reply || typeof reply !== 'object' || Array.isArray(reply)) throw failure('AI 回应的字段不对');
+      const socket = turn.toolSockets.get(connection);
+      if (!socket || socket.destroyed) return { ok: true, delivered: false };
+      await new Promise((resolve, reject) => socket.write(JSON.stringify(reply) + '\n', error => (error ? reject(failure('工具的结果没能写回去', 500)) : resolve())));
+      return { ok: true, delivered: true };
     } else if (ACP.has(turn.request.backend)) {
-      // ACP：对它的请求（权限）的回答，或开会话 / 续会话、换设置、发这一轮；工作目录由壳定，不挂 MCP 服务，这一轮只带文字
+      // ACP：对它的请求（权限）的回答，或开会话 / 续会话、换设置、发这一轮；工作目录、挂哪个 MCP 服务由壳定，这一轮只带文字
       const id = message.id, context = turn.context;
       if (!['string', 'number'].includes(typeof id) || id === ACP_INITIALIZE.id) throw failure('AI 回应的 id 不对');
       if (typeof message.method !== 'string') {
@@ -335,7 +404,7 @@ class AiService {
         let kept;
         if (ACP_SESSION_METHODS.has(method)) {
           if (context.sessionRequest) throw failure('这一轮已经开过会话');
-          kept = { cwd: turn.directory, mcpServers: [] };
+          kept = { cwd: turn.directory, mcpServers: this._toolServers(turn) };
           if (method !== 'session/new') {
             if (typeof params.sessionId !== 'string' || !params.sessionId) throw failure('会话 id 不对');
             kept.sessionId = params.sessionId; context.resumed = params.sessionId;
@@ -460,6 +529,7 @@ class AiService {
     await turn.fileQueue;
     for (const timer of turn.timers) clearTimeout(timer);
     turn.finished = true; turn.inputOpen = false;
+    for (const socket of turn.toolSockets?.values() || []) socket.destroy();
     for (const controller of turn.controllers) controller.abort();
     this._forgetTickets(turn);
     const [markdown, title, caption] = await Promise.all(['draft.md', 'title.txt', 'caption.txt'].map(name => this._safeRead(turn.directory, name)));
@@ -624,6 +694,8 @@ class AiService {
     await Promise.all(turns.map(turn => Promise.race([turn.done, sleep(this.cancelGraceMs + 2000)])));
     for (const turn of turns) if (!turn.finished && turn.child) await transport.killTree(turn.child, true);
     await Promise.allSettled([...this.operations]);
+    if (this.toolListener) await new Promise(resolve => this.toolListener.close(resolve));
+    if (this.toolDirectory) await fs.rm(this.toolDirectory, { recursive: true, force: true });
     this.tickets.clear(); this.scopes.clear();
   }
 }

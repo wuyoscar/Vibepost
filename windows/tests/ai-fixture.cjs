@@ -10,7 +10,13 @@ record({ kind: 'launch', args, cwd: process.cwd(), temp: process.env.TEMP, backg
 // 像出错信息里带出了密钥（在 App 里填的接口）
 if (process.env.AI_FIXTURE_ECHO_KEYS) process.stderr.write('request failed: ' + (process.env.VIBEPOST_API_KEY_1 || '') + '\n');
 const write = value => process.stdout.write(JSON.stringify(value) + '\n');
-let initialized = false, acpPrompt = null;
+let initialized = false, acpPrompt = null, acpTools = null;
+// 像真的 Agent 一样把挂上的 MCP 服务（App 的工具）当 stdio 程序启动，问它有哪些工具，记下回答
+function askTools(server) {
+  const child = require('node:child_process').spawn(server.command, server.args, { env: { ...process.env, ...Object.fromEntries(server.env.map(item => [item.name, item.value])) }, stdio: ['pipe', 'pipe', 'ignore'] });
+  readline.createInterface({ input: child.stdout }).on('line', text => { record({ kind: 'mcp-reply', reply: JSON.parse(text) }); child.stdin.end(); });
+  child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 5, method: 'tools/list' }) + '\n');
+}
 const input = readline.createInterface({ input: process.stdin });
 input.on('line', text => {
   const message = JSON.parse(text); record(message);
@@ -20,11 +26,12 @@ input.on('line', text => {
     const update = value => write({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'fixture-session', update: value } });
     const options = [{ id: 'model', category: 'model', type: 'select', currentValue: 'fixture/large', options: [{ value: 'fixture/large', name: 'Fixture Large' }] }];
     if (message.method === 'initialize') reply(message.id, { protocolVersion: 1, agentCapabilities: { loadSession: true, sessionCapabilities: { resume: {} } } });
-    else if (message.method === 'session/new') reply(message.id, { sessionId: 'fixture-session', configOptions: options });
+    else if (message.method === 'session/new') { acpTools = message.params.mcpServers?.[0] || null; reply(message.id, { sessionId: 'fixture-session', configOptions: options }); }
     else if (message.method === 'session/resume') reply(message.id, { configOptions: options });
     else if (message.method === 'session/set_config_option') reply(message.id, { configOptions: options });
     else if (message.method === 'session/prompt') {
       acpPrompt = message.id;
+      if (acpTools) askTools(acpTools);
       update({ sessionUpdate: 'available_commands_update', availableCommands: [{ name: 'hidden', description: 'do not expose' }] });
       update({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '完成 🐈' } });
       update({ sessionUpdate: 'tool_call_update', toolCallId: 'call-1', kind: 'edit', status: 'completed', rawInput: { filePath: 'draft.md', newString: 'secret body' }, content: [{ type: 'diff', newText: 'x'.repeat(5000) }] });

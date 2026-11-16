@@ -70,15 +70,31 @@ test('ACP (OpenCode): handshake, shell-owned session params, filtered updates, p
   const { service, events, messages } = await setup(t);
   const job = request('acp-one', 'opencode');
   const lines = () => events.flatMap(value => (value.event.lines || []).map(line => JSON.parse(line)));
+  let recordedNow = [];
+  const opened = () => recordedNow.find(value => value.method === 'session/new');
   await service.send(owner, job);
   await waitFor(() => lines().some(line => line.id === 1));
   await assert.rejects(service.respond(owner, { ...job, message: { jsonrpc: '2.0', id: 2, method: 'session/delete', params: {} } }), /不支持/);
   await service.respond(owner, { ...job, message: { jsonrpc: '2.0', id: 2, method: 'session/new', params: { cwd: 'C:\\', mcpServers: [{ name: 'evil', command: 'cmd' }] } } });
   await waitFor(() => lines().some(line => line.id === 2));
+  recordedNow = await messages();
   await assert.rejects(service.respond(owner, { ...job, message: { jsonrpc: '2.0', id: 3, method: 'session/prompt', params: { sessionId: 'other-session', prompt: [{ type: 'text', text: '写作' }] } } }), /对不上/);
   await service.respond(owner, { ...job, message: { jsonrpc: '2.0', id: 10, method: 'session/set_config_option', params: { sessionId: 'fixture-session', configId: 'model', value: 'fixture/large', extra: true } } });
   await service.respond(owner, { ...job, message: { jsonrpc: '2.0', id: 3, method: 'session/prompt', params: { sessionId: 'fixture-session', prompt: [{ type: 'text', text: '写作', unsafe: true }, { type: 'image', data: 'secret' }], cwd: 'C:\\' } } });
   await waitFor(() => lines().some(line => line.id === 77));
+  // App 的工具：Agent 经挂上的 MCP 服务问 tools/list，壳原样推给页面，页面的回答写回那条连接
+  const asked = await waitFor(() => lines().find(line => line.method === 'vibepost/mcp'));
+  assert.deepEqual(asked.params.message, { jsonrpc: '2.0', id: 5, method: 'tools/list' });
+  assert.deepEqual(await service.respond(owner, { ...job, message: { mcp: { connection: 99, message: { jsonrpc: '2.0', id: 5, result: {} } } } }), { ok: true, delivered: false });
+  await assert.rejects(service.respond(owner, { ...job, message: { mcp: { connection: asked.params.connection } } }), /字段不对/);
+  assert.deepEqual(await service.respond(owner, { ...job, message: { mcp: { connection: asked.params.connection, message: { jsonrpc: '2.0', id: 5, result: { tools: [{ name: 'set_theme' }] } } } } }), { ok: true, delivered: true });
+  await waitFor(async () => (await messages()).some(value => value.kind === 'mcp-reply'));
+  // 口令不对的连接：断开，什么也不推
+  const stranger = require('node:net').connect(opened().params.mcpServers[0].args[1]);
+  await new Promise(resolve => stranger.once('connect', resolve));
+  stranger.write(JSON.stringify({ token: 'wrong' }) + '\n' + JSON.stringify({ jsonrpc: '2.0', id: 6, method: 'tools/list' }) + '\n');
+  await new Promise(resolve => stranger.once('close', resolve));
+  assert.equal(lines().filter(line => line.method === 'vibepost/mcp').length, 1);
   await assert.rejects(service.respond(owner, { ...job, message: { jsonrpc: '2.0', id: 78, result: {} } }), /没有对应/);
   await service.respond(owner, { ...job, message: { jsonrpc: '2.0', id: 77, result: { outcome: { outcome: 'selected', optionId: 'once' } } } });
   const exit = await waitFor(() => events.find(value => value.event.type === 'exit'));
@@ -88,8 +104,13 @@ test('ACP (OpenCode): handshake, shell-owned session params, filtered updates, p
   assert.deepEqual(recorded.filter(value => value.method).map(value => value.method), ['initialize', 'session/new', 'session/set_config_option', 'session/prompt']);
   const initialize = recorded.find(value => value.method === 'initialize');
   assert.equal(initialize.params.clientCapabilities.terminal, false); assert.equal(initialize.params.clientCapabilities.fs.writeTextFile, false);
-  const opened = recorded.find(value => value.method === 'session/new');
-  assert.deepEqual(opened.params, { cwd: path.join(service.root, job.draftId), mcpServers: [] });
+  // 会话的工作目录与挂的 MCP 服务由壳定（页面给的不算）：只挂 App 的工具，经中继小程序连回这一轮
+  const session = recorded.find(value => value.method === 'session/new').params;
+  assert.equal(session.cwd, path.join(service.root, job.draftId)); assert.equal(session.mcpServers.length, 1);
+  const server = session.mcpServers[0];
+  assert.equal(server.name, 'mediacraft'); assert.equal(server.command, process.execPath); assert.match(server.args[0], /turn-relay\.cjs$/);
+  assert.deepEqual(server.env.map(item => item.name), ['ELECTRON_RUN_AS_NODE', 'VIBEPOST_TOOLS_TOKEN']);
+  assert.deepEqual(recorded.find(value => value.kind === 'mcp-reply').reply, { jsonrpc: '2.0', id: 5, result: { tools: [{ name: 'set_theme' }] } });
   assert.deepEqual(recorded.find(value => value.method === 'session/set_config_option').params, { sessionId: 'fixture-session', configId: 'model', value: 'fixture/large' });
   assert.deepEqual(recorded.find(value => value.method === 'session/prompt').params, { sessionId: 'fixture-session', prompt: [{ type: 'text', text: '写作' }] });
   assert(recorded.find(value => value.kind === 'eof'));

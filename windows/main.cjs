@@ -638,6 +638,13 @@ else {
         dataDir,
         nativeImage,
         emit: (owner, event) => emit(owner, "ai", event),
+        // 说 ACP 的 Agent 连回这一轮工具用的中继（和外部 Agent 的 stdio.cjs 放在一起）
+        toolRelay: {
+          executable: process.execPath,
+          script: app.isPackaged
+            ? path.join(process.resourcesPath, "mcp", "turn-relay.cjs")
+            : path.join(__dirname, "mcp", "turn-relay.cjs"),
+        },
       });
       phone = new PhoneService({ dataDir });
       motion = new MotionService({
