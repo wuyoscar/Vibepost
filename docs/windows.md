@@ -12,7 +12,7 @@ Windows 版本复用 `index.html` 和 `src/`，通过 `windows/` 中的 Electron
 | PDF 转图片 | 随包 PDF.js；应用集成结果见验证记录 | 原生 PDF 渲染 |
 | 含视频的动态卡片 | 完整卡片 MP4 / GIF | 原生 Live Photo `.pvt` |
 | 手机传输 | 局域网扫码下载文件和复制文字 | 原有 AirDrop 与通用剪贴板 |
-| AI 助手 | 本机 Codex / Claude Code，或说 ACP 的 OpenCode / Oh My Pi / Kimi Code，可选 | 原有后端 |
+| AI 助手 | 本机 Codex / Claude Code，或说 ACP 的 OpenCode / Oh My Pi / Kimi Code，可选；在 App 里填的接口（国产模型的密钥、OpenAI 兼容接口）经 OpenCode 使用 | 原有后端 |
 | AI 系统通知 | AI 等你确认或回复完成时 toast，点击回到对应窗口；「AI 设置 › 通知」可关，窗口在前台时不打扰 | 无 |
 | 外部 MCP Agent | 当前用户的 Windows 命名管道和令牌认证；默认关闭 | 原有 Unix 套接字；默认关闭 |
 | 检查更新 | 打开 GitHub Releases，由用户选择安装 | 原有下载、校验与更新流程 |

@@ -378,6 +378,8 @@ claude -p --input-format stream-json --output-format stream-json --verbose --inc
 | `backends()` | 认得的后端 | `[{ id, name, label }]` |
 | `setBackend(backend, draftId?)` | 给这篇（默认当前这篇）选后端，模型换成那个后端上次选的，同时记成新稿子的默认。这篇已经有对话（或正在跑）时换成别的后端 reject（先「重新开始这篇的对话」）；没有这个后端 `TypeError`，内置说明书 reject | `{ backend, model, used }` |
 | `models(backend?)` | 后端能选的模型：Claude Code 是三个别名；Codex 问它自己（`model/list`，问过一次就记着），不在 App 里时为 `[]`；Codex 的每个模型带它能选的推理强度与默认档 | `[{ id, name, isDefault, efforts?, defaultEffort? }]` |
+| `providers()` | 在 App 里填的接口（经 OpenCode 使用，见「加一个后端」里的「在 App 里填的接口」）；密钥只进不出，只有 `hasKey`；浏览器里为 `null` | `[{ provider, name, baseURL, models, hasKey }]` |
+| `saveProviders(list)` | 存整份列表：`[{ provider, name, baseURL?, models?, key? }]`。`provider` 是 OpenCode 里的服务商 id（小写字母、数字、`.`、`_`、`-`）；有 `baseURL` 的是自定义的 OpenAI 兼容接口，要有 `models`；没带 `key` 的沿用已存的（服务商和接口地址都没变时）。不合规的 reject、原来的不动；存完 OpenCode 的模型列表重新问；浏览器里 reject | 同 `providers()` |
 | `send(prompt, options?)` | 在**当前稿子**的会话里发一句，这一轮说完（或停止、出错）时返回（改了稿子时修改对比已经显示出来）。`options.skills` 可传最多 8 个写作手册名称，发送时读取正文，只附到本轮 prompt，历史消息记录 `skills: [{name}]`。内置说明书、参数错误、这篇已在回复或还有待确认修改时 reject；启动或技能读取失败返回 `state: "error"` | `TurnResult` |
 | `polish()` | 一键润色：固定的话（照写作技能「改别人的稿子」：只改错别字、读不通的句子和指代不清，不换作者的词、不加冒号口癖和总结，不改原意、顺序和结构，保留所有自定义标记）发进同一个会话 | `TurnResult` |
 | `preset(name)` | 预设命令（`src/ai/presets.js`，AI 助手里的几个按钮）：固定的话发进同一个会话，会话里显示按钮上的字，用户消息 `kind: "command"`、带 `preset: name`。`"coverTitles"` 封面标题 5 选 1（不改稿子，回复里给 5 个候选的 JSON 数组）、`"hook"` 首图文案（正文最前面一行一级标题）、`"humanize"` 去 AI 味（照写作技能的 AI 腔清单删改，用作者自己的词，不加假口语，事实与结构不变）、`"repaginate"` 按要点重新分页（Claude 直接改 `draft.md` 里的 `[[分页]]`，不用分页工具）、`"caption"` 写小红书正文（照着卡片内容与标题写 `caption.txt`：纯文本、口语、最后一行 3–5 个 #话题，不改 `draft.md` 与 `title.txt`）；后四个改的稿子照常进修改对比。改卡片内容的提示词都要求保留自定义标记与话题标签。AI 助手里另有快捷命令「加话题标签」（5 个 #话题加到 `caption.txt` 最后，同样进修改对比）。`"autoLayout"` 一键排版（AI 助手的主按钮：先 `get_pages` / `view_page` 看每页与排版自检，再调分页、块的样式、字号行距与段距 `blockGap`，不改措辞）。排版一组 `"tighten"` 收紧留白（段距调到 0.35–0.5、去掉多余的空行与分页）、`"bolder"` 更醒目、`"quieter"` 更安静、`"distill"` 精简、`"colorize"` 上色、`"typeset"` 调字、`"layout"` 理版式：让 Claude 先用 `get_pages` / `view_page` 看、再用 `restyle_block`、`move_section`、`set_style`、`set_card_css`（与预览里点选一块后的操作同一套）改、改完再看；用户还在经典引擎时提示词里多一句，让 Claude 先提醒切到「HTML 试用」。没有这个名字时 `TypeError` | `TurnResult`；`coverTitles` 另有 `titles: TitleOption[]` |
@@ -514,6 +516,8 @@ Claude 用它们直接操作 App（工具全名 `mcp__mediacraft__<名字>`）�
 | `ai/status` | `{ refresh, backend }`（`backend` 没给时是 `"claude"`） | `AIStatus` |
 | `ai/settings` | `{ backend, path }`（`null` 恢复自动查找；旧的 `{ claudePath }` 也认） | `AIStatus` |
 | `ai/models` | `{ backend }` | Codex：起一次 `codex app-server`，握手后问 `model/list` 就关上，`{ models: [{ id, name, isDefault }] }`；说 ACP 的后端：`{ models: [], configOptions }`（见「加一个后端」里的「说 ACP 的 Agent」）；Claude Code `{ models: [] }` |
+| `ai/providers` | `{}` | `{ providers: [{ provider, name, baseURL, models, hasKey }] }`（没有密钥） |
+| `ai/providers-save` | `{ providers: [{ provider, name, baseURL?, models?, key? }] }` | 同上；不合规时 400，原来的不动 |
 | `ai/send` | `{ turnId, draftId, backend, prompt, markdown, title, caption, systemPrompt, agentsFile, … }`（`agentsFile`：写进工作副本 `AGENTS.md` 的两份内置技能全文（`MediaCraftSkills.agentsFile()`，操作手册在前、写作在后）加内置写作手册全文（`MediaCraftManualLibrary.agentsSection()`），壳在后面接上写作手册的目录、把写作手册拷进 `写作手册/`，每轮重写），后面是这个后端要的：Claude Code 是 `sessionId, resume, model, allowedTools`（`model`：这篇选的模型，`null` 不传 `--model`，格式不对时 `ok: false`；`allowedTools`：这篇的会话里「本次会话都允许」过的规则），Codex 不要别的（线程由页面经 stdin 开） | 进程启动后立即返回 `{ ok }`；找不到这个后端、缺了它要的字段、这篇已在跑时 `ok: false` 带原因 |
 | `ai/cancel` | `{ draftId }` | `{ cancelled }` |
 | `ai/respond` | `{ draftId, turnId, message }`：`message` 是一整行（Claude Code 是 `control_response`；Codex 是对服务端请求的回答，或 `thread/start`、`thread/resume`、`turn/start`、`turn/interrupt`，壳按上面「Codex」里说的填好工作目录、沙箱与审批、去掉别的字段），不是这个后端认得的样子时不写、`ok: false` | 写进那一轮的 stdin，真写进去了才回 `{ delivered: true }`；这一轮已经结束、stdin 已关时 `{ delivered: false }`；写失败时 `ok: false` 带原因 |
@@ -595,6 +599,8 @@ Claude 用它们直接操作 App（工具全名 `mcp__mediacraft__<名字>`）�
 模型：`ai/models` 起一次 `<程序> acp`，握手后在 `ai/.acp-models/` 里开一个会话就关上，把它的 `configOptions` 原样返回（`{ models: [], configOptions }`），页面的 `MediaCraftAI.acpModels` 挑出模型（`{ id, name, isDefault, efforts, defaultEffort }`；ID 里有这边不收的字符的不列）。没选过推理强度时跟随它自己的；它没报档位时选单停用。
 
 这类后端没有 App 的工具（适配器的 `toolNames` 是 `null`）、不能生图。起 OpenCode 时壳带上 `OPENCODE_PERMISSION`（改文件允许，运行命令、联网、目录外的读写先问）。
+
+**在 App 里填的接口**（`src/ai/providers.js`，壳 `AIProviders.swift`，Windows `windows/lib/ai-providers.cjs`）：AI 设置里填的服务商密钥或 OpenAI 兼容接口，存在 `ai/providers.json`（0600）。只给 OpenCode：起 `opencode acp`（问模型、每一轮）时壳另加环境变量 `OPENCODE_CONFIG_CONTENT`（一段内联配置，OpenCode 把它和用户自己的配置合并；用户环境里原有这个变量时把我们的 `provider` 并进去）和每家一个 `VIBEPOST_API_KEY_<n>`，配置里只写 `{env:VIBEPOST_API_KEY_<n>}`。目录里的服务商（预设）是 `{ options: { apiKey } }`，自定义接口是 `{ npm: "@ai-sdk/openai-compatible", name, options: { baseURL, apiKey }, models }`。页面拿不到密钥；这一轮的 stderr 给页面之前把这些密钥打码。预设的服务商 id 在 `src/ai/providers.js` 的 `PRESETS`，照 OpenCode 的模型目录（models.dev）写，2026-11-17 对着 opencode 1.18.34 逐个核对过能列出模型。
 
 
 ## 窗口：一个窗口一篇稿子

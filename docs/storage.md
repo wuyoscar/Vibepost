@@ -142,7 +142,9 @@ versions: [{
 | `<稿子 id>/AGENTS.md`、`<稿子 id>/写作手册/` | 每轮开始时重写：`AGENTS.md` 是页面给的两份内置技能全文（操作手册在前、写作技能在后）加没被用户同名手册盖住的内置写作手册全文（`src/skills/skills.js`），末尾是写作手册的目录（「- 名字：说明（写作手册/文件名）」与怎么用、怎么提议修改）；`写作手册/` 是下面「写作手册」文件夹里每份手册的拷贝（拷的是内容，不是链接）。Agent 在这一轮里改了也不留，下一轮照用户的文件夹重写 |
 | `<稿子 id>/draft.md`、`title.txt`、`caption.txt` | 这篇稿子的工作副本：每轮开始前写入编辑器里当前的卡片内容、标题与小红书正文，后端（claude / codex）在这个目录里运行、直接改这几个文件；App 的工具改了分页、段落顺序、图片位置时同步写进 `draft.md`；一轮结束后读回来比对。只是中转，丢了不影响稿子。目录常驻（不是每轮一个临时目录）：Claude Code 按工作目录记会话，`--resume` 要在同一个目录里才接得上；Codex 的工作区（`workspace-write` 能改的范围）就是这个目录 |
 | `.candidates/<稿子 id>/<id>.<扩展名>` | 放进会话的配图候选原图（`propose_images` 载入的、`generate_image` 生成的、Codex 自带的生图生成的一份拷贝——它的原图在它自己的目录里，不动）（点了才插进稿子，插进去的是一份拷贝）。不放在工作副本目录里：后端在那里运行，读不到你同意载入的目录外图片的拷贝。丢了只是那张候选插不了 |
-| `settings.json` | `{ claudePath?, codexPath? }`：在「AI 设置」里指定的 claude / codex 路径，没有时在终端的 PATH 里自动找（改一个不动另一个） |
+| `settings.json` | `{ claudePath?, codexPath?, opencodePath?, ompPath?, kimiPath? }`：在「AI 设置」里指定的各个后端程序的路径，没有时在终端的 PATH 里自动找（改一个不动另一个） |
+| `providers.json` | 在 App 里填的接口（AI 设置 ›「接别家的模型」›「接口」）：`{ providers: [{ provider, name, baseURL?, models, key }] }`，`provider` 是 OpenCode 里的服务商 id，有 `baseURL` 的是自定义的 OpenAI 兼容接口。带着密钥，文件只有本人可读写（0600）；页面读不到密钥。起 OpenCode 时壳把它们写成内联配置带过去（`AIProviders.swift`） |
+| `.acp-models/` | 问说 ACP 的后端有哪些模型时开会话用的空目录 |
 
 删稿子时它的工作副本目录与配图候选一起删（壳的 `ai/remove`：正在载入的配图候选先取消，这篇还在跑的一轮先停掉、等进程退出，删完不会再写回来）；后端自己的会话记录（`~/.claude/projects/`、`~/.codex/sessions/`）不删，删除确认框里也这样说明。工作副本没删掉时稿子照样删了，状态栏说明原因。
 
