@@ -21,7 +21,7 @@
   --ui-layer: #ffffff;
   --ui-fill: #f2f2f5;
   --ui-popover: #ffffff;
-  --ui-popover-glass: rgba(255, 255, 255, 0.82);
+  --ui-popover-glass: rgba(255, 255, 255, 0.84);
   /* 细线一律半透明：压在玻璃、纸、桌面哪一层上都是「深一点点」 */
   --ui-border: rgba(0, 0, 0, 0.1);
   --ui-text: #1c1c1e;
@@ -58,7 +58,7 @@
   --ui-layer: #2e2e32;
   --ui-fill: #2e2e32;
   --ui-popover: #2a2a2e;
-  --ui-popover-glass: rgba(42, 42, 46, 0.8);
+  --ui-popover-glass: rgba(42, 42, 46, 0.82);
   --ui-border: rgba(255, 255, 255, 0.1);
   --ui-text: #f5f5f7;
   --ui-text-2: #c4c4c9;
@@ -71,7 +71,7 @@
   --ui-thumb: rgba(255, 255, 255, 0.2);
   --ui-highlight: rgba(255, 255, 255, 0.07);
   --ui-control-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.24);
-  --ui-panel-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.7), 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+  --ui-panel-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.07), 0 0 0 0.5px rgba(0, 0, 0, 0.7), 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
   --ui-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.6), 0 2px 4px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.3), 0 24px 56px rgba(0, 0, 0, 0.45);
   --ui-popover-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.8), 0 2px 6px rgba(0, 0, 0, 0.3), 0 16px 40px rgba(0, 0, 0, 0.5);
   --ui-dialog-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.8), 0 6px 18px rgba(0, 0, 0, 0.36), 0 32px 80px rgba(0, 0, 0, 0.6);
@@ -80,6 +80,12 @@
   --ui-danger: #ff8389;
   --ui-success: #42be65;
   --ui-warning: #f1c21b;
+}
+
+/* 窗口整个看不见时（<html data-motion="paused">：被挡住、最小化；测试的 harness 与它出的截图也是）WebKit 不合成背景模糊，
+   半透明的浮层会直接透出后面的字：这时退回不透明的底 */
+:root[data-motion="paused"] {
+  --ui-popover-glass: var(--ui-popover);
 }
 
 /* 由上面的令牌推出来的：悬停、按下、焦点环、强调色的淡底与选区；以及不分深浅的尺寸、层级、动效 */
@@ -274,6 +280,28 @@ body.is-resizing-editor {
   cursor: col-resize;
 }
 
+/* 滚动条占地方的系统（Windows；src/workspace/panels.js 量出来后写 <html data-scrollbars="classic">）：
+   换成细的、圆头的、平时很淡的一条，指上去才深。Mac 上接着鼠标时用系统自己的，触控板那种叠在内容上的不受影响 */
+:root[data-scrollbars="classic"] ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+:root[data-scrollbars="classic"] ::-webkit-scrollbar-track,
+:root[data-scrollbars="classic"] ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+:root[data-scrollbars="classic"] ::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--ui-text) 20%, transparent) padding-box;
+}
+
+:root[data-scrollbars="classic"] ::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--ui-text) 38%, transparent) padding-box;
+}
+
 /* ===== 控件 ===== */
 /* 点按的手感：悬停立刻变色，按下缩一点、加深（--motion-fast），松开沿弹簧回到原样；焦点环收拢着出现。
    只动 transform 与颜色，不动布局。新控件把类名加进这两处就有同样的手感。 */
@@ -286,6 +314,7 @@ body.is-resizing-editor {
 ) {
   transition:
     transform var(--motion-moderate) var(--ease-spring),
+    translate var(--motion-moderate) var(--ease-spring),
     background-color var(--motion-fast) var(--ease-standard),
     border-color var(--motion-fast) var(--ease-standard),
     color var(--motion-fast) var(--ease-standard),
@@ -1456,7 +1485,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   height: 32px;
   padding: 0 10px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 8px;
   background: transparent;
   color: var(--ui-text);
   font-size: 13px;
@@ -3051,8 +3080,10 @@ button.check-jump:hover {
   --press-scale: 0.95;
 }
 
+/* 悬停：缩略图浮起来一点（translate，不和按下的 scale 抢），投影跟着深 */
 .film-thumb:hover {
-  box-shadow: 0 0 0 1px var(--ui-text-3);
+  box-shadow: 0 0 0 1px var(--ui-border-hover), 0 4px 10px rgba(0, 0, 0, 0.14);
+  translate: 0 -2px;
 }
 
 .film-thumb[aria-current="true"] {
@@ -3697,6 +3728,9 @@ body[data-layout-mode="article"] .stage-scroller {
   min-height: 0;
   padding: 16px 16px 24px;
   overflow-y: auto;
+  /* 内容滚到标签下面时淡出去，不用一道横线硬切 */
+  -webkit-mask-image: linear-gradient(transparent, #000 12px);
+  mask-image: linear-gradient(transparent, #000 12px);
   transition:
     opacity var(--motion-moderate) var(--ease-standard),
     translate var(--motion-moderate) var(--ease-decelerate);
@@ -3854,7 +3888,19 @@ body[data-layout-mode="article"] .card-only {
     linear-gradient(var(--thumb-text), var(--thumb-text)) 16% 13% / 52% 5% no-repeat,
     var(--thumb-bg);
   box-shadow: 0 0 0 1px var(--ui-border);
-  transition: box-shadow var(--motion-moderate) var(--ease-standard);
+  transition:
+    box-shadow var(--motion-moderate) var(--ease-standard),
+    scale var(--motion-moderate) var(--ease-spring);
+}
+
+/* 悬停：缩略图放大一点点、投影浮出来，像被拿起来看 */
+:is(.theme-option, .template-tile):hover:not(:disabled, :active) .theme-thumb {
+  box-shadow: 0 0 0 1px var(--ui-border-hover), 0 4px 12px rgba(0, 0, 0, 0.12);
+  scale: 1.03;
+}
+
+.theme-option[aria-pressed="true"]:hover:not(:active) .theme-thumb {
+  box-shadow: 0 0 0 2px var(--ui-accent), 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .theme-thumb canvas {
@@ -3919,6 +3965,7 @@ body[data-layout-mode="article"] .card-only {
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-control);
   background: var(--ui-control);
+  box-shadow: var(--ui-control-shadow);
   color: var(--ui-text);
   font-size: 13px;
   text-align: left;
@@ -4088,12 +4135,13 @@ body[data-layout-mode="article"] .card-only {
   border: 1px solid var(--ui-border);
   border-radius: 6px;
   background: var(--ui-control);
+  box-shadow: var(--ui-control-shadow);
   overflow: hidden;
 }
 
 .stepper:focus-within {
   border-color: var(--ui-accent);
-  box-shadow: 0 0 0 2px var(--ui-accent-tint);
+  box-shadow: 0 0 0 3px var(--ui-focus);
 }
 
 .stepper-button {
@@ -7560,6 +7608,7 @@ body[data-layout-mode="article"] :is(#phoneButton, #aiButton) > span {
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-control);
   background: var(--ui-control);
+  box-shadow: var(--ui-control-shadow);
   color: var(--ui-text);
   font: 13px var(--font-ui);
   text-overflow: ellipsis;

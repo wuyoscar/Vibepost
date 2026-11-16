@@ -1,7 +1,7 @@
 // 工作区的面板宽度：编辑区右边、检查器左边各一道分隔条，拖动（或聚焦后按 ← →）改宽度，拖到默认宽度附近会吸住，双击恢复默认；
 // 宽度记在本机，下次打开还是它。宽度写成 .workspace 上的 CSS 变量 --editor-width / --inspector-width，
 // 列宽的最终上下限由 styles.css 按窗口宽度再收一次。检查器的分隔条在它左边：往左拖是变宽（side: -1）。
-// 另外量一次滚动条占多宽，写成 --scrollbar-width（见 measureScrollbar）。
+// 另外量一次滚动条占多宽，写成 --scrollbar-width；不是 Mac 的机器上把占地方的滚动条换成细的（见 measureScrollbar）。
 (function (root) {
   "use strict";
 
@@ -80,13 +80,22 @@
 
   // 滚动条占多宽（接着鼠标的 Mac、Windows 上十几 px；叠在内容上的那种是 0）：写成 --scrollbar-width，
   // 一直给滚动条留着位置的面板（检查器「样式」，styles.css）右边就少留这么多内边距。系统设置可能中途改，回到窗口时再量一次
-  function measureScrollbar() {
+  // 不是 Mac 的机器上，占地方的滚动条换成细的一条（<html data-scrollbars="classic">，样子在 styles.css）；
+  // 先照系统原样量出是不是占地方的那种，换好了再量一次真正占的宽度
+  function probeScrollbar() {
     const probe = document.createElement("div");
     probe.style.cssText = "position: absolute; top: -200px; width: 100px; height: 100px; overflow: scroll; visibility: hidden;";
     document.body.append(probe);
     const width = probe.offsetWidth - probe.clientWidth;
     probe.remove();
-    document.documentElement.style.setProperty("--scrollbar-width", `${width}px`);
+    return width;
+  }
+
+  function measureScrollbar() {
+    const html = document.documentElement;
+    html.removeAttribute("data-scrollbars");
+    if (probeScrollbar() > 0 && !root.MediaCraftPlatform?.mac) html.dataset.scrollbars = "classic";
+    html.style.setProperty("--scrollbar-width", `${probeScrollbar()}px`);
   }
   measureScrollbar();
   root.addEventListener("focus", measureScrollbar);

@@ -6,6 +6,7 @@ import WebKit
 /// 给人看：把写作一侧走一遍，每一步存一张整窗截图（浅色 / 深色 / Mac 最小窗口 / Windows 最小窗口）。
 /// 只在设了 `WRITING_WALK_DIR`（存到哪个目录）时跑，不做断言：打磨界面前后各跑一次，对着图看。
 ///   WRITING_WALK_DIR=/绝对路径 macos/run-tests.sh --filter WritingWalkthroughTests 900
+/// 再设 `WRITING_WALK_GLASS=1` 时开原生毛玻璃（截图是透明底）。
 @MainActor
 struct WritingWalkthroughTests {
     struct Variant: CustomStringConvertible, Sendable {
@@ -72,7 +73,8 @@ struct WritingWalkthroughTests {
     func walkthrough(_ variant: Variant) async throws {
         let directory = URL(fileURLWithPath: ProcessInfo.processInfo.environment["WRITING_WALK_DIR"]!).appendingPathComponent(variant.name)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let harness = ShellHarness(onboarding: true, inspectorFolded: true)
+        // WRITING_WALK_GLASS=1：和 App 里一样开原生毛玻璃（网页透明），截图是透明底，拿去垫一张壁纸看玻璃那一层
+        let harness = ShellHarness(glass: ProcessInfo.processInfo.environment["WRITING_WALK_GLASS"] != nil, onboarding: true, inspectorFolded: true)
         harness.webView.window?.setContentSize(NSSize(width: variant.width, height: variant.height))
         harness.setAppearance(dark: variant.dark)
         var index = 0

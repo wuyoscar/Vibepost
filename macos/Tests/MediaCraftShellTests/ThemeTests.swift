@@ -268,11 +268,12 @@ struct ThemeTests {
         let dark = result?["ink"] as? [String: Any]
         let lightSkin = light?["skin"] as? [String: String] ?? [:]
         let darkSkin = dark?["skin"] as? [String: String] ?? [:]
-        // 浅色界面：纸 #ffffff、玻璃（没有原生毛玻璃时）#ececf0、细线 10% 的黑、舞台 #f0f0f3、分段控件的槽 6% 的黑、主色 #0f62fe、浮层 82% 的白
+        // 浅色界面：纸 #ffffff、玻璃（没有原生毛玻璃时）#ececf0、细线 10% 的黑、舞台 #f0f0f3、分段控件的槽 6% 的黑、主色 #0f62fe；
+        // 浮层在看得见的窗口里是 84% 的白加背景模糊，harness 的窗口看不见（data-motion="paused"），退回不透明的白
         #expect(lightSkin.filter { $0.key != "font" } == [
             "ui": "light", "window": "rgb(255, 255, 255)", "text": "rgb(28, 28, 30)",
             "glass": "rgb(236, 236, 240)", "line": "rgba(0, 0, 0, 0.1)", "stage": "rgb(240, 240, 243)",
-            "layer": "rgba(0, 0, 0, 0.06)", "primary": "rgb(15, 98, 254)", "popover": "rgba(255, 255, 255, 0.82)",
+            "layer": "rgba(0, 0, 0, 0.06)", "primary": "rgb(15, 98, 254)", "popover": "rgb(255, 255, 255)",
         ])
         #expect(darkSkin == lightSkin, "换成纯黑，界面不变")
         #expect(lightSkin["font"]?.hasPrefix("-apple-system") == true, "界面用系统字体：\(lightSkin["font"] ?? "")")
