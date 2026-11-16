@@ -16,6 +16,7 @@ Windows 版本复用 `index.html` 和 `src/`，通过 `windows/` 中的 Electron
 | AI 系统通知 | AI 等你确认或回复完成时 toast，点击回到对应窗口；「AI 设置 › 通知」可关，窗口在前台时不打扰 | 无 |
 | 外部 MCP Agent | 当前用户的 Windows 命名管道和令牌认证；默认关闭 | 原有 Unix 套接字；默认关闭 |
 | 检查更新 | 打开 GitHub Releases，由用户选择安装 | 原有下载、校验与更新流程 |
+| 窗口外观 | 没有原生毛玻璃：顶栏、稿件栏、检查器底下那一层是不透明的 `--ui-chrome`；滚动条换成细的；页面载入前窗口的底色（`windows/main.cjs` 的 `backgroundColor`）和它同色 | 原生毛玻璃，滚动条照系统 |
 
 Windows 的 MP4 使用完整的 1440 × 1920 卡片画面、30 fps、H.264、`yuv420p`，需要声音时编码 AAC，并启用 faststart。GIF 为完整卡片的 864 × 1152、15 fps，不带声音。视频按照原来的起点、时长、倍速、显示方向、取景、居中铺满和圆角叠加在卡片中。
 

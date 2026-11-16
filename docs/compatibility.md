@@ -37,8 +37,11 @@
 | `linear()` 缓动 | 17.2（14.2） | 动效令牌 `--ease-spring`（弹簧，过冲 2%） | `@supports not` 把令牌换成 `cubic-bezier(0.35, 0.7, 0.1, 1.12)`，按同一条曲线拟合，峰值 1.020。不换的话，用到它的整条过渡都会作废 | [WebKit 17.2](https://webkit.org/blog/14787/webkit-features-in-safari-17-2/) |
 | `transition-behavior: allow-discrete` | 17.4（14.4）；`display` 真正能过渡要 18.0（15.0） | 浮层、对话框、手机预览、导出进度的退场 | 单独写成一行 `transition-behavior`：旧 WebKit 只丢掉这一行。要是写进 `transition` 简写，整条过渡都会被丢掉。退场时直接消失，没有淡出 | [WebKit 17.4](https://webkit.org/blog/15063/webkit-features-in-safari-17-4/)、[18.0](https://webkit.org/blog/15865/webkit-features-in-safari-18-0/) |
 | `@starting-style` | 17.5（14.5） | 浮层、对话框、提示条的进场 | 整条规则被忽略：直接出现，没有进场动画。状态从不等动画（`docs/design/motion.md`） | [WebKit 17.5](https://webkit.org/blog/15383/webkit-features-in-safari-17-5/) |
-| 无前缀 `backdrop-filter` | 18.0（15.0） | 实况角标、胶片页码的底（`media/media.css`） | 同时写 `-webkit-backdrop-filter`（Safari 9 起就有） | [WebKit 18.0](https://webkit.org/blog/15865/webkit-features-in-safari-18-0/) |
+| 无前缀 `backdrop-filter` | 18.0（15.0） | 实况角标、胶片页码的底（`media/media.css`）；菜单、字体列表、浮动条、发布检查、导出进度、胶片、舞台上的块菜单与图片工具条（`--ui-material`） | 同时写 `-webkit-backdrop-filter`（Safari 9 起就有）。窗口整个看不见时 WebKit 不合成背景模糊，所以 `<html data-motion="paused">` 时浮层退回不透明的底 | [WebKit 18.0](https://webkit.org/blog/15865/webkit-features-in-safari-18-0/) |
 | `scrollbar-width` | 18.2 | 舞台、胶片不显示滚动条 | `::-webkit-scrollbar { display: none }` | [WebKit 18.2](https://webkit.org/blog/16301/webkit-features-in-safari-18-2/) |
+| `::-webkit-scrollbar` 的样式 | 各版本都有 | 细滚动条，只在 `<html data-scrollbars="classic">`（不是 Mac、滚动条占地方的机器，`workspace/panels.js` 量出来后写）时用 | 不用退路：Mac 上照系统的滚动条 | [MDN](https://developer.mozilla.org/docs/Web/CSS/Reference/Selectors/::-webkit-scrollbar) |
+| 无前缀 `mask-image` | 15.4 | 舞台滚动区上下边缘淡出、检查器面板顶上淡出 | 同时写 `-webkit-mask-image`；不认时不淡出，照常显示 | [MDN](https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/mask-image) |
+| `caret-color` | 11.1 | 输入光标用强调色 | 不用退路 | [MDN](https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/caret-color) |
 | canvas `letterSpacing` | 18.4（15.4） | 卡片装饰标签的字距（`engine/paint.js`，已做特性检测） | 标签照常画，只是不加字距 | [MDN](https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D/letterSpacing) |
 | 无前缀 `user-select` | **任何正式版 Safari 都不支持** | 6 处：拖编辑区宽度时、编辑器里的媒体块、检查器的图片框、AI 会话的文字 | 只有带前缀的 `-webkit-user-select` 生效。本机 macOS 26.6 的 WKWebView 实测 `CSS.supports("user-select", "none")` 为 `false`，所以这 6 处在所有版本上都不起作用。这是已有的问题，跟最低版本无关，另外处理 | [MDN](https://developer.mozilla.org/docs/Web/CSS/Reference/Properties/user-select) |
 
