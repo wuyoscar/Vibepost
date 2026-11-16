@@ -598,7 +598,9 @@ Claude 用它们直接操作 App（工具全名 `mcp__mediacraft__<名字>`）�
 
 模型：`ai/models` 起一次 `<程序> acp`，握手后在 `ai/.acp-models/` 里开一个会话就关上，把它的 `configOptions` 原样返回（`{ models: [], configOptions }`），页面的 `MediaCraftAI.acpModels` 挑出模型（`{ id, name, isDefault, efforts, defaultEffort }`；ID 里有这边不收的字符的不列）。没选过推理强度时跟随它自己的；它没报档位时选单停用。
 
-这类后端没有 App 的工具（适配器的 `toolNames` 是 `null`）、不能生图。起 OpenCode 时壳带上 `OPENCODE_PERMISSION`（改文件允许，运行命令、联网、目录外的读写先问）。
+**App 的工具**经 MCP 挂给它：壳每一轮开一个只给这一轮用的 MCP 服务，写进开会话的 `mcpServers`（名字 `mediacraft`，页面给的 `mcpServers` 不算）。Mac：`AIToolServer.swift`，临时目录里一个只有本人连得上的 Unix 域套接字，条目是 `{ command: "/usr/bin/nc", args: ["-U", <套接字>] }`；Windows：一条限制到本人的命名管道（整个 App 一条），条目是 `{ command: <Vibepost.exe>, args: [mcp/turn-relay.cjs, <管道>], env: ELECTRON_RUN_AS_NODE、VIBEPOST_TOOLS_TOKEN }`，中继连上后第一行交这一轮的口令。Agent 发来的每条 MCP 消息壳原样推给页面，是输出行里的一行 `{ method: "vibepost/mcp", params: { connection, message } }`；适配器交给 `MediaCraftAITools.handle`（`initialize` / `tools/list` / `tools/call`，一次执行一个），回答经 `ai/respond` 的 `{ mcp: { connection, message } }` 写回那条连接（连接没了时 `delivered: false`）。通知（没有 id）不回答。它自己报的这次工具调用（`tool_call`）不再记一行、它为此要权限时直接放行（工具自己该问的自己问），靠名字认（`mediacraft_…`、`mcp__mediacraft_…`）。生图用 App 的 `generate_image`。这一轮结束套接字就关掉、删掉。
+
+起 OpenCode 时壳带上 `OPENCODE_PERMISSION`（改文件允许，运行命令、联网、目录外的读写先问）。
 
 **在 App 里填的接口**（`src/ai/providers.js`，壳 `AIProviders.swift`，Windows `windows/lib/ai-providers.cjs`）：AI 设置里填的服务商密钥或 OpenAI 兼容接口，存在 `ai/providers.json`（0600）。只给 OpenCode：起 `opencode acp`（问模型、每一轮）时壳另加环境变量 `OPENCODE_CONFIG_CONTENT`（一段内联配置，OpenCode 把它和用户自己的配置合并；用户环境里原有这个变量时把我们的 `provider` 并进去）和每家一个 `VIBEPOST_API_KEY_<n>`，配置里只写 `{env:VIBEPOST_API_KEY_<n>}`。目录里的服务商（预设）是 `{ options: { apiKey } }`，自定义接口是 `{ npm: "@ai-sdk/openai-compatible", name, options: { baseURL, apiKey }, models }`。页面拿不到密钥；这一轮的 stderr 给页面之前把这些密钥打码。预设的服务商 id 在 `src/ai/providers.js` 的 `PRESETS`，照 OpenCode 的模型目录（models.dev）写，2026-11-17 对着 opencode 1.18.34 逐个核对过能列出模型。
 
