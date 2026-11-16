@@ -3638,6 +3638,16 @@ body[data-layout-mode="article"] .stage-scroller {
     translate var(--motion-moderate) var(--ease-decelerate);
 }
 
+/* 滚动条占地方的系统（接着鼠标的 Mac、Windows）：「样式」一直给滚动条留着位置，展开一节、弹出配色库时内容不会横着挪一下、
+   缩略图不重排；右边的内边距少留滚动条那么宽（src/workspace/panels.js 量出 --scrollbar-width），两边看着还是一样宽。
+   滚动条叠在内容上时（触控板）量出来是 0，什么都不变。WebKit 18.2 之前不认 scrollbar-gutter：照旧，超出时才让出滚动条 */
+@supports (scrollbar-gutter: stable) {
+  #stylePanel {
+    padding-right: max(4px, calc(16px - var(--scrollbar-width, 0px)));
+    scrollbar-gutter: stable;
+  }
+}
+
 /* 换标签：新的一页淡入、从下面浮上来一点（旧的一页立即让位，不叠在一起） */
 @starting-style {
   .inspector-panel:not([hidden]) {
@@ -3650,6 +3660,12 @@ body[data-layout-mode="article"] .stage-scroller {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* 检查器里输入框的占位：用界面的三级文字色。WebKit 默认的灰在深色皮肤上亮得像已经填了字 */
+.inspector :is(input, textarea)::placeholder {
+  color: var(--ui-text-3);
+  opacity: 1;
 }
 
 .section-head {
@@ -4078,6 +4094,18 @@ body[data-layout-mode="article"] .card-only {
   background: var(--ui-hover);
 }
 
+.section-fold:active {
+  background: var(--ui-pressed);
+}
+
+/* 节名与数值框的 − ＋：悬停、按下的颜色和别的控件一样淡过去（写在这里，不去动「控件」开头那两组共用的列表） */
+.section-fold,
+.stepper-button {
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
 .section-fold-chevron {
   flex: none;
   width: 12px;
@@ -4122,6 +4150,35 @@ body[data-layout-mode="article"] .card-only {
   height: 10px;
   border-radius: 50%;
   box-shadow: 0 0 0 1px var(--ui-border);
+}
+
+/* 署名的摘要：头像的小圆 + 名字 */
+.section-peek-byline {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  vertical-align: -3px;
+}
+
+.section-peek-byline > img {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px var(--ui-border);
+}
+
+/* 展开一节：里面的东西淡入（位置立即到位，不做高度动画）。:where() 不抬高优先级：自己带过渡的控件照自己的来 */
+:where(.inspector-section[data-fold]) > :where(:not(.section-label, .section-head)) {
+  transition: opacity var(--motion-quick) var(--ease-standard);
+}
+
+@starting-style {
+  :where(.inspector-section[data-fold]:not(.is-folded)) > :where(:not(.section-label, .section-head)) {
+    opacity: 0;
+  }
 }
 
 .inspector-section.is-folded > :not(.section-label, .section-head),
@@ -4190,9 +4247,28 @@ body[data-layout-mode="article"] .card-only {
 }
 
 .swatch-hex {
+  max-width: 100%;
+  overflow: hidden;
   color: var(--ui-text-3);
   font: 10px var(--font-mono);
   letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+/* 检查器窄（窗口缩到最小时 280 宽）：格子之间收一点、色值小一号，七个字还在格子里 */
+.color-roles {
+  container-type: inline-size;
+}
+
+@container (max-width: 270px) {
+  .swatch-tile {
+    padding-inline: 0;
+  }
+
+  .swatch-hex {
+    font-size: 9px;
+    letter-spacing: -0.04em;
+  }
 }
 
 /* ===== 配色库与色轮：两个按钮各开一个弹出层，弹出层锚在按钮那一行、和检查器一样宽 ===== */
@@ -4565,6 +4641,27 @@ body[data-layout-mode="article"] .card-only {
   object-fit: cover;
 }
 
+/* 指上去、键盘焦点落上来时盖一层「换一张」的小图标：看得出头像能点 */
+.avatar-button {
+  position: relative;
+}
+
+.avatar-button-hint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.42);
+  color: #ffffff;
+  opacity: 0;
+  transition: opacity var(--motion-quick) var(--ease-standard);
+}
+
+.avatar-button:hover > .avatar-button-hint,
+.avatar-button:has(input:focus-visible) > .avatar-button-hint {
+  opacity: 1;
+}
+
 .byline-fields {
   display: flex;
   flex: 1;
@@ -4582,6 +4679,11 @@ body[data-layout-mode="article"] .card-only {
   color: var(--ui-text);
   font-size: 13px;
   font-weight: 600;
+}
+
+.plain-input::placeholder {
+  color: var(--ui-text-3);
+  font-weight: 400;
 }
 
 .plain-input:hover:not(:disabled) {
@@ -4744,7 +4846,8 @@ body[data-layout-mode="article"] .card-only {
 
 .ai-backend-picker {
   flex: none;
-  max-width: 48%;
+  /* 检查器最窄（280）时「Claude Code」也写得全 */
+  max-width: 60%;
 }
 
 .ai-backend-picker > .status-dot {
@@ -4837,14 +4940,19 @@ body[data-layout-mode="article"] .card-only {
   }
 }
 
+/* AI 设置：和会话历史一样相对整个顶栏定位、和内容一样宽（从齿轮那里展开）：路径、说明这些长字少折几行 */
+.ai-session-head .ai-settings.pop-menu {
+  position: static;
+}
+
 .ai-settings-popover {
-  right: 0;
-  left: auto;
-  transform-origin: top right;
+  top: 40px;
+  right: -8px;
+  left: -8px;
+  transform-origin: calc(100% - 14px) top;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: 264px;
   /* 高度跟着窗口走（src/workspace/menus.js 按顶边量出 max-height），放不下就在里面滚动 */
   max-height: calc(100vh - 140px);
   overflow-y: auto;
@@ -7331,32 +7439,15 @@ body[data-layout-mode="article"] :is(#phoneButton, #aiButton) > span {
   scroll-behavior: auto !important;
 }
 
-/* 检查器「高级 · 卡片样式」（src/workspace/card-css.js） */
-.advanced-field > summary {
-  cursor: default;
-  list-style: none;
-}
-
-.advanced-field > summary::-webkit-details-marker {
+/* 检查器「高级 · 卡片样式」（src/workspace/card-css.js）：和别的节一样收起（src/workspace/sections.js） */
+#cardCssCount:empty {
   display: none;
-}
-
-.advanced-field > summary::after {
-  content: "›";
-  display: inline-block;
-  margin-left: 6px;
-  transition: transform var(--motion-moderate) var(--ease-spring);
-}
-
-.advanced-field[open] > summary::after {
-  transform: rotate(90deg);
 }
 
 .code-input {
   display: block;
   width: 100%;
   min-height: 120px;
-  margin-top: 8px;
   padding: 8px 10px;
   border: 1px solid var(--ui-border);
   border-radius: 8px;
@@ -7371,19 +7462,56 @@ body[data-layout-mode="article"] :is(#phoneButton, #aiButton) > span {
 .code-input:focus {
   border-color: var(--ui-accent);
   outline: none;
+  box-shadow: 0 0 0 3px var(--ui-focus);
 }
 
-/* 图文尺寸与排版密度：跟随 App 的界面配色。 */
-#cardHeightInput {
-  appearance: none;
-  width: 100%;
-  min-height: 38px;
-  font: inherit;
-  padding: 8px 32px 8px 10px;
-  color: var(--ui-text);
-  background: linear-gradient(45deg, transparent 50%, var(--ui-text-2) 50%) calc(100% - 17px) 50% / 5px 5px no-repeat,
-              linear-gradient(135deg, var(--ui-text-2) 50%, transparent 50%) calc(100% - 12px) 50% / 5px 5px no-repeat, var(--ui-layer);
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
+/* 图文尺寸：和字体选单一样的样子（32 高、13 号字、右边一枚细箭头）；选单本身铺满，箭头盖在右边、不接鼠标 */
+.select-field {
+  position: relative;
+  display: block;
 }
-[aria-label="排版密度"] { margin-top: 12px; }
+
+.select-field > select {
+  display: block;
+  width: 100%;
+  height: 32px;
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-control);
+  background: var(--ui-window);
+  color: var(--ui-text);
+  font: 13px var(--font-ui);
+  text-overflow: ellipsis;
+  appearance: none;
+  -webkit-appearance: none;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-quick) var(--ease-standard);
+}
+
+.select-field > select:hover:not(:disabled) {
+  border-color: var(--ui-border-hover);
+  background: var(--ui-raised-hover);
+}
+
+.select-field > select:focus-visible {
+  border-color: var(--ui-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ui-focus);
+}
+
+.select-field > select:disabled {
+  opacity: 0.42;
+}
+
+.select-field > .icon {
+  position: absolute;
+  top: 50%;
+  right: 9px;
+  width: 12px;
+  height: 12px;
+  color: var(--ui-text-3);
+  translate: 0 -50%;
+  pointer-events: none;
+}

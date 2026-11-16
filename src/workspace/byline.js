@@ -13,7 +13,8 @@
     let avatar = { src: defaults.avatar, crop: null };
     let previewTicket = 0;
 
-    name.placeholder = defaults.name;
+    // 默认名字是空的（卡片上不写名字）：占位写「你的名字」，看得出这里能填
+    name.placeholder = defaults.name || "你的名字";
     for (const input of [name, handle]) input.addEventListener("input", () => onInput());
 
     // 没裁剪时直接显示原图；裁剪过就把那一块画成正方形。图读不出来时照样显示原图地址。

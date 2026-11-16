@@ -474,6 +474,7 @@
     const changed = backend.id !== id;
     backend = ai.backends[id] ?? ai.backends.claude;
     backendSelect.value = backend.id;
+    fitPicker(backendSelect);
     status = statuses[backend.id] ?? null;
     syncBackendNames();
     if (changed) void loadModels();
@@ -481,6 +482,18 @@
   }
 
   // ===== 后端与模型：每篇各选，模型下一轮起生效；后端有对话后锁定 =====
+
+  // 药丸按选中那一项的字宽：原生选单的宽度按最长的那个选项算，「推理：中」后面会空出一截，
+  // 三个药丸在默认宽度的检查器里就排不成一行。量字宽用画布（面板没显示时也量得出）
+  const ruler = document.createElement("canvas").getContext("2d");
+  function fitPicker(select) {
+    const text = select.selectedOptions[0]?.textContent ?? "";
+    const style = getComputedStyle(select);
+    ruler.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+    select.style.width = text && Number.isFinite(padding) ? `${Math.ceil(ruler.measureText(text).width + padding) + 2}px` : "";
+  }
+  for (const select of [backendSelect, modelSelect, effortSelect]) select.addEventListener("change", () => fitPicker(select));
 
   // 这个后端列在选单里的模型（Claude Code 是三个别名，Codex 问它自己）：[{ id, name }]
   let modelOptions = [];
@@ -519,6 +532,7 @@
     void syncEffort();
     if (!rebuilt && modelSelect.value === "custom" && !modelCustom.hidden) return;
     modelSelect.value = model ?? "default";
+    fitPicker(modelSelect);
     modelCustom.hidden = true;
     modelSelect.title = `这篇稿子的 AI 用${model === null ? ` ${backend.label} 设置里的模型` : `「${model}」`}，下一轮起生效`;
   }
@@ -533,6 +547,7 @@
     const efforts = info?.efforts ?? ["medium"];
     effortSelect.replaceChildren(...efforts.map((effort) => new Option(`推理：${effortName(effort)}`, effort)));
     effortSelect.value = info?.effort ?? "medium";
+    fitPicker(effortSelect);
     effortSelect.disabled = !usable;
     effortSelect.title = `推理强度：${effortName(effortSelect.value)}（${effortSelect.value}）。想得越深越慢，下一轮起生效`;
   }
@@ -971,12 +986,23 @@
       const label = ai.backends[id].label;
       error.hidden = true;
       pathInput.value = current?.source === "settings" ? current.path ?? "" : "";
+      syncSaveButton(id);
       if (!current) found.textContent = "正在查找…";
       else if (current.available) {
         const where = current.source === "settings" ? "在这里指定的" : "在终端的 PATH 里找到的";
         found.textContent = `现在用的是 ${current.path}（${current.version}，${where}）`;
       } else found.textContent = current.error ?? `没有找到本机 ${label}`;
     }
+  }
+
+  // 「保存」平时是普通按钮，路径框里填了和现在不一样的才是主按钮：设置里不会同时摆着两个蓝色的「保存」
+  function syncSaveButton(id) {
+    const { group, input: pathInput } = pathGroups[id];
+    const saved = statuses[id]?.source === "settings" ? statuses[id].path ?? "" : "";
+    const dirty = pathInput.value.trim() !== saved;
+    const button = group.querySelector("[data-path-save]");
+    button.classList.toggle("primary-button", dirty);
+    button.classList.toggle("pill-button", !dirty);
   }
 
   async function savePath(id, path) {
@@ -1027,6 +1053,7 @@
   for (const [id, { group, input: pathInput }] of Object.entries(pathGroups)) {
     group.querySelector("[data-path-save]").addEventListener("click", () => run(() => savePath(id, pathInput.value)));
     group.querySelector("[data-path-auto]").addEventListener("click", () => run(() => savePath(id, null)));
+    pathInput.addEventListener("input", () => syncSaveButton(id));
     pathInput.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" || event.isComposing) return;
       event.preventDefault();
