@@ -644,6 +644,8 @@
     const next = {
       backend: turn.backend.id,
       ...ownModel(turn.draftId, turn.backend.id),
+      // 这篇选的推理强度留着（不然说完一轮就回到默认档）
+      ...(typeof ai.effort === "string" ? { effort: ai.effort } : {}),
       sessionId: lost ? null : turn.sessionId,
       resumable: lost ? false : ai.resumable || turn.answered,
       messages: turn.messages,

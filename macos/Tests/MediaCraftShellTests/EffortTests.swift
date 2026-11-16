@@ -63,7 +63,7 @@ struct EffortTests {
         #expect(harness.pageErrors == [])
     }
 
-    @Test("Claude Code：固定 low / medium / high / xhigh / max，新稿子带 --effort medium；选「很高」后下一轮带 --effort xhigh")
+    @Test("Claude Code：固定 low / medium / high / xhigh / max，新稿子带 --effort medium；选「很高」后下一轮带 --effort xhigh，再下一轮也是（选的档位不随一轮说完丢掉）")
     func claudeEffortIsPassed() async throws {
         let fake = try FakeClaude(script: StreamJSON.reply(["好的。"]))
         defer { fake.remove() }
@@ -79,15 +79,18 @@ struct EffortTests {
             await pickEffort("xhigh");
             ask("第二轮");
             await until(() => finished(2));
+            ask("第三轮");
+            await until(() => finished(3));
             return { options };
         """) as? [String: Any]
         let calls = fake.calls()
         await harness.tearDown()
 
         #expect(result?["options"] as? [String] == ["low", "medium", "high", "xhigh", "max"])
-        #expect(calls.count == 2)
+        #expect(calls.count == 3)
         #expect(FakeClaude.option("--effort", in: calls.first ?? [:]) == "medium")
-        #expect(FakeClaude.option("--effort", in: calls.last ?? [:]) == "xhigh", "\((calls.last?["argv"] as? [String]) ?? [])")
+        #expect(calls.count > 1 && FakeClaude.option("--effort", in: calls[1]) == "xhigh", "\((calls.last?["argv"] as? [String]) ?? [])")
+        #expect(FakeClaude.option("--effort", in: calls.last ?? [:]) == "xhigh", "选的档位说完一轮还留着：\((calls.last?["argv"] as? [String]) ?? [])")
         #expect(harness.pageErrors == [])
     }
 }
