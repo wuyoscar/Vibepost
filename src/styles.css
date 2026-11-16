@@ -2881,13 +2881,37 @@ button.check-jump:hover {
   clip-path: inset(-40px -40px -40px 0);
 }
 
+/* 翻页：两个箭头和页码收在一枚浮着的胶囊里（上下各留 10 px，和原来一样占 52 px 高） */
 .stage-nav {
   display: flex;
   flex: none;
   align-items: center;
-  gap: 14px;
-  height: 52px;
+  gap: 4px;
+  height: 32px;
+  margin: 10px 0;
+  padding: 0 2px;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-control);
+  box-shadow: var(--ui-control-shadow);
   color: var(--ui-text-2);
+}
+
+.stage-nav > .round-button {
+  width: 26px;
+  height: 26px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.stage-nav > .round-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--ui-hover);
+}
+
+.stage-nav > .round-button:active:not(:disabled) {
+  background: var(--ui-pressed);
 }
 
 .stage-page-label {
