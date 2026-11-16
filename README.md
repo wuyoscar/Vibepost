@@ -22,7 +22,11 @@
   </a>
 </p>
 
-<p align="center">点上面的图看演示视频：一篇稿子从写到发出去的全过程。</p>
+<p align="center">
+  <img src="docs/screenshots/demo-film.webp" alt="演示视频里的一段：在对话里点一张 Agent 生成的配图，图飞进那道菜的卡片；再拖一条线，对比排版之前和现在" width="100%" />
+</p>
+
+<p align="center">上面的动图是演示视频里的一段。<a href="docs/screenshots/vibepost.mp4">完整的视频</a>是一篇稿子从写到发出去的全过程（带声音，14 MB；GitHub 页面上不能直接播放这么大的文件，点开后选 View raw 下载）。</p>
 
 Vibepost 在你的电脑上排版，有 Mac 和 Windows 两个版本。左边像写文档一样写 Markdown，中间实时排成一张张卡片，右边换主题、调样式。排版、润色、配图可以交给这台电脑上的 Claude Code 或 Codex，改动标在正文里，一处一处接受或拒绝。终端里的 Agent 也能经 MCP 连进来操作 App。写完点「发送到 iPhone」，整组图片按页序隔空投送到手机，图片下面那段正文同时进剪贴板，打开小红书粘贴就能发。
 
