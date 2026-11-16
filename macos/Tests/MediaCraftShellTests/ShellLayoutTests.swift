@@ -133,10 +133,10 @@ struct ShellLayoutTests {
         #expect(harness.pageErrors == [])
     }
 
-    /// 两套界面皮肤的令牌（浅色即原来「灰」的，深色即原来「暗夜」的）：内容区、玻璃、舞台、主色、正文色、分隔线，以及深浅。
+    /// 两套界面皮肤的令牌：纸（编辑区）、玻璃（没有原生毛玻璃时是不透明的）、桌面（舞台）、主色、正文色、细线（半透明），以及深浅。
     static let skins: [String: [String: String]] = [
-        "light": ["window": "#f4f4f4", "glass": "rgba(234, 234, 234, 0.9)", "stage": "#e8e8e8", "accent": "#0f62fe", "text": "#161616", "line": "#d9d9d9", "scheme": "light"],
-        "dark": ["window": "#161616", "glass": "rgba(38, 38, 38, 0.92)", "stage": "#0e0e0e", "accent": "#78a9ff", "text": "#f4f4f4", "line": "#393939", "scheme": "dark"],
+        "light": ["window": "#ffffff", "glass": "#ececf0", "stage": "#f0f0f3", "accent": "#0f62fe", "text": "#1c1c1e", "line": "rgba(0, 0, 0, 0.1)", "scheme": "light"],
+        "dark": ["window": "#232326", "glass": "#1b1b1e", "stage": "#161618", "accent": "#78a9ff", "text": "#f5f5f7", "line": "rgba(255, 255, 255, 0.1)", "scheme": "dark"],
     ]
 
     static func rgb(_ hex: String) -> String {
@@ -153,9 +153,8 @@ struct ShellLayoutTests {
             return {
               id: document.documentElement.dataset.uiTheme,
               window: css(region("编辑器"), "background-color"),
-              inspector: css(region("检查器"), "background-color"),
-              glass: css(document.querySelector("header"), "background-color"),
-              drawer: css(region("稿件"), "background-color"),
+              glass: css(document.querySelector(".app"), "background-color"),
+              chrome: [document.querySelector("header"), region("稿件"), region("检查器")].map((element) => css(element, "background-color")).join(" | "),
               stage: css(region("预览"), "background-color"),
               accent: css(ui.find("发送到 iPhone"), "background-color"),
               text: css(document.body, "color"),
@@ -180,13 +179,12 @@ struct ShellLayoutTests {
             let skin = skin ?? [:]
             #expect(skin["id"] == id, "\(id)：<html data-ui-theme>")
             #expect(skin["window"] == Self.rgb(expected["window"]!), "\(id) 内容区")
-            #expect(skin["inspector"] == skin["window"], "\(id) 检查器与编辑区同色")
-            #expect(skin["glass"] == expected["glass"], "\(id) 顶栏玻璃")
-            #expect(skin["drawer"] == expected["glass"], "\(id) 稿件抽屉玻璃")
+            #expect(skin["glass"] == Self.rgb(expected["glass"]!), "\(id) 玻璃那一层（.app）")
+            #expect(skin["chrome"] == "rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0)", "\(id) 顶栏、稿件抽屉、检查器直接坐在玻璃上，自己不画底")
             #expect(skin["stage"] == Self.rgb(expected["stage"]!), "\(id) 舞台")
             #expect(skin["accent"] == Self.rgb(expected["accent"]!), "\(id) 主按钮")
             #expect(skin["text"] == Self.rgb(expected["text"]!), "\(id) 正文色")
-            #expect(skin["line"] == Self.rgb(expected["line"]!), "\(id) 分隔线")
+            #expect(skin["line"] == expected["line"], "\(id) 分隔线")
             #expect(skin["scheme"] == expected["scheme"], "\(id) 深浅")
         }
         #expect(harness.pageErrors == [])
@@ -253,7 +251,7 @@ struct ShellLayoutTests {
         #expect(harness.pageErrors == [])
     }
 
-    @Test("原生毛玻璃：网页透明、顶栏与抽屉半透明、内容区不透明；顶栏空白处可拖窗口、按钮照常点；换主题不改窗口外观")
+    @Test("原生毛玻璃：网页透明、玻璃那一层半透明（顶栏、抽屉、检查器坐在上面）、内容区不透明；顶栏空白处可拖窗口、按钮照常点；换主题不改窗口外观")
     func nativeGlassFrame() async throws {
         let harness = ShellHarness(glass: true, onboarding: false)
         try await harness.load()
@@ -271,8 +269,8 @@ struct ShellLayoutTests {
             return {
               glass: document.documentElement.dataset.glass,
               body: css(document.body, "background-color"),
-              titlebarAlpha: alpha(css(document.querySelector("header"), "background-color")),
-              drawerAlpha: alpha(css(region("稿件"), "background-color")),
+              glassAlpha: alpha(css(document.querySelector(".app"), "background-color")),
+              chrome: [document.querySelector("header"), region("稿件"), region("检查器")].map((element) => alpha(css(element, "background-color"))),
               editor: css(region("编辑器"), "background-color"),
               inset: css(document.querySelector("header"), "padding-left"),
               title: center(document.querySelector("header [role='status']").previousElementSibling),
@@ -302,9 +300,10 @@ struct ShellLayoutTests {
 
         #expect(page?["glass"] as? String == "native")
         #expect(page?["body"] as? String == "rgba(0, 0, 0, 0)", "网页不画底色，透出窗口后的毛玻璃")
-        #expect((page?["titlebarAlpha"] as? Double ?? 1) < 0.6, "顶栏半透明")
-        #expect((page?["drawerAlpha"] as? Double ?? 1) < 0.6, "稿件抽屉半透明")
-        #expect(page?["editor"] as? String == "rgb(244, 244, 244)", "内容区不透明")
+        let glassAlpha = page?["glassAlpha"] as? Double ?? 1
+        #expect(glassAlpha > 0.2 && glassAlpha < 0.6, "玻璃那一层半透明：\(glassAlpha)")
+        #expect(page?["chrome"] as? [Double] == [0, 0, 0], "顶栏、稿件抽屉、检查器不再叠一层底")
+        #expect(page?["editor"] as? String == "rgb(255, 255, 255)", "内容区不透明")
         #expect(page?["inset"] as? String == "92px", "给红绿灯留出位置")
         #expect(dragAtTitle, "顶栏里的稿件名处可以拖动窗口")
         #expect(dragAtButtons == [false, false, false], "按钮、分段控件和编辑区不拖窗口")

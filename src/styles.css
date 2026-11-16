@@ -1,7 +1,9 @@
 /* MediaCraft 界面（v3 骨架）
  * 所有界面颜色都走下面的皮肤令牌：浅色、深色两套，跟随系统外观（<html data-ui-theme="light" | "dark">，ADR 0007）；卡片主题不影响界面。
- * 毛玻璃：MediaCraft.app 里网页透明、窗口后面是原生 NSVisualEffectView（<html data-glass="native">），
- * 顶栏与稿件栏用半透明令牌透出它；浏览器里没有原生毛玻璃，同一批表面退回接近不透明的令牌。
+ * 三层底：最底下是「玻璃」（.app：顶栏、稿件栏、检查器都直接坐在它上面），上面浮着一块圆角的内容面板（编辑区是「纸」、舞台是「桌面」），
+ * 再上面是浮层（菜单、对话框、胶片：半透明 + 背景模糊）。
+ * 毛玻璃：MediaCraft.app 里网页透明、窗口后面是原生 NSVisualEffectView（<html data-glass="native">），玻璃那一层半透明、透出它；
+ * 浏览器与 Windows 壳里没有原生毛玻璃，同一层退回不透明的 --ui-chrome。
  * 卡片画在 Shadow DOM 里（src/cards/），不受这里影响。
  */
 
@@ -10,68 +12,112 @@
 :root,
 :root[data-ui-theme="light"] {
   color-scheme: light;
-  --ui-window: #f4f4f4;
-  --ui-glass: rgba(234, 234, 234, 0.9);
+  /* 底色三层：玻璃（没有原生毛玻璃时的样子）、纸（编辑区，也是按钮与输入框的底）、桌面（舞台） */
+  --ui-chrome: #ececf0;
+  --ui-glass: rgba(236, 236, 240, 0.9);
+  --ui-window: #ffffff;
+  --ui-stage: #f0f0f3;
+  /* 垫在底色上的一层：坐在玻璃上时比玻璃亮（白），坐在纸与浮层上时比纸暗（见下面 --ui-fill） */
   --ui-layer: #ffffff;
+  --ui-fill: #f2f2f5;
   --ui-popover: #ffffff;
-  --ui-border: #d9d9d9;
-  --ui-text: #161616;
-  --ui-text-2: #525252;
-  --ui-text-3: #8d8d8d;
+  --ui-popover-glass: rgba(255, 255, 255, 0.84);
+  /* 细线一律半透明：压在玻璃、纸、桌面哪一层上都是「深一点点」 */
+  --ui-border: rgba(0, 0, 0, 0.1);
+  /* 能输入、能选的框：边比别的细线深一档，白底坐在白纸、白对话框上也认得出是个框 */
+  --ui-field-border: rgba(0, 0, 0, 0.17);
+  --ui-text: #1c1c1e;
+  --ui-text-2: #48484c;
+  --ui-text-3: #717176;
   --ui-accent: #0f62fe;
   --ui-on-accent: #ffffff;
-  --ui-accent-text: #0f62fe;
-  --ui-accent-tint: #e3ecfd;
-  --ui-stage: #e8e8e8;
-  --ui-selection: rgba(15, 98, 254, 0.18);
-  --ui-shadow: 0 12px 40px rgba(0, 0, 0, 0.14);
+  --ui-accent-text: #0b57e6;
+  --ui-control: #ffffff;
+  /* 凹下去的槽（分段控件、滑杆、搜索框）与槽里浮起的滑块 */
+  --ui-track: rgba(0, 0, 0, 0.06);
+  --ui-thumb: #ffffff;
+  --ui-highlight: rgba(255, 255, 255, 0.7);
+  /* 阴影都是两三层叠出来的：一圈极细的边 + 贴身的一层 + 散开的一层 */
+  --ui-control-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.06);
+  --ui-panel-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.05);
+  --ui-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.05), 0 6px 16px rgba(0, 0, 0, 0.06), 0 22px 48px rgba(0, 0, 0, 0.1);
+  --ui-popover-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.06), 0 14px 36px rgba(0, 0, 0, 0.16);
+  --ui-dialog-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.16), 0 6px 18px rgba(0, 0, 0, 0.1), 0 32px 80px rgba(0, 0, 0, 0.26);
+  --ui-backdrop: rgba(20, 20, 24, 0.26);
+  --ui-thumb-edge: rgba(0, 0, 0, 0.14);
+  --ui-danger: #d70015;
+  --ui-success: #1d8a3e;
+  --ui-warning: #8a6100;
 }
 
 /* 深色：跟随系统深色外观 */
 :root[data-ui-theme="dark"] {
-  --ui-window: #161616;
-  --ui-glass: rgba(38, 38, 38, 0.92);
-  --ui-layer: #262626;
-  --ui-popover: #262626;
-  --ui-border: #393939;
-  --ui-text: #f4f4f4;
-  --ui-text-2: #c6c6c6;
-  --ui-text-3: #8d8d8d;
+  color-scheme: dark;
+  --ui-chrome: #1b1b1e;
+  --ui-glass: rgba(27, 27, 30, 0.9);
+  --ui-window: #232326;
+  --ui-stage: #161618;
+  --ui-layer: #2e2e32;
+  --ui-fill: #2e2e32;
+  --ui-popover: #2a2a2e;
+  --ui-popover-glass: rgba(42, 42, 46, 0.82);
+  --ui-border: rgba(255, 255, 255, 0.1);
+  --ui-field-border: rgba(255, 255, 255, 0.17);
+  --ui-text: #f5f5f7;
+  --ui-text-2: #c4c4c9;
+  --ui-text-3: #98989f;
   --ui-accent: #78a9ff;
   --ui-on-accent: #0b0b0b;
   --ui-accent-text: #78a9ff;
-  --ui-accent-tint: #1c2a45;
-  --ui-stage: #0e0e0e;
-  --ui-selection: rgba(120, 169, 255, 0.28);
-  --ui-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  --ui-control: rgba(255, 255, 255, 0.08);
+  --ui-track: rgba(255, 255, 255, 0.08);
+  --ui-thumb: rgba(255, 255, 255, 0.2);
+  --ui-highlight: rgba(255, 255, 255, 0.07);
+  --ui-control-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.24);
+  --ui-panel-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.07), 0 0 0 0.5px rgba(0, 0, 0, 0.7), 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+  --ui-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.6), 0 2px 4px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.3), 0 24px 56px rgba(0, 0, 0, 0.45);
+  --ui-popover-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.8), 0 2px 6px rgba(0, 0, 0, 0.3), 0 16px 40px rgba(0, 0, 0, 0.5);
+  --ui-dialog-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.8), 0 6px 18px rgba(0, 0, 0, 0.36), 0 32px 80px rgba(0, 0, 0, 0.6);
+  --ui-backdrop: rgba(0, 0, 0, 0.5);
+  --ui-thumb-edge: rgba(0, 0, 0, 0.5);
+  --ui-danger: #ff8389;
+  --ui-success: #42be65;
+  --ui-warning: #f1c21b;
 }
 
-/* 由上面的令牌推出来的：悬停、按下、焦点环、浮层、警示色 */
+/* 窗口整个看不见时（<html data-motion="paused">：被挡住、最小化；测试的 harness 与它出的截图也是）WebKit 不合成背景模糊，
+   半透明的浮层会直接透出后面的字：这时退回不透明的底 */
+:root[data-motion="paused"] {
+  --ui-popover-glass: var(--ui-popover);
+}
+
+/* 由上面的令牌推出来的：悬停、按下、焦点环、强调色的淡底与选区；以及不分深浅的尺寸、层级、动效 */
 :root {
   --ui-hover: color-mix(in srgb, var(--ui-text) 6%, transparent);
   --ui-pressed: color-mix(in srgb, var(--ui-text) 11%, transparent);
-  --ui-raised-hover: color-mix(in srgb, var(--ui-text) 5%, var(--ui-window));
-  --ui-raised-pressed: color-mix(in srgb, var(--ui-text) 10%, var(--ui-window));
+  --ui-raised-hover: color-mix(in srgb, var(--ui-text) 5%, var(--ui-control));
+  --ui-raised-pressed: color-mix(in srgb, var(--ui-text) 10%, var(--ui-control));
   /* 有边框的控件悬停时边框也深一点，浅色与深色皮肤下都看得出 */
-  --ui-border-hover: color-mix(in srgb, var(--ui-text) 20%, var(--ui-border));
+  --ui-border-hover: color-mix(in srgb, var(--ui-text) 24%, transparent);
+  /* 强调色的淡底、选区、焦点环都从强调色推：换强调色只改 --ui-accent / --ui-accent-text / --ui-on-accent 三个 */
+  --ui-accent-tint: color-mix(in srgb, var(--ui-accent) 13%, transparent);
+  --ui-selection: color-mix(in srgb, var(--ui-accent) 22%, transparent);
   --ui-focus: color-mix(in srgb, var(--ui-accent) 50%, transparent);
-  --ui-thumb: var(--ui-window);
-  --ui-control-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-  --ui-popover-shadow: 0 10px 30px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.06);
-  --ui-dialog-shadow: 0 24px 64px rgba(0, 0, 0, 0.24);
-  --ui-backdrop: rgba(0, 0, 0, 0.28);
-  --ui-danger: #da1e28;
-  --ui-success: #24a148;
-  --ui-warning: #8e6a00;
-  --ui-glass-surface: var(--ui-glass);
-  --ui-glass-field: color-mix(in srgb, var(--ui-text) 6%, transparent);
-  /* 分段控件滑块下沿的一道细边（代替投影：滑块靠 clip-path 移动，投影会被裁掉） */
-  --ui-thumb-edge: rgba(0, 0, 0, 0.16);
+  --ui-glass-surface: var(--ui-chrome);
+  --ui-glass-field: var(--ui-track);
+  /* 浮层的材质：半透明的底 + 把后面的东西模糊、提一点饱和度（docs/compatibility.md：-webkit- 版本要写在前面） */
+  --ui-material: blur(28px) saturate(170%);
 
   --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "MC JetBrains Mono", Menlo, monospace;
-  --radius-control: 7px;
-  --radius-popover: 12px;
+  /* 圆角五档：小件（菜单里的行、格式条按钮）、控件、内容面板、浮层、对话框 */
+  --radius-small: 6px;
+  --radius-control: 8px;
+  --radius-panel: 12px;
+  --radius-popover: 13px;
+  --radius-dialog: 16px;
+  /* 内容面板四周露出玻璃的那一圈 */
+  --pane-gap: 8px;
   /* 控件高度：图标按钮、圆按钮、药丸按钮、发送键 */
   --control-size: 30px;
   --titlebar-height: 52px;
@@ -105,19 +151,6 @@
   }
 }
 
-:root[data-ui-theme="dark"] {
-  color-scheme: dark;
-  --ui-thumb: color-mix(in srgb, var(--ui-text) 14%, var(--ui-layer));
-  --ui-thumb-edge: rgba(0, 0, 0, 0.55);
-  --ui-control-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
-  --ui-popover-shadow: 0 12px 34px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04);
-  --ui-dialog-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
-  --ui-backdrop: rgba(0, 0, 0, 0.5);
-  --ui-danger: #ff8389;
-  --ui-success: #42be65;
-  --ui-warning: #f1c21b;
-}
-
 /* 原生毛玻璃：网页不画底色，玻璃表面更透，红绿灯留出位置 */
 :root[data-glass="native"] {
   --ui-glass-surface: color-mix(in srgb, var(--ui-glass) 45%, transparent);
@@ -146,8 +179,10 @@ body {
 }
 
 body {
-  background: var(--ui-window);
+  background: var(--ui-chrome);
   color: var(--ui-text);
+  /* 输入光标用强调色（标题、正文、各个输入框都继承它） */
+  caret-color: var(--ui-accent);
   font: 13px/1.45 var(--font-ui);
   -webkit-font-smoothing: antialiased;
 }
@@ -194,6 +229,11 @@ summary::-webkit-details-marker {
 :focus-visible {
   outline: 3px solid var(--ui-focus);
   outline-offset: 1px;
+}
+
+/* 输入框的焦点由它的框来表示（下划线，或边变强调色加一圈光环）：里面的 <input> 自己不再画一个方方的焦点框 */
+:is(.search-field, .title-field, .unit-field, .find-field, .ai-composer, .ai-history-search, .field, .ai-model-custom) :is(input, textarea):focus-visible {
+  outline: none;
 }
 
 ::selection {
@@ -250,6 +290,28 @@ body.is-resizing-editor {
   cursor: col-resize;
 }
 
+/* 滚动条占地方的系统（Windows；src/workspace/panels.js 量出来后写 <html data-scrollbars="classic">）：
+   换成细的、圆头的、平时很淡的一条，指上去才深。Mac 上接着鼠标时用系统自己的，触控板那种叠在内容上的不受影响 */
+:root[data-scrollbars="classic"] ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+:root[data-scrollbars="classic"] ::-webkit-scrollbar-track,
+:root[data-scrollbars="classic"] ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+:root[data-scrollbars="classic"] ::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--ui-text) 20%, transparent) padding-box;
+}
+
+:root[data-scrollbars="classic"] ::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--ui-text) 38%, transparent) padding-box;
+}
+
 /* ===== 控件 ===== */
 /* 点按的手感：悬停立刻变色，按下缩一点、加深（--motion-fast），松开沿弹簧回到原样；焦点环收拢着出现。
    只动 transform 与颜色，不动布局。新控件把类名加进这两处就有同样的手感。 */
@@ -262,6 +324,7 @@ body.is-resizing-editor {
 ) {
   transition:
     transform var(--motion-moderate) var(--ease-spring),
+    translate var(--motion-moderate) var(--ease-spring),
     background-color var(--motion-fast) var(--ease-standard),
     border-color var(--motion-fast) var(--ease-standard),
     color var(--motion-fast) var(--ease-standard),
@@ -341,7 +404,8 @@ body.is-resizing-editor {
 
 .pill-button {
   border: 1px solid var(--ui-border);
-  background: var(--ui-window);
+  background: var(--ui-control);
+  box-shadow: var(--ui-control-shadow);
   color: var(--ui-text);
 }
 
@@ -354,25 +418,33 @@ body.is-resizing-editor {
 }
 
 .pill-button[aria-pressed="true"] {
-  border-color: var(--ui-accent);
+  border-color: color-mix(in srgb, var(--ui-accent) 55%, transparent);
   background: var(--ui-accent-tint);
+  box-shadow: none;
   color: var(--ui-accent-text);
 }
 
+/* 主按钮：强调色上面罩一层从上往下淡掉的高光，底下一圈带颜色的投影 */
 .primary-button {
   padding: 0 14px;
   border: 0;
-  background: var(--ui-accent);
+  --button-color: var(--ui-accent);
+  background: linear-gradient(rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0)) var(--button-color);
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.28),
+    0 0.5px 1px rgba(0, 0, 0, 0.2),
+    0 2px 6px color-mix(in srgb, var(--button-color) 32%, transparent);
   color: var(--ui-on-accent);
   font-weight: 600;
 }
 
 .primary-button:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--ui-accent) 88%, var(--ui-text));
+  background-color: color-mix(in srgb, var(--button-color) 90%, var(--ui-text));
 }
 
 .primary-button:active:not(:disabled) {
-  background: color-mix(in srgb, var(--ui-accent) 78%, var(--ui-text));
+  background-color: color-mix(in srgb, var(--button-color) 80%, var(--ui-text));
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .text-button {
@@ -410,7 +482,8 @@ body.is-resizing-editor {
   padding: 0;
   border: 1px solid var(--ui-border);
   border-radius: 50%;
-  background: var(--ui-window);
+  background: var(--ui-control);
+  box-shadow: var(--ui-control-shadow);
   color: var(--ui-text-2);
 }
 
@@ -445,9 +518,9 @@ summary[aria-disabled="true"] {
   display: inline-flex;
   gap: 2px;
   padding: 2px;
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
-  background: var(--ui-layer);
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: var(--ui-track);
   isolation: isolate;
 }
 
@@ -457,7 +530,7 @@ summary[aria-disabled="true"] {
   height: 26px;
   padding: 0 16px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
   color: var(--ui-text-2);
   font-size: 12px;
@@ -488,18 +561,19 @@ summary[aria-disabled="true"] {
   pointer-events: none;
 }
 
+/* 细边比滑块四周大半个像素、下沿多一个像素：一圈极细的边加一道下唇，读起来像浮起来的一片 */
 .segmented::before {
   background: var(--ui-thumb-edge);
-  clip-path: inset(var(--sel-top, 0) var(--sel-right, 0) calc(var(--sel-bottom, 0px) - 1px) var(--sel-left, 0) round 6px);
+  clip-path: inset(calc(var(--sel-top, 0px) - 0.5px) calc(var(--sel-right, 0px) - 0.5px) calc(var(--sel-bottom, 0px) - 1.5px) calc(var(--sel-left, 0px) - 0.5px) round 7.5px);
 }
 
 .segmented::after {
   background: var(--ui-thumb);
-  clip-path: inset(var(--sel-top, 0) var(--sel-right, 0) var(--sel-bottom, 0) var(--sel-left, 0) round 6px);
+  clip-path: inset(var(--sel-top, 0) var(--sel-right, 0) var(--sel-bottom, 0) var(--sel-left, 0) round 7px);
 }
 
 .segmented.has-selection::before {
-  opacity: 0.5;
+  opacity: 0.6;
 }
 
 .segmented.has-selection::after {
@@ -563,7 +637,8 @@ summary[aria-disabled="true"] {
   padding: 0 10px;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-control);
-  background: var(--ui-window);
+  background: var(--ui-control);
+  box-shadow: var(--ui-control-shadow);
   color: var(--ui-text);
   font-size: 12px;
   white-space: nowrap;
@@ -578,8 +653,9 @@ summary[aria-disabled="true"] {
 }
 
 .chip:is(.active, [aria-pressed="true"]) {
-  border-color: var(--ui-accent);
+  border-color: color-mix(in srgb, var(--ui-accent) 55%, transparent);
   background: var(--ui-accent-tint);
+  box-shadow: none;
   color: var(--ui-accent-text);
   font-weight: 600;
 }
@@ -638,9 +714,10 @@ summary[aria-disabled="true"] {
 .palette-input,
 .unit-field {
   height: 30px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-field-border);
   border-radius: var(--radius-control);
-  background: var(--ui-window);
+  background: var(--ui-control);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.04);
   color: var(--ui-text);
   font-size: 13px;
 }
@@ -718,7 +795,8 @@ input[type="range"] {
 input[type="range"]::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 2px;
-  background: linear-gradient(var(--ui-accent), var(--ui-accent)) 0 / var(--fill, 0%) 100% no-repeat, var(--ui-border);
+  background: linear-gradient(var(--ui-accent), var(--ui-accent)) 0 / var(--fill, 0%) 100% no-repeat, var(--ui-track);
+  box-shadow: inset 0 0.5px 1px rgba(0, 0, 0, 0.1);
 }
 
 input[type="range"]::-webkit-slider-thumb {
@@ -727,7 +805,7 @@ input[type="range"]::-webkit-slider-thumb {
   margin-top: -6px;
   border-radius: 50%;
   background: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.1), 0 0.5px 1px rgba(0, 0, 0, 0.16), 0 2px 5px rgba(0, 0, 0, 0.16);
   transition:
     transform var(--motion-moderate) var(--ease-spring),
     box-shadow var(--motion-quick) var(--ease-standard);
@@ -738,7 +816,7 @@ input[type="range"]::-webkit-slider-thumb {
 /* 拖着滑杆时圆钮稍稍放大，像被捏住了 */
 input[type="range"]:active:not(:disabled)::-webkit-slider-thumb {
   transform: scale(1.12);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.18), 0 4px 10px rgba(0, 0, 0, 0.2);
   transition-duration: var(--motion-fast);
 }
 
@@ -813,6 +891,8 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   display: grid;
   grid-template-rows: var(--titlebar-height) minmax(0, 1fr);
   height: 100%;
+  /* 玻璃这一层只画一次：顶栏、稿件栏、检查器都不再自己画底，内容面板四周露出来的也是它 */
+  background: var(--ui-glass-surface);
 }
 
 .titlebar {
@@ -822,8 +902,6 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   align-items: center;
   gap: 16px;
   padding: 0 16px 0 calc(16px + var(--traffic-lights));
-  border-bottom: 1px solid var(--ui-border);
-  background: var(--ui-glass-surface);
   -webkit-user-select: none;
   user-select: none;
 }
@@ -984,9 +1062,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   flex-direction: column;
   gap: 10px;
   min-height: 0;
-  padding: 14px 12px;
-  border-right: 1px solid var(--ui-border);
-  background: var(--ui-glass-surface);
+  padding: 10px 12px 14px;
 }
 
 .workspace.is-drawer-open .drawer {
@@ -1202,14 +1278,27 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 }
 
 /* ===== 编辑区 ===== */
+/* 编辑区与舞台合成一块浮在玻璃上的圆角内容面板：编辑区是左半（纸）、舞台是右半（桌面），四周露出一圈玻璃。
+   编辑区不裁剪（格式条的菜单要伸到舞台上面），圆角只画在它自己的底上；舞台本来就裁剪。
+   两半各带一圈细边与投影，舞台朝编辑区那一侧的投影裁掉，不压在纸上。 */
 .editor-pane {
   position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  margin: 0 0 var(--pane-gap) var(--pane-gap);
   border-right: 1px solid var(--ui-border);
+  border-radius: var(--radius-panel) 0 0 var(--radius-panel);
   background: var(--ui-window);
+  box-shadow: var(--ui-panel-shadow);
+  /* 坐在纸上的一层比纸暗一点（代码、图片块、查找栏） */
+  --ui-layer: var(--ui-fill);
+}
+
+/* 稿件栏开着：稿件栏自己的留白就是那一圈 */
+.workspace.is-drawer-open .editor-pane {
+  margin-left: 0;
 }
 
 .format-bar {
@@ -1337,7 +1426,9 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   padding: 5px;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-popover);
-  background: var(--ui-popover);
+  background: var(--ui-popover-glass);
+  -webkit-backdrop-filter: var(--ui-material);
+  backdrop-filter: var(--ui-material);
   box-shadow: var(--ui-popover-shadow);
   color: var(--ui-text);
 }
@@ -1405,7 +1496,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   height: 32px;
   padding: 0 10px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 8px;
   background: transparent;
   color: var(--ui-text);
   font-size: 13px;
@@ -1865,9 +1956,9 @@ body[data-layout-mode="article"] .caption-field {
   min-width: 0;
   height: 28px;
   padding: 0 8px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-field-border);
   border-radius: var(--radius-control);
-  background: var(--ui-window);
+  background: var(--ui-control);
   color: var(--ui-text-3);
 }
 
@@ -2344,7 +2435,7 @@ body[data-layout-mode="article"] .caption-field {
   padding: 0 10px;
   border: 1px solid var(--ui-border);
   border-radius: 6px;
-  background: var(--ui-window);
+  background: var(--ui-control);
   color: var(--ui-text);
   font-size: 12px;
 }
@@ -2551,7 +2642,9 @@ body[data-layout-mode="article"] .caption-field {
   max-height: min(62%, 560px);
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-popover);
-  background: var(--ui-popover);
+  background: var(--ui-popover-glass);
+  -webkit-backdrop-filter: var(--ui-material);
+  backdrop-filter: var(--ui-material);
   box-shadow: var(--ui-popover-shadow);
   transform-origin: bottom left;
 }
@@ -2790,17 +2883,46 @@ button.check-jump:hover {
   align-items: center;
   min-width: 0;
   min-height: 0;
+  margin-bottom: var(--pane-gap);
   overflow: hidden;
-  background: var(--ui-stage);
+  border-radius: 0 var(--radius-panel) var(--radius-panel) 0;
+  /* 桌面：中间偏上亮一点，卡片像被一盏灯照着 */
+  background: radial-gradient(120% 70% at 50% 38%, var(--ui-highlight), transparent 70%) var(--ui-stage);
+  box-shadow: var(--ui-panel-shadow);
+  clip-path: inset(-40px -40px -40px 0);
 }
 
+/* 翻页：两个箭头和页码收在一枚浮着的胶囊里（上下各留 10 px，和原来一样占 52 px 高） */
 .stage-nav {
   display: flex;
   flex: none;
   align-items: center;
-  gap: 14px;
-  height: 52px;
+  gap: 4px;
+  height: 32px;
+  margin: 10px 0;
+  padding: 0 2px;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-control);
+  box-shadow: var(--ui-control-shadow);
   color: var(--ui-text-2);
+}
+
+.stage-nav > .round-button {
+  width: 26px;
+  height: 26px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.stage-nav > .round-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--ui-hover);
+}
+
+.stage-nav > .round-button:active:not(:disabled) {
+  background: var(--ui-pressed);
 }
 
 .stage-page-label {
@@ -2820,6 +2942,9 @@ button.check-jump:hover {
   scroll-snap-type: y mandatory;
   scrollbar-width: none;
   container-type: size;
+  /* 上下边缘淡出：卡片的投影伸到滚动区外面的那一截不会被齐齐切一刀，翻页时卡片也是淡着进出 */
+  -webkit-mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 10px), transparent);
+  mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 10px), transparent);
 }
 
 .stage-scroller::-webkit-scrollbar {
@@ -2918,7 +3043,8 @@ button.check-jump:hover {
   padding: 0;
   border: 1px solid var(--ui-border);
   border-radius: 50%;
-  background: var(--ui-window);
+  background: var(--ui-control);
+  box-shadow: var(--ui-control-shadow);
   color: var(--ui-text-2);
 }
 
@@ -2955,11 +3081,14 @@ button.check-jump:hover {
   gap: 10px;
   max-width: calc(100% - 32px);
   margin: 10px 0 18px;
-  padding: 8px 12px;
+  padding: 8px 10px;
   overflow-x: auto;
   border: 1px solid var(--ui-border);
-  border-radius: 12px;
-  background: var(--ui-glass);
+  border-radius: 14px;
+  background: var(--ui-popover-glass);
+  -webkit-backdrop-filter: var(--ui-material);
+  backdrop-filter: var(--ui-material);
+  box-shadow: var(--ui-control-shadow), 0 8px 24px rgba(0, 0, 0, 0.06);
   scroll-behavior: smooth;
   scrollbar-width: none;
 }
@@ -2980,14 +3109,16 @@ button.check-jump:hover {
   padding: 0;
   overflow: hidden;
   border: 0;
-  border-radius: 4px;
+  border-radius: 5px;
   background: var(--ui-window);
   box-shadow: 0 0 0 1px var(--ui-border);
   --press-scale: 0.95;
 }
 
+/* 悬停：缩略图浮起来一点（translate，不和按下的 scale 抢），投影跟着深 */
 .film-thumb:hover {
-  box-shadow: 0 0 0 1px var(--ui-text-3);
+  box-shadow: 0 0 0 1px var(--ui-border-hover), 0 4px 10px rgba(0, 0, 0, 0.14);
+  translate: 0 -2px;
 }
 
 .film-thumb[aria-current="true"] {
@@ -3002,8 +3133,8 @@ button.check-jump:hover {
   z-index: 2;
   width: var(--sel-width, 0);
   height: var(--sel-height, 0);
-  border-radius: 4px;
-  box-shadow: 0 0 0 2px var(--ui-accent);
+  border-radius: 5px;
+  box-shadow: 0 0 0 2px var(--ui-accent), 0 0 0 5px var(--ui-accent-tint);
   opacity: 0;
   pointer-events: none;
   translate: var(--sel-left, 0) var(--sel-top, 0);
@@ -3610,19 +3741,18 @@ body[data-layout-mode="article"] .stage-scroller {
 }
 
 /* ===== 检查器 ===== */
+/* 检查器直接坐在玻璃上（和稿件栏一样），控件是浮在上面的白 */
 .inspector {
   position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: var(--ui-window);
 }
 
 .inspector-head {
   flex: none;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--ui-border);
+  padding: 7px 14px 10px;
 }
 
 .inspector-panel {
@@ -3633,6 +3763,9 @@ body[data-layout-mode="article"] .stage-scroller {
   min-height: 0;
   padding: 16px 16px 24px;
   overflow-y: auto;
+  /* 内容滚到标签下面时淡出去，不用一道横线硬切 */
+  -webkit-mask-image: linear-gradient(transparent, #000 12px);
+  mask-image: linear-gradient(transparent, #000 12px);
   transition:
     opacity var(--motion-moderate) var(--ease-standard),
     translate var(--motion-moderate) var(--ease-decelerate);
@@ -3790,7 +3923,19 @@ body[data-layout-mode="article"] .card-only {
     linear-gradient(var(--thumb-text), var(--thumb-text)) 16% 13% / 52% 5% no-repeat,
     var(--thumb-bg);
   box-shadow: 0 0 0 1px var(--ui-border);
-  transition: box-shadow var(--motion-moderate) var(--ease-standard);
+  transition:
+    box-shadow var(--motion-moderate) var(--ease-standard),
+    scale var(--motion-moderate) var(--ease-spring);
+}
+
+/* 悬停：缩略图放大一点点、投影浮出来，像被拿起来看 */
+:is(.theme-option, .template-tile):hover:not(:disabled, :active) .theme-thumb {
+  box-shadow: 0 0 0 1px var(--ui-border-hover), 0 4px 12px rgba(0, 0, 0, 0.12);
+  scale: 1.03;
+}
+
+.theme-option[aria-pressed="true"]:hover:not(:active) .theme-thumb {
+  box-shadow: 0 0 0 2px var(--ui-accent), 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .theme-thumb canvas {
@@ -3852,9 +3997,10 @@ body[data-layout-mode="article"] .card-only {
   height: 32px;
   padding: 0 28px 0 10px;
   overflow: hidden;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-field-border);
   border-radius: var(--radius-control);
-  background: var(--ui-window);
+  background: var(--ui-control);
+  box-shadow: var(--ui-control-shadow);
   color: var(--ui-text);
   font-size: 13px;
   text-align: left;
@@ -3910,7 +4056,9 @@ body[data-layout-mode="article"] .card-only {
   overflow-y: auto;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-popover);
-  background: var(--ui-popover);
+  background: var(--ui-popover-glass);
+  -webkit-backdrop-filter: var(--ui-material);
+  backdrop-filter: var(--ui-material);
   box-shadow: var(--ui-popover-shadow);
   list-style: none;
 }
@@ -4019,15 +4167,16 @@ body[data-layout-mode="article"] .card-only {
   flex: none;
   align-items: center;
   height: 24px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-field-border);
   border-radius: 6px;
-  background: var(--ui-window);
+  background: var(--ui-control);
+  box-shadow: var(--ui-control-shadow);
   overflow: hidden;
 }
 
 .stepper:focus-within {
   border-color: var(--ui-accent);
-  box-shadow: 0 0 0 2px var(--ui-accent-tint);
+  box-shadow: 0 0 0 3px var(--ui-focus);
 }
 
 .stepper-button {
@@ -4203,7 +4352,7 @@ body[data-layout-mode="article"] .card-only {
   padding: 7px 2px 6px;
   border: 1px solid var(--ui-border);
   border-radius: 8px;
-  background: var(--ui-window);
+  background: var(--ui-control);
   cursor: pointer;
 }
 
@@ -5120,7 +5269,7 @@ body[data-layout-mode="article"] .card-only {
   height: 28px;
   min-width: 0;
   padding: 0 10px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-field-border);
   border-radius: var(--radius-control);
   background: var(--ui-layer);
   color: var(--ui-text);
@@ -5288,7 +5437,9 @@ body[data-layout-mode="article"] .card-only {
   padding: 12px;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-popover);
-  background: var(--ui-popover);
+  background: var(--ui-popover-glass);
+  -webkit-backdrop-filter: var(--ui-material);
+  backdrop-filter: var(--ui-material);
   box-shadow: var(--ui-popover-shadow);
   transform-origin: bottom right;
   transition:
@@ -6476,7 +6627,9 @@ button.ai-skill-tag:hover { background: var(--ui-hover); }
   padding: 4px;
   border: 1px solid var(--ui-border);
   border-radius: 11px;
-  background: var(--ui-popover);
+  background: var(--ui-popover-glass);
+  -webkit-backdrop-filter: var(--ui-material);
+  backdrop-filter: var(--ui-material);
   box-shadow: var(--ui-popover-shadow);
   color: var(--ui-text);
 }
@@ -6594,7 +6747,9 @@ button.ai-skill-tag:hover { background: var(--ui-hover); }
   padding: 12px 12px 12px 14px;
   border: 1px solid var(--ui-border);
   border-radius: 12px;
-  background: var(--ui-popover);
+  background: var(--ui-popover-glass);
+  -webkit-backdrop-filter: var(--ui-material);
+  backdrop-filter: var(--ui-material);
   box-shadow: var(--ui-popover-shadow);
   transition:
     opacity var(--motion-quick) var(--ease-standard),
@@ -6802,10 +6957,12 @@ button.ai-skill-tag:hover { background: var(--ui-hover); }
   padding: 20px;
   overflow: auto;
   border: 1px solid var(--ui-border);
-  border-radius: 14px;
+  border-radius: var(--radius-dialog);
   background: var(--ui-popover);
   box-shadow: var(--ui-dialog-shadow);
   color: var(--ui-text);
+  /* 坐在对话框里的一层比它暗一点 */
+  --ui-layer: var(--ui-fill);
 }
 
 .dialog-small {
@@ -6910,16 +7067,21 @@ button.ai-skill-tag:hover { background: var(--ui-hover); }
   margin-top: 6px;
 }
 
+/* 删除这类确认：主按钮换成警示色，字的颜色和强调色按钮上的一样（深色皮肤里警示色是浅的，白字看不清） */
 #confirmOk.is-danger {
-  background: var(--ui-danger);
-  color: #ffffff;
+  --button-color: var(--ui-danger);
 }
 
 /* ===== 窄窗口：顶栏按钮只留图标（名字仍给读屏） ===== */
 /* 编辑区窄（38vw 放不下一整行格式条）：去掉分隔线、「插入」只留加号，尽量还是一行；再窄就折成两行 */
 @media (max-width: 1240px) {
+  /* 内容面板四周那一圈玻璃收窄一点，格式条两边少留一点：编辑区让出去的宽度在这里找回来 */
+  .workspace {
+    --pane-gap: 6px;
+  }
+
   .format-bar {
-    padding-inline: 10px;
+    padding-inline: 7px;
   }
 
   .format-bar > .bar-separator {
@@ -7022,7 +7184,7 @@ body[data-layout-mode="article"] :is(#phoneButton, #aiButton) > span {
   overflow: hidden;
   border: 0;
   border-radius: 6px;
-  background: var(--ui-window);
+  background: var(--ui-control);
   box-shadow: 0 0 0 1px var(--ui-border);
   color: var(--ui-text-3);
   font-size: 11px;
@@ -7339,9 +7501,9 @@ body[data-layout-mode="article"] :is(#phoneButton, #aiButton) > span {
 .save-template-field > select {
   height: 30px;
   padding: 0 8px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-field-border);
   border-radius: var(--radius-control);
-  background: var(--ui-window);
+  background: var(--ui-control);
   color: var(--ui-text);
   font-size: 13px;
 }
@@ -7376,7 +7538,9 @@ body[data-layout-mode="article"] :is(#phoneButton, #aiButton) > span {
   padding: 8px 8px 8px 14px;
   border: 1px solid var(--ui-border);
   border-radius: 12px;
-  background: var(--ui-popover);
+  background: var(--ui-popover-glass);
+  -webkit-backdrop-filter: var(--ui-material);
+  backdrop-filter: var(--ui-material);
   box-shadow: var(--ui-dialog-shadow);
   color: var(--ui-text-2);
   font-size: 12px;
@@ -7449,9 +7613,10 @@ body[data-layout-mode="article"] :is(#phoneButton, #aiButton) > span {
   width: 100%;
   min-height: 120px;
   padding: 8px 10px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-field-border);
   border-radius: 8px;
-  background: var(--ui-field, transparent);
+  background: var(--ui-control);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.04);
   color: var(--ui-text);
   font-family: "MC JetBrains Mono", ui-monospace, monospace;
   font-size: 12px;
@@ -7476,9 +7641,10 @@ body[data-layout-mode="article"] :is(#phoneButton, #aiButton) > span {
   width: 100%;
   height: 32px;
   padding: 0 28px 0 10px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-field-border);
   border-radius: var(--radius-control);
-  background: var(--ui-window);
+  background: var(--ui-control);
+  box-shadow: var(--ui-control-shadow);
   color: var(--ui-text);
   font: 13px var(--font-ui);
   text-overflow: ellipsis;

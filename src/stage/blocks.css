@@ -78,7 +78,9 @@
   padding: 4px;
   border: 1px solid var(--ui-border);
   border-radius: 10px;
-  background: var(--ui-popover);
+  background: var(--ui-popover-glass);
+  -webkit-backdrop-filter: var(--ui-material);
+  backdrop-filter: var(--ui-material);
   box-shadow: var(--ui-popover-shadow);
   transform: translateX(-50%);
   transform-origin: 50% 0;
@@ -196,7 +198,9 @@
   padding: 10px;
   border: 1px solid var(--ui-border);
   border-radius: 12px;
-  background: var(--ui-popover);
+  background: var(--ui-popover-glass);
+  -webkit-backdrop-filter: var(--ui-material);
+  backdrop-filter: var(--ui-material);
   box-shadow: var(--ui-popover-shadow);
   transform-origin: 0 0;
   transition:
@@ -246,7 +250,9 @@
   padding: 6px 6px 6px 14px;
   border: 1px solid var(--ui-border);
   border-radius: 999px;
-  background: var(--ui-popover);
+  background: var(--ui-popover-glass);
+  -webkit-backdrop-filter: var(--ui-material);
+  backdrop-filter: var(--ui-material);
   box-shadow: var(--ui-popover-shadow);
   transition:
     opacity var(--motion-quick) var(--ease-standard),

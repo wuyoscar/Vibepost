@@ -175,7 +175,7 @@ async function createWindow({
     show: false,
     title: "Vibepost",
     icon: path.join(assets, "icon.ico"),
-    backgroundColor: "#f6f5f1",
+    backgroundColor: "#ececf0",
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
