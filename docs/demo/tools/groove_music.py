@@ -6,7 +6,8 @@ D major, one chord a bar (D - A/C# - Bm7 - G, later G - D/F# - Em7 - A). A marim
 plays a syncopated line, a pad sits behind and ducks on every kick; kick on every beat, a soft clap on 2 and 4, hats off the beat.
 The arrangement follows the film (beats given in the last argument): a sparse opening with single notes on beats 2, 3, 4, the
 groove from "reveal", no drums during "wipe", a lighter groove under "terminal", everything from "payoff", three chord stabs at
-"claim", one held chord at "end". Bars are counted so that "reveal" falls on a downbeat. Stereo, 44.1 kHz, 16-bit, peak -3 dBFS.
+"claim" (or at each beat in "claims"), one held chord at "end"; "words" moves the three opening notes, "hits" adds a bright
+note where the card on screen visibly changes. Bars are counted so that "reveal" falls on a downbeat. Stereo, 44.1 kHz, 16-bit, peak -3 dBFS.
 """
 import json
 import sys
@@ -31,6 +32,9 @@ terminal = marks.get("terminal", beats_total * 0.72)
 payoff = marks.get("payoff", beats_total * 0.81)
 claim = marks.get("claim", beats_total * 0.9)
 end = marks.get("end", beats_total * 0.95)
+words = marks.get("words", [2, 3, 4])                            # the three opening words
+claims = marks.get("claims", [claim + 0.6 + index for index in range(3)])  # the three closing lines
+hits = marks.get("hits", [])                                     # moments the card visibly changes: one bright note each
 
 
 def hz(midi):
@@ -190,7 +194,7 @@ while offset + bar * 4 < beats_total:
 for note in (62, 66, 69, 74):
     put(plucks, 0, pluck(note, 1.4), 0.20)
     put(wet, 0, pluck(note, 1.4), 0.16)
-for position, note in ((2, 78), (3, 81), (4, 86), (8, 71), (8, 78), (10, 74), (11, 76)):
+for position, note in (*zip(words, (78, 81, 86)), (8, 71), (8, 78), (10, 74), (11, 76)):
     if position < reveal:
         put(plucks, position, pluck(note, 1.2), 0.36, 0.2 if note % 2 else -0.2)
         put(wet, position, pluck(note, 1.2), 0.24)
@@ -203,9 +207,15 @@ for mark in (reveal, hands, payoff, end):
     put(drums, mark, impact(), 0.30)
     put(wet, mark, impact(), 0.20)
 
+# 卡片变样的那一下：高处两个音
+for position in hits:
+    for note, gain in ((90, 0.20), (93, 0.13)):
+        put(plucks, position, pluck(note, 0.9), gain)
+        put(wet, position, pluck(note, 0.9), gain * 0.8)
+
 # 结尾：三句各一个和弦，最后一个长和弦
 for index, (root, _, arp) in enumerate((A[0], A[3], B[3])):
-    position = claim + 0.6 + index
+    position = claims[index]
     for note in arp:
         put(plucks, position, pluck(note, 1.0), 0.11)
         put(wet, position, pluck(note, 1.0), 0.08)

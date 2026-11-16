@@ -19,7 +19,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageChops, ImageStat
 
 from filmkit import FPS, FULL, PAGE_W, PLAY, Film, frame
 
@@ -32,27 +32,36 @@ PARTIAL = "--partial" in sys.argv
 BEAT = 60 / 96
 
 
-# 分镜里的拍号是初稿的，后来有的镜头加长、有的是插进来的：每一段（拍号 起, 止）排在片子里从第几拍起。
+# 分镜里的拍号是初稿的，后来有的镜头压短、有的是插进来的：每一段（拍号 起, 止）排在片子里从第几拍起、占几拍。
+# 段里的拍号按比例落进去；光标走多久、弹簧多快这些按秒写的不跟着变，所以压短的是停着不动的时间。
 # 排的时候按 96 BPM、一秒 24 帧算，放的时候一秒 30 帧，所以成片是 120 BPM（见 filmkit 的 FPS / PLAY）。
 SEGMENTS = [
-    (0, 12, 0),       # 开头
-    (12, 16, 14),     # 亮名字（前一句说明多留两拍）
-    (16, 48, 20),     # 说一句、Agent 动手、你点头
-    (400, 415, 52),   # 配图：三张各五拍，落下以后在那一页上停住
-    (60, 66, 67),     # 之前 / 现在
-    (300, 310, 73),   # 自己动手调
-    (66, 131, 83),    # 卡片样式、写作手册、终端、发到手机、片尾
+    (0, 8, 0, 6),         # 开头
+    (8, 12, 6, 2),        # 窗口摆正
+    (12, 16, 8, 4),       # 亮名字
+    (16, 26, 12, 6),      # 说一句
+    (26, 40, 18, 12),     # Agent 动手
+    (40, 48, 30, 6),      # 你点头
+    (400, 415, 36, 12),   # 配图：三张各四拍，落下以后在那一页上停住
+    (60, 66, 48, 6),      # 之前 / 现在
+    (300, 310, 54, 8),    # 自己动手调
+    (66, 80, 62, 11),     # 卡片样式
+    (80, 88, 73, 6),      # 写作手册
+    (88, 102, 79, 12),    # 终端
+    (102, 116, 91, 10),   # 发到手机
+    (116, 122, 101, 5),   # 三句话
+    (122, 130, 106, 7),   # 片尾
 ]
 
 
 def at(beats):
     """第几拍 → 秒（取到整帧）。正好落在一段末尾的拍号，算那一段的结尾。"""
-    for first, last, start in SEGMENTS:
+    for first, last, start, span in SEGMENTS:
         if first <= beats < last:
             break
     else:
-        first, last, start = next(segment for segment in SEGMENTS if beats == segment[1])
-    return round((start + beats - first) * BEAT * FPS) / FPS
+        first, last, start, span = next(segment for segment in SEGMENTS if beats == segment[1])
+    return round((start + (beats - first) / (last - first) * span) * BEAT * FPS) / FPS
 
 
 class Take:
@@ -247,6 +256,61 @@ def click_frames(t, pane, take, chapter, step, travel=0.55):
     return before, after
 
 
+flashes = []  # (面板, 时刻)：录屏里那一块真变了样的那一下，面板描边亮一下
+hits = []     # 这些时刻配乐上加一个音
+differences = {}
+
+
+def differs(take, before, now, name):
+    """两帧里那一块差多少（0–255 的平均差）。"""
+    key = (take.name, before, now, name)
+    if key not in differences:
+        box = take.near(now, name) or FULL
+        crops = []
+        for index in (before, now):
+            image = Image.open(take.dir / take.frames[index]["file"]).convert("RGB")
+            scale = image.width / PAGE_W
+            crops.append(image.crop(tuple(round(value * scale) for value in (box[0], box[1], box[0] + box[2], box[1] + box[3]))).resize((160, 160)))
+        differences[key] = sum(ImageStat.Stat(ImageChops.difference(*crops)).mean) / 3
+    return differences[key]
+
+
+def changes(t0, t1, name="stage", limit=1.0, gap=0.45):
+    """t0–t1 之间，画面上那一块真变了样的时刻（照已经排好的每一帧找）。"""
+    moments = []
+    for position in range(frame(t0) + 1, min(frame(t1) + 1, film.count)):
+        (take, now), (other, before) = screen[position], screen[position - 1]
+        if take is other and now != before and (not moments or position / FPS - moments[-1] >= gap) and differs(take, before, now, name) > limit:
+            moments.append(position / FPS)
+    return moments
+
+
+def flash(pane, moments, sound=True):
+    for moment in moments:
+        flashes.append((pane, moment))
+        if sound:
+            hits.append(moment)
+
+
+def width(words, size):
+    return sum(size if ord(char) > 0x2E7F else size * 0.56 for char in words)
+
+
+TICK = '<svg viewBox="0 0 24 24"><path d="M5 12.6l4.6 4.6L19 7.4"/></svg>'
+
+
+def checklist(beat, until, label, items):
+    """说明那一行换成一排要做的事：先是灰的，真做到的那一刻打勾、变黑。items: [(时刻, 字)]"""
+    start, end = at(beat), at(until) - 0.3
+    film.text(label, 128, 1022, "cap lead", ay=0.5).rise(start).out(end)
+    x = 128 + width(label, 44) + 44
+    for moment, words in items:
+        ghost = film.node(TICK + words, x, 1022, cls="todo", ay=0.5, z=30)
+        ghost.rise(start).o.set(moment, 0)
+        film.text(TICK + words, x, 1022, "done", ay=0.5).stamp(moment).out(end)
+        x += 40 + 12 + width(words, 44) + 46
+
+
 sections = []
 
 
@@ -264,37 +328,33 @@ def hook():
     film.text("写完了。", 110, 84, "h1").show(0).out(at(8) - 0.12, dx=-90, dy=0)
     x = 110
     for index, words in enumerate(["还要排版、", "配图、", "分页。"]):
-        film.text(words, x, 236, "h2").stamp(at(2 + index)).out(at(8) - 0.12 + 0.03 * (index + 1), dx=-90, dy=0)
+        film.text(words, x, 236, "h2").stamp(at(4 / 3 * (index + 1))).out(at(8) - 0.12 + 0.03 * (index + 1), dx=-90, dy=0)
         x += 96 * len(words)
     collab.crop(raw, collab.near(raw, "page"), "before.jpg")
 
 
-# ===== 8–12 拍：没排过的样子 =====
+# ===== 8–12 拍：窗口摆正，亮名字 =====
 @section
 def tension():
     A.place(at(8), WORK, 0.75, r=18, ry=0, rx=0)
     A.look(at(8), FULL)
-    A.look(at(8.8), region("page", pad=36), zmax=1.55)
-    caption(8.2, "没排过版的样子：一整页的字。", 12)
+    caption(8.4, 'Vibepost：你写字，<span class="ul">Agent</span> 排版。', 17.6).cls += " brand"
     cursor.go(at(9.6), None, (2040, 1180), 0.01)
     cursor.show(at(9.7))
-    click_frames(at(11), A, collab, "hook", "next", travel=0.8)
 
 
-# ===== 12–16 拍：Vibepost，你写字，Agent 排版 =====
+# ===== 12–16 拍：点开 AI 助手 =====
 @section
 def reveal():
-    A.look(at(12), FULL)
-    caption(12.2, 'Vibepost：你写字，<span class="ul">Agent</span> 排版。', 16).cls += " brand"
-    click_frames(at(14), A, collab, "ask", "open", travel=0.7)
+    click_frames(at(13.4), A, collab, "ask", "open", travel=0.7)
     # 从这里起分成两块：左边是你的卡片，右边是和 Agent 的对话
-    split(14.6, FULL, 9.0, region("page", pad=30), composer_view)
+    split(14.2, FULL, 9.0, region("page", pad=30), composer_view)
 
 
 # ===== 16–26 拍：说一句 =====
 @section
 def ask():
-    caption(16.2, "说一句你要什么。", 26)
+    caption(17.7, "说一句你要什么。", 26)
     run(at(16), at(21), collab, collab.find("ask", "type"))
     show(at(21), collab, collab.one("ask", "typed"))
     click_frames(at(23), B, collab, "ask", "send")
@@ -304,10 +364,26 @@ def ask():
 # ===== 26–40 拍：Agent 动手 =====
 @section
 def work():
-    real = run(at(26.4), at(37), collab, collab.find("work", "wait"))
-    show(at(37), collab, collab.one("work", "done"))
-    caption(26.3, "Agent 换主题、分页、套组件，还生成了配图。", 40)
-    fast(26.4, 37, real)
+    """这一段是片子的正事：卡片真变样的那几下各占一个拍点，镜头推近、描边亮一下、下面那一排打一个勾。
+    哪一下是什么（换主题和分页、套组件、出配图）是照这一次录到的内容标的，重录以后要对着帧再看一遍。"""
+    waits = collab.find("work", "wait")
+    turns = [index for order, index in enumerate(waits) if order and differs(collab, waits[order - 1], index, "stage") > 1.0]
+    first, second = turns[0], turns[1]
+    drawn = next(index for index in waits if collab.rect(index, "candidate"))  # 第一张配图候选出来
+    t1, t2, t3, done = at(28.4), at(30.4), at(33.2), at(37.2)
+    run(at(26.2), t1, collab, [index for index in waits if index < first])
+    run(t1, t2, collab, [index for index in waits if first <= index < second])
+    run(t2, t3, collab, [index for index in waits if second <= index < drawn])
+    run(t3, done, collab, [index for index in waits if index >= drawn])
+    show(done, collab, collab.one("work", "done"))
+    real = collab.frames[waits[-1]]["at"] + collab.frames[waits[-1]]["hold"] - collab.frames[waits[0]]["at"]
+    for moment, pad in ((t1, 0), (t2, 10)):  # 变样的那一下镜头推近一点，再回来
+        A.look(moment, region("page", pad=pad), zmax=2.0)
+        A.look(moment + 0.6, region("page", pad=30), zmax=1.7)
+    flash(A, [t1, t2])
+    flash(B, [t3])
+    checklist(26.3, 40, "Agent 动手：", [(t1, "换主题"), (t1 + 0.25, "分页"), (t2, "套组件"), (t3, "生成配图")])
+    fast(26.2, 37.2, real)
 
 
 # ===== 40–48 拍：你点头 =====
@@ -315,8 +391,7 @@ def work():
 def review():
     show(at(40), collab, collab.one("review", "marks"))
     A.look(at(40), EDITOR, zmax=2.0)  # 修改对比的那一条在编辑器顶上，逐处的标注在正文里
-    caption(40.0, "改了哪里，逐处标给你看。", 44.5)
-    caption(44.6, "你点头，才算数。", 48)
+    caption(40.0, "改动逐处标出，你点头才算数。", 48)
     click_frames(at(45.5), "auto", collab, "review", "accept", travel=0.7)
 
 
@@ -379,11 +454,12 @@ def hands():
 def style():
     show(at(66), collab, collab.one("style", "ask"))
     B.look(at(66), composer_view, zmax=2.7)
-    caption(66.3, "还不够？让它给这篇写一套卡片样式。", 76)
+    caption(66.3, "还不够？让它给这篇写一套卡片样式。", 75.2)
     click_frames(at(68.5), B, collab, "style", "send")
     B.look(at(68.8), thread_view, zmax=2.7)
     real = run(at(69), at(73.6), collab, collab.find("style", "wait"))
     fast(69, 73.6, real)
+    flash(A, changes(at(69), at(73.6)))
     if collab.find("style", "accept"):
         show(at(73.6), collab, collab.one("style", "marks"))
         A.look(at(73.6), EDITOR, zmax=2.0)
@@ -391,7 +467,7 @@ def style():
     A.look(at(75.4), region("stage", pad=-6), zmax=1.6)
     B.look(at(75.6), thread_view, zmax=2.7)
     show(at(76), collab, collab.one("style", "first"))
-    caption(76.2, "新样式下的每一页。", 80)
+    caption(75.3, "新样式下的每一页。", 80)
     flips = sorted({entry["step"] for entry in collab.frames if entry["chapter"] == "style" and entry.get("step", "").startswith("flip-")})
     for order, step in enumerate(flips[:3]):
         click_frames(at(77 + order), A, collab, "style", step, travel=0.5 if order == 0 else 0.2)
@@ -405,7 +481,7 @@ def manual():
     view = (spot[0] - 400, spot[1] - 300, 760, 427.5)
     merge(80, view, 2.3)
     show(at(80), collab, menu)
-    caption(80.3, "把这篇的写法存成写作手册，下次照着写。", 88)
+    caption(80.3, "写法存成写作手册，下次照着写。", 88)
     click_frames(at(82), A, collab, "manual", "pick", travel=0.7)
     waits = collab.find("manual", "wait")
     asked = [index for index in waits if collab.rect(index, "confirm")]
@@ -429,7 +505,8 @@ def terminal():
     if not agent:
         raise IndexError("没有 agent 这一段")
     frames = agent.find("agent", "before") + agent.find("agent", "window")
-    leave, enter = at(88), at(88.9)
+    leave = at(88)
+    enter = max(at(88.9), leave + 0.5)
     cursor.hide(leave - 0.1)
     cursor.go(leave + 0.3, None, (2040, 1180), 0.01)
     if B.o.at(leave) > 0:  # 前一段没并回一块时（素材不全）：右边那块直接收掉
@@ -443,6 +520,7 @@ def terminal():
     real = run(at(90), at(98), agent, frames)
     show(at(98), agent, agent.one("agent", "done"))
     fast(90, 98, real)
+    flash(A, changes(at(90), at(98) + 0.1, limit=2.0, gap=0.6))
     flips = sorted({entry["step"] for entry in agent.frames if entry.get("step", "").startswith("flip-")})
     if flips:
         cursor.go(at(98.2), None, (1500, 1180), 0.01)
@@ -463,13 +541,14 @@ def payoff():
     show(leave + 0.42, collab, collab.one("send", "first"))
     stage = (-250, 130, 1480, 832.5)  # 窗口左边出画：卡片和「发送到 iPhone」都在画面里
     A.place(leave + 0.42, (-1800, stage[1], stage[2], stage[3])).look(leave + 0.42, FULL, snap=True)
-    A.place(at(102.4), x=stage[0], duration=0.6, ease="expo")
+    rise = max(at(102.4), leave + 0.5)
+    A.place(rise, x=stage[0], duration=0.6, ease="expo")
     caption(102.6, "发送到 iPhone：卡片按页序隔空投送过去。", 116)
     cursor.go(at(103), None, (700, 1160), 0.01)
     cursor.show(at(103.1))
     click_frames(at(104.5), A, collab, "send", "send", travel=0.8)
     cursor.hide(at(105.6))
-    return at(102.4), at(105)
+    return rise, at(105)
 
 
 # ===== 116–130 拍：你写字。Agent 排版。你点头。 =====
@@ -478,7 +557,7 @@ def claim():
     A.place(at(116), x=-1800, duration=0.45, ease="in")
     A.place(at(117), o=0)
     for index, words in enumerate(["你写字。", 'Agent 排版。', "你点头。"]):
-        film.text(words, 150, 236 + index * 168, "h1").stamp(at(116.6 + index)).out(at(122) - 0.1 + 0.03 * index, dx=-90, dy=0)
+        film.text(words, 150, 236 + index * 168, "h1").stamp(at(116.6 + 1.2 * index)).out(at(122) - 0.1 + 0.03 * index, dx=-90, dy=0)
 
 
 built = {}
@@ -495,6 +574,16 @@ A.solve()
 B.solve()
 
 
+# 描边亮一下：跟着面板的位置和大小
+for pane in (A, B):
+    moments = sorted(moment for owner, moment in flashes if owner is pane)
+    if moments:
+        ring = film.node("", cls="glow", z=pane.z + 2, extra=(("w", 10), ("h", 10)))
+        ring.x.v, ring.y.v, ring.extra["w"].v, ring.extra["h"].v = pane.x.v[:], pane.y.v[:], pane.w.v[:], pane.h.v[:]
+        for moment in moments:
+            ring.o.set(moment, 1).to(moment + 0.12, 0.75, 0, "out")
+
+
 def on(pane, box):
     """页面上的一块，在某一帧落在画面上的位置（给飞的东西当起点、终点）。"""
     return lambda index: pane.box_to_film(index, box)
@@ -507,6 +596,12 @@ style_css = """
 .cap.brand { font-weight: 700; font-size: 50px; }
 .ul { box-shadow: inset 0 -.13em 0 var(--accent); }
 .fast { font: 500 30px/1.2 var(--sans); color: var(--muted); }
+.cap.lead { font-weight: 700; }
+.todo, .done { display: flex; align-items: center; gap: 12px; font: 500 44px/1.2 var(--sans); }
+.todo { color: #b4b6be; }
+.todo svg, .done svg { width: 40px; height: 40px; fill: none; stroke: #c9cbd2; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
+.done svg { stroke: var(--accent); }
+.glow { border-radius: 18px; box-shadow: 0 0 0 6px var(--accent), 0 0 70px 6px rgba(255, 79, 31, .55); }
 .shot { border-radius: 12px; overflow: hidden; box-shadow: 0 18px 44px rgba(0, 0, 0, .28); }
 .shot img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .flat { overflow: hidden; }
@@ -671,8 +766,9 @@ if "payoff" in built:
     slot = lambda index: (phone.x.v[index] - 220 + 13 + 19, phone.y.v[index] - 450 + 13 + 84, 376, 501)
     page = collab.near(collab.one("send", "send"), "page")
     step = 395  # 一张卡片加间距
+    GAP = 1.1 * BEAT  # 两张卡片先后隔多久
     for order, name in enumerate(names):
-        leave = sent + at(1.5) * order
+        leave = sent + GAP * order
         landing = leave + 0.6
         card = film.node(f'<img src="{name}" alt="">', cls="card", z=21, extra=(("w", 10), ("h", 10)))
         card.o.set(leave, 1)
@@ -683,9 +779,9 @@ if "payoff" in built:
         if order:
             phone.extra["strip"].to(landing - 0.4, 0.4, order * step, "inout")
         film.clicks.append(landing)
-    last = sent + at(1.5) * (len(names) - 1) + 0.6
+    last = sent + GAP * (len(names) - 1) + 0.6
     if len(names) > 2:  # 回到带图的那一页停住
-        phone.extra["strip"].to(last + at(1.5), 0.6, step, "inout")
+        phone.extra["strip"].to(last + GAP, 0.6, step, "inout")
     extra.append("""
   const phone = items.find((item) => item.id === "phone");
   if (phone) {
@@ -741,6 +837,8 @@ beats = lambda moment: round(moment / BEAT, 2)
 cues = json.loads((HERE / "cues.json").read_text())
 cues["bpm"] = round(60 / BEAT * PLAY / FPS)
 cues["marks"] = {"reveal": beats(at(12)), "ask": beats(at(16)), "photos": beats(at(400)), "wipe": beats(at(60)), "hands": beats(at(300)),
-                 "style": beats(at(66.01)), "terminal": beats(at(88)), "payoff": beats(at(102)), "claim": beats(at(116)), "end": beats(at(122))}
+                 "style": beats(at(66.01)), "terminal": beats(at(88)), "payoff": beats(at(102)), "claim": beats(at(116)), "end": beats(at(122)),
+                 "words": [beats(at(4 / 3 * order)) for order in (1, 2, 3)], "claims": [beats(at(116.6 + 1.2 * order)) for order in (0, 1, 2)],
+                 "hits": sorted(beats(moment) for moment in hits)}
 (HERE / "cues.json").write_text(json.dumps(cues, ensure_ascii=False))
 print(f"{film.length:.2f} 秒，{len(listing)} 段画面，{len(film.clicks)} 次点击；镜头：", ", ".join(built))
