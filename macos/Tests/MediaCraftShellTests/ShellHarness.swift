@@ -137,8 +137,11 @@ final class ShellHarness: NSObject {
     /// 新环境的新手引导这时已经弹出）。测试自己的网页根目录里没有 App API，载入完就算。
     func load() async throws {
         if onboardingPending { try await prepareStorage("") }
-        // 重新载入前先放掉页面上的视频：程序发起的载入不给页面反应的机会，载到一半的视频会被打断报错（用户不会重新载入 App）
+        // 已经有页面时这是「关掉 App 再打开」：真 App 换掉页面之前（退出、关窗、⌘R）都先让它把稿子存完，这里也一样。
+        // 不然刚做的改动可能正写到一半，载入一来事务就废了，重新打开读到的是上一次存下的样子
+        // 再放掉页面上的视频：程序发起的载入不给页面反应的机会，载到一半的视频会被打断报错（用户不会重新载入 App）
         if webView.url != nil {
+            await shell.saveDrafts()
             _ = try? await evaluate("document.querySelectorAll('video').forEach((video) => { video.removeAttribute('src'); video.load(); });")
         }
         try await shell.loadEntry()
