@@ -1,6 +1,6 @@
 import Foundation
 
-/// AI 后端：本机的哪个命令行 Agent、每一轮怎么起（参数、环境变量、开头写进 stdin 的几行）、读到哪一行算这一轮说完。
+/// AI 后端：本机的哪个命令行 Agent（Claude Code、Codex 在这个文件里，说 ACP 的几个在 ACPBackend.swift）、每一轮怎么起（参数、环境变量、开头写进 stdin 的几行）、读到哪一行算这一轮说完。
 /// 输出行的意思由页面里对应的适配器解读（src/ai/backends/），回答也由它写好、经 `ai/respond` 写回 stdin——
 /// 只写这个后端认得的几种，要紧的设置（Codex 线程的沙箱与审批）由壳定；壳（AISessions）起进程、转发输出、说完时收尾。
 protocol AIBackend: Sendable {
@@ -21,6 +21,10 @@ protocol AIBackend: Sendable {
     func outgoing(_ message: [String: Any], directory: URL, context: TurnContext) -> [String: Any]?
     /// 这一行里后端自己生成的图（如 Codex 自带的生图）；没有时为 nil
     func generatedImages(in line: [String: Any]) -> GeneratedImages?
+    /// 推给页面之前把这一行削薄（去掉页面用不上的大块内容）；原样推时为 nil
+    func slim(_ line: [String: Any]) -> [String: Any]?
+    /// App 的工具要不要经一个这一轮的 MCP 服务挂给它（见 AIToolServer；Claude Code、Codex 各有自己的通道，不用）
+    var mountsTools: Bool { get }
 }
 
 /// 一轮里壳自己记着的几样（读输出与写 stdin 在不同线程上，加锁）
@@ -37,6 +41,8 @@ final class TurnContext: @unchecked Sendable {
 extension AIBackend {
     func validate(_ request: AISessions.TurnRequest) throws {}
     func generatedImages(in line: [String: Any]) -> GeneratedImages? { nil }
+    func slim(_ line: [String: Any]) -> [String: Any]? { nil }
+    var mountsTools: Bool { false }
 }
 
 /// 后端自己生成的图：壳读到时直接存成这篇的配图候选（是后端自己画的，不用再问用户；原图不动），
@@ -268,12 +274,13 @@ struct CodexBackend: AIBackend {
 enum JSONLineExchange {
     static func run(
         _ executable: URL, _ arguments: [String], environment: [String: String], input: Data, timeout: Duration,
-        until: @escaping @Sendable ([String: Any]) -> Bool
+        directory: URL? = nil, until: @escaping @Sendable ([String: Any]) -> Bool
     ) async throws -> [String: Any] {
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
         process.environment = environment
+        if let directory { process.currentDirectoryURL = directory }
         let stdin = Pipe()
         let stdout = Pipe()
         process.standardInput = stdin

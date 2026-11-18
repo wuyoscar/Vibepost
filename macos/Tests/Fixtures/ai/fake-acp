@@ -1,0 +1,329 @@
+#!/usr/bin/env python3
+"""假的 ACP Agent：测试时代替本机的 OpenCode / Oh My Pi / Kimi Code（见 AIACPTests.swift）。
+
+测试把它复制进一个临时目录（名字叫 opencode、omp 或 kimi），同目录里放回放脚本：
+  script-<第几次调用>.jsonl，没有时用 script.jsonl。
+  `<程序> --version`：打印版本。
+  `<程序> acp`：在 stdio 上说 ACP（JSON-RPC，每行一条）：
+    initialize → 回答能力（loadSession，以及 session/resume；同目录有 no-resume 文件时不报 resume）与登录办法；
+    session/new → 新建一个会话（UUID），回答 { sessionId, configOptions }；同目录有 logged-out 文件时报 Authentication required；
+    session/resume → 同目录 sessions/ 里有这个会话才回答，没有就报错；同目录有 resume-error 文件时照它的内容报错；
+    session/load → 和 resume 一样，但先把「历史」重放一遍（一条 agent_message_chunk）；
+    session/set_config_option → 换模型（model）或推理强度（effort），记在会话里，回答新的 configOptions；值不在选单里报错；
+    session/prompt → 回放脚本，放完回答 { stopReason: "end_turn" }；
+    session/cancel（通知）→ 这一轮回答 { stopReason: "cancelled" }；
+  读到 EOF（App 关上 stdin）才退出。
+环境变量 OPENCODE_CONFIG_CONTENT（App 里填的接口，壳起 OpenCode 时带上）里自己写了模型的服务商，模型也列进选单（<服务商>/<模型>）。
+续会话或发这一轮的进程算一次调用（序号从 1 起；只开了会话就关上的是在问模型，不算），在 calls/<序号>.json 里记下参数、工作目录、
+进程号、几个环境变量、开始时的 draft.md / title.txt / caption.txt、stdin 收到的每一行、页面对它的请求的回答（responses，按请求 id）、
+收到的信号，以及 stdin 有没有被关上。
+
+脚本一行一个要发的 JSON（通知，原样发出；{{SESSION}}、{{CWD}} 换成会话 id、工作目录）；以 # 开头的是动作：
+  #sleep 秒数
+  #write ["文件", "内容"]          在工作目录里写文件（像它自己改文件）
+  #request {"id": …, "method": …, "params": {…}}   发一个请求（权限……），等到它的回答再往下走
+  #hang                            一直不结束，等着被停止
+  #mcp {"id": …, "method": …}      经挂上的 MCP 服务（App 的工具，session/new 的 mcpServers[0]）发一条 MCP 消息：像真的 Agent 一样
+                                   把它当 stdio 程序启动（一轮里只起一次），有 id 的等到回答、记进 mcp，再往下走
+  #stderr "文字"                   往 stderr 写一行
+  #stderr-env "变量名"             往 stderr 写这个环境变量的值（像出错信息里带出了密钥）
+  #error {"code": …, "message": …} 这一轮以出错结束（session/prompt 回答 error）
+  #stop "max_tokens"               这一轮以这个 stopReason 结束
+  #exit 退出码                     马上退出
+"""
+import json
+import os
+import signal
+import subprocess
+import sys
+import threading
+import time
+import uuid
+
+HERE = os.path.dirname(os.path.abspath(sys.argv[0]))
+NAME = os.path.basename(sys.argv[0])
+ARGS = sys.argv[1:]
+
+if "--version" in ARGS:
+    print("9.9.9")
+    sys.exit(0)
+if ARGS[:1] != ["acp"]:
+    print(f"fake {NAME}: 不认识的用法 {ARGS}", file=sys.stderr)
+    sys.exit(2)
+
+
+def read_file(name):
+    try:
+        with open(name, encoding="utf-8") as handle:
+            return handle.read()
+    except OSError:
+        return None
+
+
+calls = os.path.join(HERE, "calls")
+sessions = os.path.join(HERE, "sessions")
+os.makedirs(calls, exist_ok=True)
+os.makedirs(sessions, exist_ok=True)
+index = None  # 续会话或发这一轮时才登记这次调用（begin）
+
+record = {
+    "argv": ARGS,
+    "cwd": os.getcwd(),
+    "pid": os.getpid(),
+    "env": {key: value for key, value in os.environ.items()
+            if key in ("OPENCODE_PERMISSION", "OPENCODE_CONFIG_CONTENT") or key.startswith("VIBEPOST_API_KEY_")},
+    "draft": read_file("draft.md"),
+    "title": read_file("title.txt"),
+    "caption": read_file("caption.txt"),
+    "stdin": [],
+    "responses": {},
+    "mcpServers": None,
+    "mcp": [],
+    "signals": [],
+    "stdinClosed": False,
+}
+lock = threading.Lock()
+answered = threading.Condition(lock)
+state = {"session": None, "prompt": None, "done": False, "settings": {"model": "fake/large", "effort": "low"}}
+SCRIPT = []
+
+MODELS = [("fake/large", "Fake Large"), ("fake/mini", "Fake Mini"), ("fake/~odd name", "名字不合规的")]
+try:
+    for provider, block in json.loads(os.environ.get("OPENCODE_CONFIG_CONTENT") or "{}").get("provider", {}).items():
+        MODELS += [(f"{provider}/{model}", f"{block.get('name', provider)}/{model}") for model in block.get("models", {})]
+except (ValueError, AttributeError):
+    pass
+EFFORTS = ["off", "low", "high"]
+
+
+def config_options():
+    settings = state["settings"]
+    return [
+        {"id": "mode", "name": "Mode", "category": "mode", "type": "select", "currentValue": "build",
+         "options": [{"value": "build", "name": "Build"}, {"value": "plan", "name": "Plan"}]},
+        {"id": "model", "name": "Model", "category": "model", "type": "select", "currentValue": settings["model"],
+         "options": [{"value": value, "name": name} for value, name in MODELS]},
+        {"id": "effort", "name": "Effort", "category": "thought_level", "type": "select", "currentValue": settings["effort"],
+         "options": [{"value": value, "name": value} for value in EFFORTS]},
+    ]
+
+
+def session_file(session):
+    return os.path.join(sessions, f"{session}.json")
+
+
+def store_session():
+    with open(session_file(state["session"]), "w", encoding="utf-8") as handle:
+        json.dump(state["settings"], handle)
+
+
+def begin():
+    global index, SCRIPT
+    if index is not None:
+        return
+    candidate = 1
+    while True:
+        try:
+            descriptor = os.open(os.path.join(calls, f"{candidate}.json"), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.close(descriptor)
+            break
+        except FileExistsError:
+            candidate += 1
+    index = candidate
+    script_path = os.path.join(HERE, f"script-{index}.jsonl")
+    if not os.path.exists(script_path):
+        script_path = os.path.join(HERE, "script.jsonl")
+    with open(script_path, encoding="utf-8") as handle:
+        SCRIPT = [line.rstrip("\n") for line in handle if line.strip()]
+
+
+def save():
+    if index is None:
+        return
+    with open(os.path.join(calls, f"{index}.json"), "w", encoding="utf-8") as handle:
+        json.dump(record, handle, ensure_ascii=False)
+
+
+def send(obj):
+    with lock:
+        sys.stdout.write(json.dumps({"jsonrpc": "2.0", **obj}, ensure_ascii=False) + "\n")
+        sys.stdout.flush()
+
+
+def on_signal(number, _frame):
+    with lock:
+        record["signals"].append(number)
+        save()
+    sys.exit(128 + number)
+
+
+signal.signal(signal.SIGINT, on_signal)
+signal.signal(signal.SIGTERM, on_signal)
+
+
+mcp_process = None
+
+
+def mcp_send(message):
+    """经挂上的 MCP 服务发一条消息；有 id 的等它的回答"""
+    global mcp_process
+    servers = record["mcpServers"] or []
+    if not servers:
+        reply = {"error": "没有挂 MCP 服务"}
+    else:
+        if mcp_process is None:
+            server = servers[0]
+            env = {**os.environ, **{item["name"]: item["value"] for item in server.get("env", [])}}
+            mcp_process = subprocess.Popen([server["command"], *server.get("args", [])], stdin=subprocess.PIPE,
+                                           stdout=subprocess.PIPE, env=env, text=True, bufsize=1)
+        mcp_process.stdin.write(json.dumps(message, ensure_ascii=False) + "\n")
+        mcp_process.stdin.flush()
+        if "id" not in message:
+            return
+        line = mcp_process.stdout.readline()
+        reply = json.loads(line) if line.strip() else {"error": "连接断了"}
+    with lock:
+        record["mcp"].append(reply)
+        save()
+
+
+def fill(text):
+    return text.replace("{{SESSION}}", state["session"] or "").replace("{{CWD}}", os.getcwd())
+
+
+def respond(request_id, result=None, error=None):
+    send({"id": request_id, **({"error": error} if error else {"result": result})})
+
+
+def finish(result=None, error=None):
+    if state["done"]:
+        return
+    state["done"] = True
+    respond(state["prompt"], result, error)
+
+
+def replay():
+    for line in SCRIPT:
+        if state["done"]:
+            return
+        if line.startswith("#"):
+            action, _, rest = line[1:].partition(" ")
+            if action == "sleep":
+                time.sleep(float(rest))
+            elif action == "write":
+                name, content = json.loads(rest)
+                with open(name, "w", encoding="utf-8") as handle:
+                    handle.write(content)
+            elif action == "request":
+                request = json.loads(fill(rest))
+                send(request)
+                with answered:
+                    while str(request["id"]) not in record["responses"] and not record["stdinClosed"]:
+                        answered.wait(0.1)
+            elif action == "mcp":
+                mcp_send(json.loads(fill(rest)))
+            elif action == "hang":
+                while not record["stdinClosed"] and not state["done"]:
+                    time.sleep(0.1)
+                return
+            elif action == "stderr":
+                print(json.loads(rest), file=sys.stderr, flush=True)
+            elif action == "stderr-env":
+                print(f"request failed: {os.environ.get(json.loads(rest), '')}", file=sys.stderr, flush=True)
+            elif action == "error":
+                finish(error=json.loads(rest))
+                return
+            elif action == "stop":
+                finish({"stopReason": json.loads(rest)})
+                return
+            elif action == "exit":
+                with lock:
+                    save()
+                os._exit(int(rest))
+            continue
+        send(json.loads(fill(line)))
+    finish({"stopReason": "end_turn", "usage": {"inputTokens": 1, "outputTokens": 1, "totalTokens": 2}})
+
+
+for raw in sys.stdin:
+    line = raw.rstrip("\n")
+    if not line:
+        continue
+    with lock:
+        record["stdin"].append(line)
+        save()
+    try:
+        message = json.loads(line)
+    except json.JSONDecodeError:
+        continue
+    method = message.get("method")
+    params = message.get("params") or {}
+    if method is None and "id" in message:
+        # 页面对它的请求的回答
+        with answered:
+            record["responses"][str(message["id"])] = message.get("result", {"error": message.get("error")})
+            save()
+            answered.notify_all()
+        continue
+    if method == "initialize":
+        session_caps = {"close": {}, "list": {}}
+        if not os.path.exists(os.path.join(HERE, "no-resume")):
+            session_caps["resume"] = {}
+        respond(message["id"], {
+            "protocolVersion": 1,
+            "agentCapabilities": {"loadSession": True, "mcpCapabilities": {"http": True, "sse": True},
+                                  "promptCapabilities": {"image": True}, "sessionCapabilities": session_caps},
+            "authMethods": [{"id": "login", "name": "Login", "description": f"在终端里运行 {NAME} auth login"}],
+            "agentInfo": {"name": f"Fake {NAME}", "version": "9.9.9"},
+        })
+    elif method == "session/new":
+        if os.path.exists(os.path.join(HERE, "logged-out")):
+            respond(message["id"], error={"code": -32000, "message": "Authentication required"})
+            continue
+        state["session"] = str(uuid.uuid4())
+        record["mcpServers"] = params.get("mcpServers")
+        store_session()
+        respond(message["id"], {"sessionId": state["session"], "configOptions": config_options()})
+    elif method in ("session/resume", "session/load"):
+        begin()
+        with lock:
+            save()
+        session = str(params.get("sessionId"))
+        resume_error = read_file(os.path.join(HERE, "resume-error"))
+        if resume_error:
+            respond(message["id"], error={"code": -32603, "message": resume_error})
+            continue
+        saved = read_file(session_file(session))
+        if saved is None:
+            respond(message["id"], error={"code": -32603, "message": "Internal error: service failure"})
+            continue
+        state["session"] = session
+        record["mcpServers"] = params.get("mcpServers")
+        state["settings"] = json.loads(saved)
+        if method == "session/load":
+            send({"method": "session/update", "params": {"sessionId": session, "update": {
+                "sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "（重放的历史）"}}}})
+        respond(message["id"], {"configOptions": config_options()})
+    elif method == "session/set_config_option":
+        key = {"model": "model", "effort": "effort"}.get(params.get("configId"))
+        allowed = [value for value, _ in MODELS] if key == "model" else EFFORTS
+        if key is None or params.get("value") not in allowed:
+            respond(message["id"], error={"code": -32602, "message": f"Invalid value: {params.get('value')}"})
+            continue
+        state["settings"][key] = params["value"]
+        store_session()
+        respond(message["id"], {"configOptions": config_options()})
+    elif method == "session/prompt":
+        begin()
+        with lock:
+            save()
+        state["prompt"] = message["id"]
+        threading.Thread(target=replay, daemon=True).start()
+    elif method == "session/cancel":
+        finish({"stopReason": "cancelled"})
+    elif "id" in message:
+        respond(message["id"], error={"code": -32601, "message": f"fake {NAME} 不支持 {method}"})
+
+with lock:
+    record["stdinClosed"] = True
+    save()

@@ -6,13 +6,41 @@ const args = process.argv.slice(2);
 if (args[0] === '--version') { console.log('fixture-cli 1.2.3'); process.exit(0); }
 if (args[0] === 'login') process.exit(process.env.AI_FIXTURE_LOGIN_FAIL ? 1 : 0);
 const record = value => { if (process.env.AI_FIXTURE_LOG) fs.appendFileSync(process.env.AI_FIXTURE_LOG, JSON.stringify(value) + '\n'); };
-record({ kind: 'launch', args, cwd: process.cwd(), temp: process.env.TEMP, backgroundDisabled: process.env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS });
+record({ kind: 'launch', args, cwd: process.cwd(), temp: process.env.TEMP, backgroundDisabled: process.env.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS, permission: process.env.OPENCODE_PERMISSION, config: process.env.OPENCODE_CONFIG_CONTENT, keys: Object.fromEntries(Object.entries(process.env).filter(([name]) => name.startsWith('VIBEPOST_API_KEY_'))) });
+// 像出错信息里带出了密钥（在 App 里填的接口）
+if (process.env.AI_FIXTURE_ECHO_KEYS) process.stderr.write('request failed: ' + (process.env.VIBEPOST_API_KEY_1 || '') + '\n');
 const write = value => process.stdout.write(JSON.stringify(value) + '\n');
-let initialized = false;
+let initialized = false, acpPrompt = null, acpTools = null;
+// 像真的 Agent 一样把挂上的 MCP 服务（App 的工具）当 stdio 程序启动，问它有哪些工具，记下回答
+function askTools(server) {
+  const child = require('node:child_process').spawn(server.command, server.args, { env: { ...process.env, ...Object.fromEntries(server.env.map(item => [item.name, item.value])) }, stdio: ['pipe', 'pipe', 'ignore'] });
+  readline.createInterface({ input: child.stdout }).on('line', text => { record({ kind: 'mcp-reply', reply: JSON.parse(text) }); child.stdin.end(); });
+  child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 5, method: 'tools/list' }) + '\n');
+}
 const input = readline.createInterface({ input: process.stdin });
 input.on('line', text => {
   const message = JSON.parse(text); record(message);
-  if (args[0] === 'app-server') {
+  if (args[0] === 'acp') {
+    // ACP（OpenCode、Oh My Pi、Kimi Code）：握手 → 开会话 → 这一轮（问一次权限，答了才改稿、说完）
+    const reply = (id, result) => write({ jsonrpc: '2.0', id, result });
+    const update = value => write({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'fixture-session', update: value } });
+    const options = [{ id: 'model', category: 'model', type: 'select', currentValue: 'fixture/large', options: [{ value: 'fixture/large', name: 'Fixture Large' }] }];
+    if (message.method === 'initialize') reply(message.id, { protocolVersion: 1, agentCapabilities: { loadSession: true, sessionCapabilities: { resume: {} } } });
+    else if (message.method === 'session/new') { acpTools = message.params.mcpServers?.[0] || null; reply(message.id, { sessionId: 'fixture-session', configOptions: options }); }
+    else if (message.method === 'session/resume') reply(message.id, { configOptions: options });
+    else if (message.method === 'session/set_config_option') reply(message.id, { configOptions: options });
+    else if (message.method === 'session/prompt') {
+      acpPrompt = message.id;
+      if (acpTools) askTools(acpTools);
+      update({ sessionUpdate: 'available_commands_update', availableCommands: [{ name: 'hidden', description: 'do not expose' }] });
+      update({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '完成 🐈' } });
+      update({ sessionUpdate: 'tool_call_update', toolCallId: 'call-1', kind: 'edit', status: 'completed', rawInput: { filePath: 'draft.md', newString: 'secret body' }, content: [{ type: 'diff', newText: 'x'.repeat(5000) }] });
+      write({ jsonrpc: '2.0', id: 77, method: 'session/request_permission', params: { sessionId: 'fixture-session', toolCall: { toolCallId: 'call-2', kind: 'execute', rawInput: { command: 'fixture' } }, options: [{ optionId: 'once', kind: 'allow_once' }, { optionId: 'reject', kind: 'reject_once' }] } });
+    } else if (message.id === 77 && message.method == null) {
+      fs.writeFileSync(path.join(process.cwd(), 'draft.md'), 'ACP 改稿');
+      reply(acpPrompt, { stopReason: 'end_turn' });
+    }
+  } else if (args[0] === 'app-server') {
     if (message.method === 'initialize') write({ id: 'initialize', result: { userAgent: 'fixture' } });
     else if (message.method === 'initialized') initialized = true;
     else if (!initialized) write({ id: message.id, error: { message: 'initialized missing' } });

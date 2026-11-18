@@ -392,7 +392,7 @@ struct InspectorPolishTests {
         #expect(harness.pageErrors == [])
     }
 
-    @Test("AI 助手的会话栏：后端、模型、推理强度三个药丸按选中那一项的字宽，默认宽度的检查器里排成一行；检查器最窄时「Claude Code」也写得全；AI 设置和面板一样宽，两个「保存」只有填了新路径才是主按钮")
+    @Test("AI 助手的会话栏：后端、模型、推理强度三个药丸按选中那一项的字宽，默认宽度的检查器里排成一行；检查器最窄时「Claude Code」也写得全；AI 设置和面板一样宽，每组的「保存」只有填了新路径才是主按钮")
     func aiSessionBarFitsOneRow() async throws {
         let fake = try FakeClaude(script: StreamJSON.reply(["好"]))
         defer { fake.remove() }
@@ -415,7 +415,7 @@ struct InspectorPolishTests {
             const popover = document.querySelector(".ai-settings-popover");
             const head = document.querySelector(".ai-session-head");
             const widths = [popover.offsetWidth, head.offsetWidth];
-            // 两个「保存」平时都不是主按钮；路径框里填了新的，那一组的才是
+            // 每组的「保存」平时都不是主按钮；路径框里填了新的，那一组的才是
             const saves = () => [...popover.querySelectorAll("[data-path-save]")].map((button) => button.classList.contains("primary-button"));
             const idle = saves();
             const path = ui.find("claude 的路径");
@@ -441,8 +441,10 @@ struct InspectorPolishTests {
         #expect(wide?["clipped"] as? [String] == [] && wide?["outside"] as? Int == 0, "字都写得全：\(wide ?? [:])")
         let widths = wide?["widths"] as? [Int] ?? []
         #expect(widths.count == 2 && widths[0] == widths[1] + 16, "AI 设置比会话栏两边各宽出 8：\(widths)")
-        #expect(wide?["idle"] as? [Bool] == [false, false] && wide?["cleared"] as? [Bool] == [false, false], "「保存」平时是普通按钮：\(wide?["idle"] ?? "")")
-        #expect(wide?["typed"] as? [Bool] == [false, true], "填了新路径的那一组才是主按钮：\(wide?["typed"] ?? "")")
+        // 每个后端一组（Codex、Claude Code，和收在「接别家的模型」里的 OpenCode、Oh My Pi、Kimi Code）
+        let idle = [false, false, false, false, false]
+        #expect(wide?["idle"] as? [Bool] == idle && wide?["cleared"] as? [Bool] == idle, "「保存」平时是普通按钮：\(wide?["idle"] ?? "")")
+        #expect(wide?["typed"] as? [Bool] == [false, true, false, false, false], "填了新路径的那一组才是主按钮：\(wide?["typed"] ?? "")")
         #expect(narrow?["inspector"] as? Int == 280)
         #expect(narrow?["clipped"] as? [String] == [] && narrow?["outside"] as? Int == 0, "最窄时折行、不截断：\(narrow ?? [:])")
         #expect(harness.pageErrors == [])

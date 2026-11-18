@@ -14,7 +14,10 @@ final class AISessions: @unchecked Sendable {
     /// 页面重新载入、App 退出时先 SIGTERM，过这么久还没退出的 SIGKILL
     private static let terminateGrace: DispatchTimeInterval = .milliseconds(1500)
     /// 认得的后端（页面请求里的 backend）
-    private static let backends: [String: any AIBackend] = ["claude": ClaudeBackend(), "codex": CodexBackend()]
+    private static let backends: [String: any AIBackend] = [
+        "claude": ClaudeBackend(), "codex": CodexBackend(),
+        "opencode": ACPBackend.opencode, "omp": ACPBackend.omp, "kimi": ACPBackend.kimi,
+    ]
 
     /// 往已经退出的后端进程的 stdin 写字时，默认的 SIGPIPE 会让整个进程（App、跑测试的进程）退出；
     /// 壳一建好 AI 会话就忽略它（整个进程只设这一次），写入只得到 EPIPE 错误，由这里报给页面。
@@ -25,10 +28,12 @@ final class AISessions: @unchecked Sendable {
     private let configuration: AIConfiguration
     /// 终端里的环境变量（登录 shell 读出来的），查找程序与读生图密钥共用
     private let terminal: TerminalEnvironment
-    /// 每个后端的程序在哪（claude、codex）
+    /// 每个后端的程序在哪（claude、codex、opencode、omp、kimi）
     private let locators: [String: AgentLocator]
     private let candidates: AICandidates
     private let images: AIImages
+    /// 在 App 里填的接口（经 OpenCode 使用，见 AIProviders.swift）
+    private let providers: AIProviders
     private let approvals = CandidateApprovals()
     private let lock = NSLock()
     private var turns: [String: Turn] = [:]
@@ -53,12 +58,12 @@ final class AISessions: @unchecked Sendable {
         let terminal = TerminalEnvironment(configuration: configuration)
         self.terminal = terminal
         let settings = AgentSettings(root: configuration.root)
-        locators = [
-            "claude": AgentLocator(program: .claude, settings: settings, terminal: terminal),
-            "codex": AgentLocator(program: .codex, settings: settings, terminal: terminal),
-        ]
+        locators = Dictionary(uniqueKeysWithValues: [
+            ("claude", AgentProgram.claude), ("codex", .codex), ("opencode", .opencode), ("omp", .omp), ("kimi", .kimi),
+        ].map { ($0, AgentLocator(program: $1, settings: settings, terminal: terminal)) })
         candidates = AICandidates(root: configuration.root)
         images = AIImages(api: configuration.imageAPI)
+        providers = AIProviders(root: configuration.root)
     }
 
     func setSink(_ sink: Sink?) {
@@ -81,6 +86,14 @@ final class AISessions: @unchecked Sendable {
             return await saveSettings(request)
         case "models":
             return await models(request)
+        case "providers":
+            return .ok(["providers": await providers.list()])
+        case "providers-save":
+            do {
+                return .ok(["providers": try await providers.save(request["providers"] as? [[String: Any]] ?? [])])
+            } catch {
+                return .failure(400, error.localizedDescription)
+            }
         case "send":
             return await start(request, window: window, epoch: epoch ?? self.epoch(window: window))
         case "cancel":
@@ -120,16 +133,35 @@ final class AISessions: @unchecked Sendable {
         }
     }
 
-    /// 后端能用的模型（现在只有 Codex 有列表）：`{ models: [{ id, name, isDefault }] }`
+    /// 后端能用的模型。Codex：`{ models: [{ id, name, isDefault, … }] }`；说 ACP 的后端：`{ models: [], configOptions }`
+    /// （它开会话时报的设置原样给页面，页面挑出模型与推理强度）；Claude Code 没有列表
     private func models(_ request: [String: Any]) async -> NativeBridge.Reply {
-        guard (request["backend"] as? String) == "codex", let locator = locators["codex"] else { return .ok(["models": []]) }
+        let id = request["backend"] as? String ?? ""
+        guard id != "claude", let backend = Self.backends[id], let locator = locators[id] else { return .ok(["models": []]) }
         let status = await locator.status(refresh: false)
-        guard status.available, let path = status.path else { return .failure(400, status.error ?? "找不到本机 Codex") }
+        guard status.available, let path = status.path else { return .failure(400, status.error ?? "找不到本机的 \(locator.program.name)") }
+        let executable = URL(fileURLWithPath: path)
         do {
-            return .ok(["models": try await CodexBackend.models(executable: URL(fileURLWithPath: path), environment: status.environment)])
+            if let agent = backend as? ACPBackend {
+                // 问模型要开一个会话：开在一个只放这个用的空目录里，不碰稿子的工作副本
+                let directory = configuration.root.appendingPathComponent(".acp-models", isDirectory: true)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                let extra = await providerEnvironment(agent, base: status.environment)
+                let options = try await agent.sessionOptions(
+                    executable: executable, environment: status.environment.merging(extra.environment) { $1 }, directory: directory
+                )
+                return .ok(["models": [Any](), "configOptions": options])
+            }
+            return .ok(["models": try await CodexBackend.models(executable: executable, environment: status.environment)])
         } catch {
-            return .failure(500, "没能读出 Codex 的模型：\(error.localizedDescription)")
+            return .failure(500, "没能读出 \(locator.program.name) 的模型：\(error.localizedDescription)")
         }
+    }
+
+    /// 在 App 里填的接口只给 OpenCode：另加的环境变量（内联配置、各家的密钥）与要打码的密钥
+    private func providerEnvironment(_ backend: any AIBackend, base: [String: String]) async -> (environment: [String: String], secrets: [String]) {
+        guard backend.id == "opencode" else { return ([:], []) }
+        return await providers.launch(existing: base[AIProviders.configVariable])
     }
 
     private func start(_ request: [String: Any], window: String, epoch: Int) async -> NativeBridge.Reply {
@@ -146,6 +178,13 @@ final class AISessions: @unchecked Sendable {
     private func respond(_ request: [String: Any], window: String) async -> NativeBridge.Reply {
         guard let message = request["message"] as? [String: Any] else { return .failure(400, "AI 回应的字段不对") }
         guard let turn = runningTurn(request, window: window) else { return .ok(["delivered": false]) }
+        // 页面里的工具对 Agent 的一条 MCP 消息的回答：写回它来的那条连接（见 AIToolServer）
+        if let mcp = message["mcp"] as? [String: Any] {
+            guard let tools = turn.tools, let connection = mcp["connection"] as? Int, let reply = mcp["message"] as? [String: Any] else {
+                return .failure(400, "AI 回应的字段不对")
+            }
+            return .ok(["delivered": tools.send(reply, to: connection)])
+        }
         guard let outgoing = turn.backend.outgoing(message, directory: turn.directory, context: turn.context),
               let line = try? JSONSerialization.data(withJSONObject: outgoing)
         else { return .failure(400, "AI 回应的字段不对") }
@@ -450,7 +489,16 @@ final class AISessions: @unchecked Sendable {
         private var cancelledFlag = false
         private var stderrTail = Data()
 
-        init(request: TurnRequest, window: String, backend: any AIBackend, process: Process, input: FileHandle, directory: URL) {
+        /// 这一轮给了进程的密钥（在 App 里填的接口）：出错信息给页面之前打码
+        let secrets: [String]
+        /// 这一轮挂给 Agent 的 MCP 服务（App 的工具）；只有说 ACP 的后端有。起进程之前设好，之后只读
+        var tools: AIToolServer?
+
+        init(
+            request: TurnRequest, window: String, backend: any AIBackend, process: Process, input: FileHandle, directory: URL,
+            secrets: [String] = []
+        ) {
+            self.secrets = secrets
             self.request = request
             self.window = window
             self.backend = backend
@@ -537,7 +585,8 @@ final class AISessions: @unchecked Sendable {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
         process.arguments = backend.arguments(for: request)
-        process.environment = status.environment.merging(backend.environment) { $1 }
+        let extra = await providerEnvironment(backend, base: status.environment)
+        process.environment = status.environment.merging(backend.environment) { $1 }.merging(extra.environment) { $1 }
         process.currentDirectoryURL = directory
         let input = Pipe()
         let output = Pipe()
@@ -545,9 +594,31 @@ final class AISessions: @unchecked Sendable {
         process.standardInput = input
         process.standardOutput = output
         process.standardError = errors
-        let turn = Turn(request: request, window: window, backend: backend, process: process, input: input.fileHandleForWriting, directory: directory)
+        let turn = Turn(
+            request: request, window: window, backend: backend, process: process, input: input.fileHandleForWriting, directory: directory,
+            secrets: extra.secrets
+        )
+        if backend.mountsTools {
+            // App 的工具：这一轮开一个套接字，Agent 发来的 MCP 消息原样推给页面（和它的输出行走同一条路）。
+            // 开不了时不挂，它照样能改文件
+            turn.tools = try? AIToolServer { [weak self] connection, message in
+                let line: [String: Any] = ["jsonrpc": "2.0", "method": AIToolServer.method, "params": ["connection": connection, "message": message]]
+                guard let data = try? JSONSerialization.data(withJSONObject: line) else { return }
+                self?.emit(
+                    ["type": "lines", "turnId": request.turnId, "draftId": request.draftId, "lines": [String(decoding: data, as: UTF8.self)]],
+                    to: window
+                )
+            }
+            turn.context[ACPBackend.toolSocket] = turn.tools?.path
+        }
 
-        let readers = try launch(turn, epoch: epoch)
+        let readers: DispatchGroup
+        do {
+            readers = try launch(turn, epoch: epoch)
+        } catch {
+            turn.tools?.close()
+            throw error
+        }
         for line in backend.openingLines(for: request) {
             turn.enqueue(try JSONSerialization.data(withJSONObject: line) + Data("\n".utf8))
         }
@@ -672,6 +743,10 @@ final class AISessions: @unchecked Sendable {
                     lines.append(String(decoding: data, as: UTF8.self))
                     continue
                 }
+                if let slim = turn.backend.slim(object), let data = try? JSONSerialization.data(withJSONObject: slim) {
+                    lines.append(String(decoding: data, as: UTF8.self))
+                    continue
+                }
                 lines.append(String(decoding: line, as: UTF8.self))
             }
             if !lines.isEmpty {
@@ -713,6 +788,7 @@ final class AISessions: @unchecked Sendable {
     /// 进程退出、输出读完：把工作副本读回来一起交给页面（页面决定怎样套用到稿子上）。
     private func finish(_ turn: Turn) {
         turn.closeInput()
+        turn.tools?.close()
         images.cancel(draftId: turn.request.draftId)
         turn.process.terminationHandler = nil
         approvals.endTurn(turn.request.turnId)
@@ -728,7 +804,7 @@ final class AISessions: @unchecked Sendable {
             "status": signaled ? NSNull() : process.terminationStatus,
             "signal": signaled ? process.terminationStatus : NSNull(),
             "cancelled": turn.cancelled,
-            "stderr": turn.stderr,
+            "stderr": AIProviders.redact(turn.stderr, secrets: turn.secrets),
             "markdown": read("draft.md"),
             "title": read("title.txt"),
             "caption": read("caption.txt"),

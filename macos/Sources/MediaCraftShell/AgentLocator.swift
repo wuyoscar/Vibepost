@@ -1,6 +1,6 @@
 import Foundation
 
-/// AI 会话（本机的 Claude Code、Codex）放在哪、怎样找到它们。
+/// AI 会话（本机的 Claude Code、Codex 与说 ACP 的几个 Agent）放在哪、怎样找到它们。
 public struct AIConfiguration: Sendable {
     /// 每篇稿子的工作副本（`<稿子 id>/draft.md`、`title.txt`）与设置（`settings.json`）
     public var root: URL
@@ -72,6 +72,10 @@ struct AgentProgram: Sendable {
         let result = try? await Subprocess.run(URL(fileURLWithPath: path), ["login", "status"], environment: environment, timeout: .seconds(10))
         return result?.status == 0 ? nil : "Codex 还没有登录：在终端里运行一次 codex login"
     }
+    /// 说 ACP 的几个（ACPBackend.swift）：登录没登录、配没配模型各家不一样，到开会话时它自己会说
+    static let opencode = AgentProgram(name: "opencode", settingsKey: "opencodePath", check: nil)
+    static let omp = AgentProgram(name: "omp", settingsKey: "ompPath", check: nil)
+    static let kimi = AgentProgram(name: "kimi", settingsKey: "kimiPath", check: nil)
 }
 
 /// 找到的程序：可执行文件、版本，以及启动它要用的环境变量（终端里的那一套）。

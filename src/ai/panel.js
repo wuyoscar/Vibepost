@@ -71,7 +71,7 @@
   const modelError = $("#aiModelError");
   const effortSelect = $("#aiEffortSelect");
   // 推理强度的中文叫法（Codex、Claude Code 用的英文词放在括号里）
-  const EFFORT_NAMES = { none: "不推理", minimal: "最低", low: "低", medium: "中", high: "高", xhigh: "很高", max: "最高", ultra: "极限" };
+  const EFFORT_NAMES = { none: "不推理", off: "不推理", auto: "自动", minimal: "最低", low: "低", medium: "中", high: "高", xhigh: "很高", max: "最高", ultra: "极限" };
   const effortName = (effort) => EFFORT_NAMES[effort] ?? effort;
   const newSessionButton = $("#aiNewSessionBtn");
   const moreMenu = $("#aiMore");
@@ -503,7 +503,8 @@
     const forBackend = backend;
     let list = [];
     try {
-      list = forBackend.id === "codex" && !statuses.codex?.available ? [] : await ai.api.models(forBackend.id);
+      // 要问后端自己的（Codex、说 ACP 的那几个）：还没找到它时先不问，找到了再来（见下面的 status 事件）
+      list = forBackend.id !== "claude" && !statuses[forBackend.id]?.available ? [] : await ai.api.models(forBackend.id);
     } catch {
       list = []; // 读不出来就只留「默认」与「自定义」
     }
@@ -545,11 +546,15 @@
     const info = usable ? await ai.api.effort(draft.id).catch(() => null) : null;
     if (mine !== effortTicket) return;
     const efforts = info?.efforts ?? ["medium"];
-    effortSelect.replaceChildren(...efforts.map((effort) => new Option(`推理：${effortName(effort)}`, effort)));
-    effortSelect.value = info?.effort ?? "medium";
+    // 说 ACP 的后端没报能选的档位（或这个模型没有）：跟随它自己的设置，选单停用
+    const own = usable && info && !efforts.length;
+    effortSelect.replaceChildren(...(own ? [new Option("推理：默认", "")] : efforts.map((effort) => new Option(`推理：${effortName(effort)}`, effort))));
+    effortSelect.value = own ? "" : info?.effort ?? "medium";
     fitPicker(effortSelect);
-    effortSelect.disabled = !usable;
-    effortSelect.title = `推理强度：${effortName(effortSelect.value)}（${effortSelect.value}）。想得越深越慢，下一轮起生效`;
+    effortSelect.disabled = !usable || own;
+    effortSelect.title = own
+      ? `推理强度跟随 ${backend.label} 自己的设置`
+      : `推理强度：${effortName(effortSelect.value)}（${effortSelect.value}）。想得越深越慢，下一轮起生效`;
   }
 
   effortSelect.addEventListener("change", () => run(async () => {
@@ -873,6 +878,29 @@
       },
     },
   };
+  // 没有专门写指引的后端（说 ACP 的那几个，src/ai/backends/acp.js）：照它登记的命令拼一份
+  function genericGuide({ label, program, install, login }) {
+    const which = ["回到这里点「重新查找」。装在别处的话，在终端运行 ", { code: `which ${program}` }, "，把显示的路径填进「指定路径」。"];
+    return {
+      missing: {
+        title: `没有找到本机 ${label}`,
+        lead: `AI 助手用你电脑上的 ${label} 改稿，沿用它在终端里的登录与模型设置，不用另填密钥。`,
+        steps: [
+          install ? ["在「终端」里安装：", { code: install }] : [`照 ${label} 官网的办法安装。`],
+          login ? ["在终端里登录、配好模型：", { code: login }] : ["在终端里运行一次 ", { code: program }, "，配好要用的模型。"],
+          which,
+        ],
+      },
+      broken: {
+        title: `本机的 ${label} 运行不起来`,
+        lead: `找到了 ${program}，但它启动时出错了，原因在下面。`,
+        steps: [
+          ["在「终端」里运行 ", { code: `${program} --version` }, "，看看能不能启动。"],
+          install ? ["不行就重新安装：", { code: install }, "，再回来点「重新查找」。"] : ["不行就重新安装，再回来点「重新查找」。"],
+        ],
+      },
+    };
+  }
   // 为了「改用另一个后端」去找过的
   const probed = new Set();
 
@@ -880,7 +908,7 @@
   function syncGuide(locked) {
     guide.hidden = status?.available !== false;
     if (guide.hidden) return;
-    const texts = GUIDES[backend.id] ?? GUIDES.claude;
+    const texts = GUIDES[backend.id] ?? genericGuide(backend);
     const text = texts[status.reason] ?? texts.missing;
     guideTitle.textContent = text.title;
     guideLead.textContent = text.lead;
@@ -891,12 +919,15 @@
     }));
     guideReason.textContent = status.error ?? "";
     // 这篇还没有对话、另一个后端能用：一键改用它（没找过就去找一次）
-    const other = backend.id === "codex" ? "claude" : "codex";
+    // 另一个：Codex 不行时是 Claude Code，别的都先看 Codex，Codex 也不行再看 Claude Code
+    const others = backend.id === "codex" ? ["claude"] : ["codex", "claude"].filter((id) => id !== backend.id);
     const switchable = !locked && !draft.readOnly;
-    if (switchable && statuses[other] === undefined && !probed.has(other)) {
-      probed.add(other);
-      void ai.api.status({ backend: other }).catch(() => undefined);
+    for (const id of others) {
+      if (!switchable || statuses[id] !== undefined || probed.has(id)) continue;
+      probed.add(id);
+      void ai.api.status({ backend: id }).catch(() => undefined);
     }
+    const other = others.find((id) => statuses[id]?.available === true) ?? others[0];
     guideSwitch.hidden = !switchable || statuses[other]?.available !== true;
     guideSwitch.textContent = `改用 ${ai.backends[other].label}`;
     guideSwitch.dataset.backend = other;
@@ -979,8 +1010,12 @@
     root.MediaCraftNative?.windows?.checkForUpdates().catch((error) => showModelError(error.message || String(error)));
   });
 
+  // 接别家模型的几个后端平时收着；这篇正用着其中一个时展开
+  const moreBackends = $("#aiMoreBackends");
+
   function syncSettings() {
     void syncAbout();
+    if (backend.protocol === "acp") moreBackends.open = true;
     for (const [id, { found, input: pathInput, error }] of Object.entries(pathGroups)) {
       const current = statuses[id];
       const label = ai.backends[id].label;
@@ -1023,7 +1058,7 @@
     void syncImageSettings();
   });
 
-  // ===== 生图的设置（用 Claude Code 时的 generate_image，走 OpenAI）：模型（空为默认），存在本机 =====
+  // ===== 生图的设置（App 的工具 generate_image，走 OpenAI；Codex 用它自带的）：模型（空为默认），存在本机 =====
 
   async function syncImageSettings(error = null) {
     const current = await ai.api.imageSettings();
@@ -1032,7 +1067,7 @@
     if (!error) imageModelInput.value = current.model === current.defaultModel ? "" : current.model;
     imageError.hidden = !error;
     imageError.textContent = error ?? "";
-    imageNote.textContent = `用 Claude Code 时，生图调 OpenAI 的接口，密钥用终端环境（或 ~/.env）里的 ${current.key}，不用在这里填；按张计费，记在你自己的账户上。用 Codex 时它用自带的生图，不用这里的设置。`;
+    imageNote.textContent = `生图调 OpenAI 的接口，密钥用终端环境（或 ~/.env）里的 ${current.key}，不用在这里填；按张计费，记在你自己的账户上。用 Codex 时它用自带的生图，不用这里的设置。`;
   }
 
   async function saveImageSettings() {
@@ -1090,9 +1125,12 @@
       statuses[event.backend] = event.status;
       // 没选过后端的新稿子：找到 Codex 之后默认就是它
       syncBackend();
-      if (event.backend === "codex" && backend.id === "codex") void loadModels();
+      if (event.backend === backend.id && backend.id !== "claude") void loadModels();
       syncControls();
       if (settings.open) syncSettings();
+    } else if (event.type === "providers") {
+      // 在 App 里填的接口变了：它们的模型在 OpenCode 报的选单里
+      if (backend.id === "opencode") void loadModels();
     } else if (event.draftId === draft.id) {
       if (event.type === "text") updateText(event);
       else if (event.type === "model") {
